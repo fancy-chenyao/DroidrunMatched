@@ -1,0 +1,162 @@
+{
+  "id": "580adab2-22ab-4adb-a05d-2df89129e0f3",
+  "goal": "打开EmpLab应用，进入请休假系统，提交2025年10月28日到2025年11月29日的年休假申请。请假事由：计划休息，拟前往地区：北京。请尝试完成整个流程，包括登录（如果需要的话）和提交申请。",
+  "success": true,
+  "timestamp": 1760661929.9467938,
+  "page_sequence": [],
+  "action_sequence": [
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 18
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 18: '请休假' (ImageView) at coordinates (341, 791)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 6
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 6: 'LinearLayout' (LinearLayout) at coordinates (613, 503)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 7
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 7: 'layoutStartDate' (LinearLayout) at coordinates (650, 535)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 60
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 60: '25' (TextView) at coordinates (931, 1637)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 76
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 76: 'OK' (TextView) at coordinates (936, 1982)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 14
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 14: 'layoutEndDate' (LinearLayout) at coordinates (540, 724)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 61
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 61: '26' (TextView) at coordinates (149, 1734)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 76
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 76: 'OK' (TextView) at coordinates (936, 1982)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 23
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 23: '拟请假2天, 确认' (Button) at coordinates (540, 2232)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 7
+      },
+      "success": true,
+      "timestamp": 1760661929.9457946,
+      "description": "Tap element at index 7: '请输入, 100字以内' (EditText) at coordinates (540, 566)"
+    },
+    {
+      "action": "input_text",
+      "params": {
+        "text": "计划休息和恢复精力"
+      },
+      "success": true,
+      "timestamp": 1760661929.9467938,
+      "description": "Input text: '计划休息和恢复精力'"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 11
+      },
+      "success": true,
+      "timestamp": 1760661929.9467938,
+      "description": "Tap element at index 11: '请输入, 100字以内' (EditText) at coordinates (540, 1086)"
+    },
+    {
+      "action": "input_text",
+      "params": {
+        "text": "上海"
+      },
+      "success": true,
+      "timestamp": 1760661929.9467938,
+      "description": "Input text: '上海'"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 18
+      },
+      "success": true,
+      "timestamp": 1760661929.9467938,
+      "description": "Tap element at index 18: '提交' (Button) at coordinates (799, 2232)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 23
+      },
+      "success": true,
+      "timestamp": 1760661929.9467938,
+      "description": "Tap element at index 23: '确定' (Button) at coordinates (848, 1338)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 22
+      },
+      "success": true,
+      "timestamp": 1760661929.9467938,
+      "description": "Tap element at index 22: '确定' (Button) at coordinates (848, 1338)"
+    }
+  ],
+  "ui_states": [],
+  "metadata": {
+    "steps": 0,
+    "output": "Hot-start direct execution finished with 16 actions",
+    "reason": "Hot-start direct execution finished with 16 actions",
+    "execution_time": 0.0,
+    "model": "OpenAILike"
+  },
+  "similarity_score": null
+}
