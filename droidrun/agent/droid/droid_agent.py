@@ -555,6 +555,10 @@ class DroidAgent(Workflow):
                 
                 if best_experience:
                     try:
+                        # 获取匹配经验的ID
+                        experience_id = best_experience.get("id")
+                        logger.info(f"🔥 Hot start using experience ID: {experience_id}")
+                        
                         # 参数自适应
                         if self.memory_config.parameter_adaptation_enabled:
                             adapted_actions = self.memory_manager.adapt_parameters(
@@ -563,15 +567,24 @@ class DroidAgent(Workflow):
                             )
                             logger.info(f"🔄 Parameters adapted for hot start")
                         else:
-                            adapted_actions = best_experience.get("action_sequence", [])
+                            # 优先从对应的trajectories子文件夹加载macro.json
+                            macro_actions = self._load_macro_actions(experience_id)
+                            if macro_actions:
+                                logger.info(f"📋 Using macro actions from trajectories/{experience_id}/macro.json")
+                                adapted_actions = macro_actions
+                            else:
+                                # 回退到使用experience中的action_sequence
+                                logger.info(f"📋 Fallback to using action_sequence from experience")
+                                adapted_actions = best_experience.get("action_sequence", [])
                         
-                        # 直执：将动作放入队列，并用 LLM 预判哪些索引是“变更点击步”
+                        # 直执：将动作放入队列，并用 LLM 预判哪些索引是"变更点击步"
                         self.pending_hot_actions = adapted_actions or []
                         if self.pending_hot_actions:
                             logger.info(f"🔥 Hot start direct-execution prepared with {len(self.pending_hot_actions)} actions")
                             self.pending_hot_context = {
                                 "experience_goal": best_experience.get("goal", ""),
                                 "experience_actions": best_experience.get("action_sequence", []),
+                                "experience_id": experience_id,  # 保存experience_id以备后用
                                 "changed_indices": [],
                                 "goal_diffs": {}
                             }
@@ -1035,10 +1048,57 @@ class DroidAgent(Workflow):
         logger.info(f"🎬 Extracted {len(actions)} actions from trajectory (fallback)")
         return actions
 
-    def _load_macro_actions(self) -> List[Dict]:
-        """加载 macro.json 中的完整动作序列"""
+    def _load_macro_actions(self, experience_id: str = None) -> List[Dict]:
+        """
+        加载 macro.json 中的完整动作序列
+        
+        Args:
+            experience_id: 经验ID，用于直接定位对应的trajectories子文件夹
+                          如果为None，则回退到查找最新的macro.json文件
+        
+        Returns:
+            List of actions in TaskExperience format
+        """
         try:
-            # 查找最新的 macro.json 文件
+            if experience_id:
+                # 直接使用experience_id定位macro.json文件
+                macro_file = f"trajectories/{experience_id}/macro.json"
+                
+                if os.path.exists(macro_file):
+                    logger.info(f"📋 Loading macro.json from matched experience: {macro_file}")
+                    
+                    with open(macro_file, 'r', encoding='utf-8') as f:
+                        macro_data = json.load(f)
+                        actions = macro_data.get('actions', [])
+                        
+                        logger.info(f"📋 Found {len(actions)} actions in matched experience macro.json")
+                        
+                        if not actions:
+                            logger.warning("📋 No actions found in matched experience macro.json")
+                            return []
+                        
+                        # 转换格式以匹配 TaskExperience 的 action_sequence 格式
+                        converted_actions = []
+                        for i, action in enumerate(actions):
+                            description = action.get('description', '')
+                            logger.info(f"📋 Action {i}: type={action.get('type')}, description='{description[:50]}...'")
+                            
+                            converted_action = {
+                                "action": self._convert_action_type(action.get('type', '')),
+                                "params": self._convert_action_params(action),
+                                "success": True,  # macro.json 中的动作都是成功的
+                                "timestamp": action.get('timestamp', time.time()),
+                                "description": description  # 直接使用macro.json中的description
+                            }
+                            converted_actions.append(converted_action)
+                        
+                        logger.info(f"📋 Loaded {len(converted_actions)} actions from matched experience macro.json with descriptions")
+                        return converted_actions
+                else:
+                    logger.warning(f"📋 Macro file not found for experience_id {experience_id}: {macro_file}")
+                    # 回退到查找最新的macro.json
+            
+            # 回退逻辑：查找最新的 macro.json 文件
             trajectory_dirs = glob.glob("trajectories/*/macro.json")
             if trajectory_dirs:
                 # 按修改时间排序，获取最新的
