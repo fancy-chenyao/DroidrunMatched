@@ -718,10 +718,21 @@ class DroidAgent(Workflow):
             try:
                 ui_state = tools.get_state()
                 logger.info(f"[HOT] ✅ UI state initialized with {len(ui_state.get('elements', []))} elements")
+                
+                # 创建RecordUIStateEvent并添加到trajectory
+                if ui_state and 'a11y_tree' in ui_state:
+                    ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
+                    self.trajectory.ui_states.append(ui_state_event.ui_state)
+                    logger.info("[HOT] 📋 Initial UI state recorded")
+                
                 try:
                     screenshot = tools.take_screenshot()
                     if screenshot:
-                        logger.info("[HOT] 📸 Initial screenshot captured")
+                        # take_screenshot返回(format, bytes)，我们需要bytes部分
+                        screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
+                        screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
+                        self.trajectory.screenshots.append(screenshot_event.screenshot)
+                        logger.info("[HOT] 📸 Initial screenshot captured and recorded")
                 except Exception as e:
                     logger.warning(f"[HOT] ⚠️ Failed to capture initial screenshot: {e}")
             except Exception as e:
@@ -750,9 +761,20 @@ class DroidAgent(Workflow):
                                 if ok:
                                     step_count += 1
                                     try:
-                                        tools.get_state()
-                                    except Exception:
-                                        pass
+                                        # 在微冷启动后捕获UI状态和截图
+                                        ui_state = tools.get_state()
+                                        if ui_state and 'a11y_tree' in ui_state:
+                                            ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
+                                            self.trajectory.ui_states.append(ui_state_event.ui_state)
+                                        
+                                        screenshot = tools.take_screenshot()
+                                        if screenshot:
+                                            # take_screenshot返回(format, bytes)，我们需要bytes部分
+                                            screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
+                                            screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
+                                            self.trajectory.screenshots.append(screenshot_event.screenshot)
+                                    except Exception as e:
+                                        logger.warning(f"[HOT] Failed to capture state after micro-coldstart: {e}")
                                     if idx_action < len(actions) - 1:
                                         time.sleep(0.5)
                                     # 成功后继续到下一步（不再执行原点击）
@@ -762,9 +784,32 @@ class DroidAgent(Workflow):
                             tools.tap_by_index(idx)
                             time.sleep(1.0)
                             try:
-                                tools.get_state()
-                            except Exception:
-                                pass
+                                # 在每次动作后捕获UI状态和截图
+                                ui_state = tools.get_state()
+                                if ui_state and 'a11y_tree' in ui_state:
+                                    ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
+                                    self.trajectory.ui_states.append(ui_state_event.ui_state)
+                                
+                                screenshot = tools.take_screenshot()
+                                if screenshot:
+                                    # take_screenshot返回(format, bytes)，我们需要bytes部分
+                                    screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
+                                    screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
+                                    self.trajectory.screenshots.append(screenshot_event.screenshot)
+                            except Exception as e:
+                                logger.warning(f"[HOT] Failed to capture state after tap: {e}")
+                            
+                            # 创建TapActionEvent并添加到macro
+                            from droidrun.agent.common.events import TapActionEvent
+                            tap_event = TapActionEvent(
+                                action_type="tap",
+                                description=f"Tap element at index {idx}",
+                                x=0,  # 热启动时没有具体坐标信息
+                                y=0,
+                                element_index=idx
+                            )
+                            self.trajectory.macro.append(tap_event)
+                            
                             step_count += 1
                             executed_actions.append({
                                 "action": "tap_by_index",
@@ -780,9 +825,30 @@ class DroidAgent(Workflow):
                             tools.input_text(text)
                             time.sleep(0.5)
                             try:
-                                tools.get_state()
-                            except Exception:
-                                pass
+                                # 在输入文本后捕获UI状态和截图
+                                ui_state = tools.get_state()
+                                if ui_state and 'a11y_tree' in ui_state:
+                                    ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
+                                    self.trajectory.ui_states.append(ui_state_event.ui_state)
+                                
+                                screenshot = tools.take_screenshot()
+                                if screenshot:
+                                    # take_screenshot返回(format, bytes)，我们需要bytes部分
+                                    screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
+                                    screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
+                                    self.trajectory.screenshots.append(screenshot_event.screenshot)
+                            except Exception as e:
+                                logger.warning(f"[HOT] Failed to capture state after input: {e}")
+                            
+                            # 创建InputTextActionEvent并添加到macro
+                            from droidrun.agent.common.events import InputTextActionEvent
+                            input_event = InputTextActionEvent(
+                                action_type="input_text",
+                                description=f"Input text: '{text}'",
+                                text=text
+                            )
+                            self.trajectory.macro.append(input_event)
+                            
                             step_count += 1
                             executed_actions.append({
                                 "action": "input_text",
@@ -800,6 +866,35 @@ class DroidAgent(Workflow):
                         dur = int(params.get("duration_ms", params.get("duration", 300)))
                         tools.swipe(sx, sy, ex, ey, dur)
                         time.sleep(1.0)
+                        try:
+                            # 在滑动后捕获UI状态和截图
+                            ui_state = tools.get_state()
+                            if ui_state and 'a11y_tree' in ui_state:
+                                ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
+                                self.trajectory.ui_states.append(ui_state_event.ui_state)
+                            
+                            screenshot = tools.take_screenshot()
+                            if screenshot:
+                                # take_screenshot返回(format, bytes)，我们需要bytes部分
+                                screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
+                                screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
+                                self.trajectory.screenshots.append(screenshot_event.screenshot)
+                        except Exception as e:
+                            logger.warning(f"[HOT] Failed to capture state after swipe: {e}")
+                        
+                        # 创建SwipeActionEvent并添加到macro
+                        from droidrun.agent.common.events import SwipeActionEvent
+                        swipe_event = SwipeActionEvent(
+                            action_type="swipe",
+                            description=f"Swipe from ({sx}, {sy}) to ({ex}, {ey})",
+                            start_x=sx,
+                            start_y=sy,
+                            end_x=ex,
+                            end_y=ey,
+                            duration_ms=dur
+                        )
+                        self.trajectory.macro.append(swipe_event)
+                        
                         step_count += 1
                     elif name == "start_app":
                         pkg = params.get("package", params.get("pkg", ""))
@@ -807,6 +902,31 @@ class DroidAgent(Workflow):
                         if pkg and hasattr(tools, "start_app"):
                             tools.start_app(pkg)
                             time.sleep(2.0)
+                            try:
+                                # 在启动应用后捕获UI状态和截图
+                                ui_state = tools.get_state()
+                                if ui_state and 'a11y_tree' in ui_state:
+                                    ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
+                                    self.trajectory.ui_states.append(ui_state_event.ui_state)
+                                
+                                screenshot = tools.take_screenshot()
+                                if screenshot:
+                                    # take_screenshot返回(format, bytes)，我们需要bytes部分
+                                    screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
+                                    screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
+                                    self.trajectory.screenshots.append(screenshot_event.screenshot)
+                            except Exception as e:
+                                logger.warning(f"[HOT] Failed to capture state after start_app: {e}")
+                            
+                            # 创建StartAppEvent并添加到macro
+                            from droidrun.agent.common.events import StartAppEvent
+                            start_app_event = StartAppEvent(
+                                action_type="start_app",
+                                description=f"Start app: {pkg}",
+                                package=pkg
+                            )
+                            self.trajectory.macro.append(start_app_event)
+                            
                             step_count += 1
                     elif name == "press_key":
                         key_val = params.get("keycode", params.get("key", 0))
@@ -817,6 +937,31 @@ class DroidAgent(Workflow):
                         if keycode:
                             tools.press_key(keycode)
                             time.sleep(0.5)
+                            try:
+                                # 在按键后捕获UI状态和截图
+                                ui_state = tools.get_state()
+                                if ui_state and 'a11y_tree' in ui_state:
+                                    ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
+                                    self.trajectory.ui_states.append(ui_state_event.ui_state)
+                                
+                                screenshot = tools.take_screenshot()
+                                if screenshot:
+                                    # take_screenshot返回(format, bytes)，我们需要bytes部分
+                                    screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
+                                    screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
+                                    self.trajectory.screenshots.append(screenshot_event.screenshot)
+                            except Exception as e:
+                                logger.warning(f"[HOT] Failed to capture state after press_key: {e}")
+                            
+                            # 创建KeyPressActionEvent并添加到macro
+                            from droidrun.agent.common.events import KeyPressActionEvent
+                            key_event = KeyPressActionEvent(
+                                action_type="press_key",
+                                description=f"Press key: {keycode}",
+                                keycode=keycode
+                            )
+                            self.trajectory.macro.append(key_event)
+                            
                             step_count += 1
                     elif name in ("sleep", "wait"):
                         import time as _t
