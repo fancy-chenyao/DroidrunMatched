@@ -33,7 +33,7 @@ async def main():
     # Create agent with memory system enabled
     agent_init_start = time.time()
     agent = DroidAgent(
-        goal="打开EmpLab应用，进入请休假系统，提交2025年10月28日到2025年11月29日的年休假申请。请假事由：计划休息，拟前往地区：北京。请尝试完成整个流程，包括登录（如果需要的话）和提交申请。",
+        goal="打开EmpLab应用，进入请休假系统，提交2025年10月21日到2025年11月1日的年休假申请。请假事由：出去玩，拟前往地区：天津。请尝试完成整个流程，包括登录（如果需要的话）和提交申请。",
         llm=llm,
         tools=tools,
         enable_memory=True,  # 启用记忆系统

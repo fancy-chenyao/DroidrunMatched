@@ -186,7 +186,10 @@ class DroidAgent(Workflow):
             else:
                 self.save_trajectories = save_trajectories
 
-        self.trajectory = Trajectory(goal=goal)
+        # 生成共享的experience_id，用于experiences和trajectories的一致性
+        self.experience_id = str(uuid.uuid4())
+        
+        self.trajectory = Trajectory(goal=goal, experience_id=self.experience_id)
         self.task_manager = TaskManager()
         self.task_iter = None
 
@@ -971,7 +974,7 @@ class DroidAgent(Workflow):
         
         # 构建经验
         experience = TaskExperience(
-            id=str(uuid.uuid4()),
+            id=self.experience_id,  # 使用共享的experience_id
             goal=self.goal,
             success=ev.success,
             timestamp=time.time(),

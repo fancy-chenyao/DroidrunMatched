@@ -60,17 +60,19 @@ def make_serializable(obj):
 
 class Trajectory:
 
-    def __init__(self, goal: str = None):
+    def __init__(self, goal: str = None, experience_id: str = None):
         """Initializes an empty trajectory class.
 
         Args:
             goal: The goal/prompt that this trajectory is trying to achieve
+            experience_id: The shared experience ID for consistency with experiences folder
         """
         self.events: List[Event] = [] 
         self.screenshots: List[bytes] = []
         self.ui_states: List[Dict[str, Any]] = []
         self.macro: List[Event] = []
         self.goal = goal or "DroidRun automation sequence"
+        self.experience_id = experience_id
 
     def set_goal(self, goal: str) -> None:
         """Update the goal/description for this trajectory.
@@ -141,9 +143,17 @@ class Trajectory:
             Path to the trajectory folder
         """
         os.makedirs(directory, exist_ok=True)
+        
+        # 生成时间戳，无论使用哪种命名方式都需要
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        unique_id = str(uuid.uuid4())[:8]
-        trajectory_folder = os.path.join(directory, f"{timestamp}_{unique_id}")
+        
+        # 使用experience_id作为文件夹名称，如果没有则使用旧的命名方式
+        if self.experience_id:
+            trajectory_folder = os.path.join(directory, self.experience_id)
+        else:
+            unique_id = str(uuid.uuid4())[:8]
+            trajectory_folder = os.path.join(directory, f"{timestamp}_{unique_id}")
+        
         os.makedirs(trajectory_folder, exist_ok=True)
 
         serializable_events = []
@@ -504,7 +514,8 @@ def get_trajectory_statistics(
 # Example usage:
 """
 # Save a trajectory with a specific goal (automatically creates folder structure)
-trajectory = Trajectory(goal="Open settings and check battery level")
+trajectory = Trajectory()
+trajectory.set_goal("Open settings and check battery level")
 # ... add events and screenshots to trajectory ...
 folder_path = trajectory.save_trajectory()
 
