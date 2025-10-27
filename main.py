@@ -49,26 +49,9 @@ async def main():
     print(f"🧠 记忆系统已启用 (Agent初始化耗时: {agent_init_time - agent_init_start:.2f}秒)")
     print("📁 经验存储目录: experiences/")
     print("💾 轨迹保存级别: step")
-    print("🎯 目标: 打开EmpLab应用并完成请假申请流程")
+    print(f"🎯 目标: {agent.goal}")
     
-    # 检查是否有相似经验
-    memory_check_start = time.time()
-    if hasattr(agent, 'memory_manager') and agent.memory_manager:
-        similar_experiences = agent.memory_manager.find_similar_experiences(
-            "打开EmpLab应用并完成请假申请流程", 
-            threshold=0.8
-        )
-        memory_check_time = time.time()
-        print(f"🔍 记忆检查完成 (耗时: {memory_check_time - memory_check_start:.2f}秒)")
-        
-        if similar_experiences:
-            print(f"🔥 发现 {len(similar_experiences)} 个相似经验，将使用热启动")
-            for i, exp in enumerate(similar_experiences[:3]):
-                print(f"  {i+1}. {exp.goal} (相似度: {exp.similarity_score:.2f})")
-        else:
-            print("❄️ 未发现相似经验，将使用冷启动")
-    
-    print(f"\n🚀 开始执行任务... (总初始化耗时: {memory_check_time - start_time:.2f}秒)")
+    print(f"\n🚀 开始执行任务... (总初始化耗时: {agent_init_time - start_time:.2f}秒)")
     
     # Run agent
     task_start_time = time.time()
@@ -92,7 +75,7 @@ async def main():
     print(f"  🕐 结束时间: {end_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"  ⏰ 总耗时: {total_duration:.2f}秒 ({timedelta(seconds=int(total_duration))})")
     print(f"  🎯 任务执行时间: {task_duration:.2f}秒 ({timedelta(seconds=int(task_duration))})")
-    print(f"  🔧 初始化时间: {(memory_check_time - start_time):.2f}秒")
+    print(f"  🔧 初始化时间: {(agent_init_time - start_time):.2f}秒")
     print(f"  🚀 任务执行占比: {(task_duration/total_duration*100):.1f}%")
     
     # 显示执行步骤统计

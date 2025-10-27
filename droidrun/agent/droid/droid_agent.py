@@ -525,14 +525,24 @@ class DroidAgent(Workflow):
                 self.goal, 
                 threshold=self.memory_config.similarity_threshold
             )
-            # 打印命中集合的相似度（检索阶段结果）
-            try:
-                if similar_experiences:
+            
+            # 打印用户友好的经验检查信息
+            if similar_experiences:
+                print(f"🔥 发现 {len(similar_experiences)} 个相似经验，将使用热启动")
+                for i, exp in enumerate(similar_experiences[:3]):
+                    print(f"  {i+1}. {exp.goal} (相似度: {exp.similarity_score:.2f})")
+                logger.info(f"🔥 Hot start: Found {len(similar_experiences)} similar experiences")
+                # 打印命中集合的相似度（检索阶段结果）
+                try:
                     for exp in similar_experiences:
                         if hasattr(exp, "similarity_score") and exp.similarity_score is not None:
                             logger.info(f"[SIM][kept] similarity={exp.similarity_score:.2f} goal={exp.goal}")
-            except Exception:
-                pass
+                except Exception:
+                    pass
+            else:
+                print("❄️ 未发现相似经验，将使用冷启动")
+                logger.info(f"❄️ Cold start: No similar experiences found (threshold={self.memory_config.similarity_threshold})")
+            
             # 打印本次检索对所有经验的相似度，便于排查为何未达阈值
             try:
                 for exp in (self.memory_manager.get_all_experiences() or []):
@@ -545,7 +555,6 @@ class DroidAgent(Workflow):
                 pass
             
             if similar_experiences:
-                logger.info(f"🔥 Hot start: Found {len(similar_experiences)} similar experiences")
                 
                 # 使用LLM选择最佳经验
                 best_experience = self.llm_services.select_best_experience(
