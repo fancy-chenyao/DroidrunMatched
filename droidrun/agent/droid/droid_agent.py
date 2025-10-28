@@ -1,44 +1,56 @@
-"""
-DroidAgent - A wrapper class that coordinates the planning and execution of tasks
-to achieve a user's goal on an Android device.
-"""
-
+# 标准库导入
+import asyncio
+import glob
+import json
 import logging
+import os
+import re
 import time
 import uuid
-import json
-import re
-import glob
-import os
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
+# 第三方库导入
 from llama_index.core.llms.llm import LLM
-from llama_index.core.workflow import step, StartEvent, StopEvent, Workflow, Context
+from llama_index.core.workflow import Context, StartEvent, StopEvent, Workflow, step
 from llama_index.core.workflow.handler import WorkflowHandler
-from droidrun.agent.droid.events import *
+
+# 本地模块导入 - droidrun.agent
 from droidrun.agent.codeact import CodeActAgent
-from droidrun.agent.codeact.events import EpisodicMemoryEvent
-from droidrun.agent.planner import PlannerAgent
-from droidrun.agent.context.task_manager import TaskManager
-from droidrun.agent.utils.trajectory import Trajectory
-from droidrun.tools import Tools, describe_tools
-from droidrun.agent.common.events import ScreenshotEvent, MacroEvent, RecordUIStateEvent
+from droidrun.agent.codeact.events import EpisodicMemoryEvent, TaskEndEvent, TaskExecutionEvent
 from droidrun.agent.common.default import MockWorkflow
+from droidrun.agent.common.events import (
+    InputTextActionEvent,
+    KeyPressActionEvent,
+    MacroEvent,
+    RecordUIStateEvent,
+    ScreenshotEvent,
+    StartAppEvent,
+    SwipeActionEvent,
+    TapActionEvent,
+)
 from droidrun.agent.context import ContextInjectionManager
 from droidrun.agent.context.agent_persona import AgentPersona
-from droidrun.agent.context.personas import DEFAULT
-from droidrun.agent.oneflows.reflector import Reflector
-from droidrun.agent.context.experience_memory import ExperienceMemory, TaskExperience
 from droidrun.agent.context.execution_monitor import ExecutionMonitor, MonitorResult
+from droidrun.agent.context.experience_memory import ExperienceMemory, TaskExperience
 from droidrun.agent.context.llm_services import LLMServices
 from droidrun.agent.context.memory_config import MemoryConfig, create_memory_config
+from droidrun.agent.context.personas import DEFAULT
+from droidrun.agent.context.task_manager import TaskManager
+from droidrun.agent.droid.events import *
+from droidrun.agent.oneflows.reflector import Reflector
+from droidrun.agent.planner import PlannerAgent
+from droidrun.agent.utils.trajectory import Trajectory
+
+# 本地模块导入 - droidrun其他
 from droidrun.telemetry import (
+    DroidAgentFinalizeEvent,
+    DroidAgentInitEvent,
     capture,
     flush,
-    DroidAgentInitEvent,
-    DroidAgentFinalizeEvent,
 )
+from droidrun.tools import Tools, describe_tools
 
+# 初始化日志
 logger = logging.getLogger("droidrun")
 
 
@@ -280,13 +292,14 @@ class DroidAgent(Workflow):
             # 热启动直执分支：若有待执行动作，直接绕过 CodeAct
             if self.memory_enabled and getattr(self, 'pending_hot_actions', None):
                 logger.info(f"🚀 Directly executing {len(self.pending_hot_actions)} hot-start actions")
+                # 设置热启动标志，用于后续判断（finalize阶段）
+                self.is_hot_start_execution = True
                 success, reason = await self._direct_execute_actions_async(self.pending_hot_actions)
                 # 记录热启动执行结果
                 if hasattr(self, 'trajectory') and self.trajectory:
-                    from droidrun.agent.codeact.events import TaskEndEvent
                     self.trajectory.events.append(TaskEndEvent(success=success, reason=reason, task=task))
                     logger.info(f"[HOT] 📝 Hot start execution recorded in trajectory")
-                # 用完即清空
+                # 用完即清空（但保留is_hot_start_execution标志）
                 self.pending_hot_actions = []
                 return CodeActResultEvent(success=success, reason=reason, task=task, steps=self.step_counter)
 
@@ -543,12 +556,19 @@ class DroidAgent(Workflow):
                 print("❄️ 未发现相似经验，将使用冷启动")
                 logger.info(f"❄️ Cold start: No similar experiences found (threshold={self.memory_config.similarity_threshold})")
             
-            # 打印本次检索对所有经验的相似度，便于排查为何未达阈值
+            # 优化：直接使用已缓存的相似度分数，避免重复计算
             try:
-                for exp in (self.memory_manager.get_all_experiences() or []):
+                # 打印所有经验的相似度（使用已计算的值）
+                all_experiences = self.memory_manager.get_all_experiences() or []
+                for exp in all_experiences:
                     try:
-                        score = self.memory_manager._calculate_similarity(self.goal, exp.goal)
-                        logger.info(f"[SIM] Similarity {score:.2f} to experience goal: {exp.goal}")
+                        # 优先使用已缓存的similarity_score
+                        if hasattr(exp, 'similarity_score') and exp.similarity_score is not None:
+                            logger.info(f"[SIM] Similarity {exp.similarity_score:.2f} to experience goal: {exp.goal}")
+                        else:
+                            # 仅当没有缓存时才重新计算
+                            score = self.memory_manager._calculate_similarity(self.goal, exp.goal)
+                            logger.info(f"[SIM] Similarity {score:.2f} to experience goal: {exp.goal}")
                     except Exception:
                         continue
             except Exception:
@@ -556,25 +576,48 @@ class DroidAgent(Workflow):
             
             if similar_experiences:
                 
-                # 使用LLM选择最佳经验
-                best_experience = self.llm_services.select_best_experience(
-                    [exp.to_dict() for exp in similar_experiences], 
-                    self.goal
-                )
+                # 优化：如果存在相似度=1.0的经验，直接选择，不调用LLM
+                perfect_matches = [exp for exp in similar_experiences if exp.similarity_score >= 0.999]
+                best_exp_obj = None  # 初始化变量，用于后续判断
+                
+                if perfect_matches:
+                    # 直接使用相似度最高的完美匹配
+                    best_exp_obj = max(perfect_matches, key=lambda e: e.similarity_score)
+                    best_experience = best_exp_obj.to_dict()
+                    logger.info(f"🎯 Perfect match found (similarity={best_exp_obj.similarity_score:.2f}), skipping LLM selection")
+                else:
+                    # 没有完美匹配时才调用LLM选择
+                    logger.info(f"🤔 No perfect match, using LLM to select best from {len(similar_experiences)} candidates")
+                    best_experience = self.llm_services.select_best_experience(
+                        [exp.to_dict() for exp in similar_experiences], 
+                        self.goal
+                    )
                 
                 if best_experience:
                     try:
                         # 获取匹配经验的ID
                         experience_id = best_experience.get("id")
+                        experience_goal = best_experience.get("goal", "")
                         logger.info(f"🔥 Hot start using experience ID: {experience_id}")
+                        
+                        # 优化：检测目标是否完全匹配
+                        is_perfect_match = (self.goal == experience_goal) or (
+                            best_exp_obj is not None and best_exp_obj.similarity_score >= 0.999
+                        )
                         
                         # 参数自适应
                         if self.memory_config.parameter_adaptation_enabled:
-                            adapted_actions = self.memory_manager.adapt_parameters(
-                                TaskExperience.from_dict(best_experience), 
-                                self.goal
-                            )
-                            logger.info(f"🔄 Parameters adapted for hot start")
+                            # 优化：完美匹配时跳过LLM参数适配
+                            if is_perfect_match:
+                                logger.info(f"✨ Perfect match detected, skipping parameter adaptation")
+                                adapted_actions = best_experience.get("action_sequence", [])
+                            else:
+                                logger.info(f"🔄 Adapting parameters for similar goal (similarity < 1.0)")
+                                adapted_actions = self.memory_manager.adapt_parameters(
+                                    TaskExperience.from_dict(best_experience), 
+                                    self.goal
+                                )
+                                logger.info(f"🔄 Parameters adapted for hot start")
                         else:
                             # 优先从对应的trajectories子文件夹加载macro.json
                             macro_actions = self._load_macro_actions(experience_id)
@@ -609,22 +652,29 @@ class DroidAgent(Workflow):
                             except Exception:
                                 pass
                             try:
-                                # 在传入前，对仍缺 description 的动作进行通用语义补齐
-                                for a in self.pending_hot_actions:
-                                    if isinstance(a, dict) and not a.get("description"):
-                                        name = (a or {}).get("action") or (a or {}).get("name") or ""
-                                        params = (a or {}).get("params") or (a or {}).get("parameters") or {}
-                                        a["description"] = f"{name} with params {json.dumps(params, ensure_ascii=False)}"
+                                # 优化：完美匹配时跳过LLM变更检测
+                                if is_perfect_match:
+                                    logger.info(f"✨ Perfect match detected, skipping change detection (no changes expected)")
+                                    self.pending_hot_context["changed_indices"] = []
+                                    self.pending_hot_context["changed_index_reasons"] = []
+                                else:
+                                    # 在传入前，对仍缺 description 的动作进行通用语义补齐
+                                    for a in self.pending_hot_actions:
+                                        if isinstance(a, dict) and not a.get("description"):
+                                            name = (a or {}).get("action") or (a or {}).get("name") or ""
+                                            params = (a or {}).get("params") or (a or {}).get("parameters") or {}
+                                            a["description"] = f"{name} with params {json.dumps(params, ensure_ascii=False)}"
 
-                                det = self.llm_services.detect_changed_actions(
-                                    self.pending_hot_context["experience_goal"],
-                                    self.goal,
-                                    self.pending_hot_actions
-                                )
-                                self.pending_hot_context["changed_indices"] = det.get("changed_indices", [])
-                                # 保存 index->reason，用于更具体的微冷启动子目标
-                                self.pending_hot_context["changed_index_reasons"] = det.get("index_reasons", [])
-                                logger.info(f"[HOT] Changed action indices predicted: {self.pending_hot_context['changed_indices']}")
+                                    logger.info(f"🔍 Detecting changed actions for similar goal (similarity < 1.0)")
+                                    det = self.llm_services.detect_changed_actions(
+                                        self.pending_hot_context["experience_goal"],
+                                        self.goal,
+                                        self.pending_hot_actions
+                                    )
+                                    self.pending_hot_context["changed_indices"] = det.get("changed_indices", [])
+                                    # 保存 index->reason，用于更具体的微冷启动子目标
+                                    self.pending_hot_context["changed_index_reasons"] = det.get("index_reasons", [])
+                                    logger.info(f"[HOT] Changed action indices predicted: {self.pending_hot_context['changed_indices']}")
                             except Exception as _:
                                 pass
                             task = Task(
@@ -680,7 +730,6 @@ class DroidAgent(Workflow):
             # 轨迹保存完成后，保存经验到记忆系统
             if self.memory_enabled and ev.success:
                 try:
-                    import asyncio
                     await asyncio.sleep(0.5)  # 确保macro.json已经生成
                     
                     experience = self._build_experience_from_execution(ev)
@@ -721,7 +770,6 @@ class DroidAgent(Workflow):
         try:
             tools = self.tools_instance
             step_count = 0
-            import time
             # 初始化UI
             logger.info("[HOT] Initializing UI state cache...")
             try:
@@ -809,7 +857,6 @@ class DroidAgent(Workflow):
                                 logger.warning(f"[HOT] Failed to capture state after tap: {e}")
                             
                             # 创建TapActionEvent并添加到macro
-                            from droidrun.agent.common.events import TapActionEvent
                             tap_event = TapActionEvent(
                                 action_type="tap",
                                 description=f"Tap element at index {idx}",
@@ -850,7 +897,7 @@ class DroidAgent(Workflow):
                                 logger.warning(f"[HOT] Failed to capture state after input: {e}")
                             
                             # 创建InputTextActionEvent并添加到macro
-                            from droidrun.agent.common.events import InputTextActionEvent
+                            
                             input_event = InputTextActionEvent(
                                 action_type="input_text",
                                 description=f"Input text: '{text}'",
@@ -892,7 +939,7 @@ class DroidAgent(Workflow):
                             logger.warning(f"[HOT] Failed to capture state after swipe: {e}")
                         
                         # 创建SwipeActionEvent并添加到macro
-                        from droidrun.agent.common.events import SwipeActionEvent
+                        
                         swipe_event = SwipeActionEvent(
                             action_type="swipe",
                             description=f"Swipe from ({sx}, {sy}) to ({ex}, {ey})",
@@ -928,7 +975,7 @@ class DroidAgent(Workflow):
                                 logger.warning(f"[HOT] Failed to capture state after start_app: {e}")
                             
                             # 创建StartAppEvent并添加到macro
-                            from droidrun.agent.common.events import StartAppEvent
+                            
                             start_app_event = StartAppEvent(
                                 action_type="start_app",
                                 description=f"Start app: {pkg}",
@@ -963,7 +1010,7 @@ class DroidAgent(Workflow):
                                 logger.warning(f"[HOT] Failed to capture state after press_key: {e}")
                             
                             # 创建KeyPressActionEvent并添加到macro
-                            from droidrun.agent.common.events import KeyPressActionEvent
+                            
                             key_event = KeyPressActionEvent(
                                 action_type="press_key",
                                 description=f"Press key: {keycode}",
@@ -973,12 +1020,12 @@ class DroidAgent(Workflow):
                             
                             step_count += 1
                     elif name in ("sleep", "wait"):
-                        import time as _t
+                        
                         ms = int(params.get("ms", params.get("milliseconds", 0)))
                         sec = int(params.get("sec", 0))
                         delay = sec if sec > 0 else (ms / 1000.0 if ms > 0 else 0)
                         if delay > 0:
-                            _t.sleep(delay)
+                            time.sleep(delay)
                             step_count += 1
                     elif name == "complete":
                         reason = str(params.get("reason", "Hot start direct execution finished"))
@@ -997,15 +1044,15 @@ class DroidAgent(Workflow):
             # 写回到轨迹 - 使用事件对象而不是字典
             if executed_actions:
                 try:
-                    from droidrun.agent.codeact.events import TaskExecutionEvent
+                    
                     for a in executed_actions:
-                        # 创建TaskExecutionEvent对象而不是字典
+                        # 创建TaskExecutionEvent对象，locals字段的值必须全部是字符串类型
                         event_data = {
                             "event_type": "task_execution",
-                            "action": a["action"],
-                            "params": a["params"],
-                            "timestamp": a["timestamp"],
-                            "success": a.get("success", True)
+                            "action": str(a["action"]),
+                            "params": json.dumps(a["params"], ensure_ascii=False) if isinstance(a["params"], dict) else str(a["params"]),
+                            "timestamp": str(a["timestamp"]),
+                            "success": str(a.get("success", True))
                         }
                         # 创建事件对象
                         event = TaskExecutionEvent(
@@ -1058,8 +1105,8 @@ class DroidAgent(Workflow):
             logger.info(f"🔄 Action details: {action_name} with params {params}")
             logger.info(f"🔄 [MICRO-COLD] Task description: '{micro_goal}'")
             
-            from droidrun.agent.codeact import CodeActAgent as _CA
-            agent = _CA(
+            
+            agent = CodeActAgent(
                 llm=self.llm,
                 persona=self.cim.get_persona("Default"),
                 vision=self.vision,
@@ -1126,13 +1173,23 @@ class DroidAgent(Workflow):
     
     def _build_experience_from_execution(self, ev: FinalizeEvent) -> TaskExperience:
         """从执行结果构建经验"""
-        # 提取页面序列
+        # 提取页面序列 - 热启动跳过LLM调用以提升性能
         page_sequence = []
         if self.trajectory and self.trajectory.ui_states:
-            page_sequence = self.llm_services.extract_page_sequence({
-                "ui_states": self.trajectory.ui_states,
-                "events": [e.__dict__ for e in self.trajectory.events]
-            })
+            # 检查是否为热启动执行（使用is_hot_start_execution标志，因为pending_hot_actions已被清空）
+            is_hot_start = getattr(self, 'is_hot_start_execution', False)
+            
+            if is_hot_start:
+                # 热启动：使用快速的简化方法，不调用LLM（避免3+分钟的延迟）
+                page_sequence = self._extract_simple_page_sequence()
+                logger.info(f"📄 Hot start: Extracted {len(page_sequence)} pages using simplified method (no LLM)")
+            else:
+                # 冷启动：调用LLM提取详细的页面序列（保留完整语义信息）
+                page_sequence = self.llm_services.extract_page_sequence({
+                    "ui_states": self.trajectory.ui_states,
+                    "events": [e.__dict__ for e in self.trajectory.events]
+                })
+                logger.info(f"📄 Cold start: Extracted {len(page_sequence)} pages using LLM")
         
         # 提取动作序列
         action_sequence = []
@@ -1153,7 +1210,8 @@ class DroidAgent(Workflow):
                 "output": ev.output,
                 "reason": ev.reason,
                 "execution_time": time.time() - getattr(self, 'start_time', time.time()),
-                "model": self.llm.class_name() if hasattr(self.llm, 'class_name') else "unknown"
+                "model": self.llm.class_name() if hasattr(self.llm, 'class_name') else "unknown",
+                "is_hot_start": getattr(self, 'is_hot_start_execution', False)
             }
         )
         
@@ -1201,6 +1259,59 @@ class DroidAgent(Workflow):
         
         logger.info(f"🎬 Extracted {len(actions)} actions from trajectory (fallback)")
         return actions
+
+    def _extract_simple_page_sequence(self) -> List[Dict]:
+        """
+        热启动专用：快速提取简化的页面序列，不调用LLM
+        
+        基于UI状态变化来简单划分页面，避免昂贵的LLM调用
+        """
+        try:
+            page_sequence = []
+            if not self.trajectory or not self.trajectory.ui_states:
+                return page_sequence
+            
+            # 简化策略：每个UI状态记录一个页面
+            # 对于热启动，页面序列主要用于记录执行路径，不需要详细的语义分析
+            ui_states = self.trajectory.ui_states
+            
+            for i, ui_state in enumerate(ui_states):
+                try:
+                    # 提取基本页面信息
+                    page_name = f"Page_{i+1}"
+                    
+                    # 尝试从UI状态中提取页面标识信息
+                    if isinstance(ui_state, dict):
+                        # 尝试提取活动窗口名称或包名
+                        activity = ui_state.get('activity_name', '')
+                        package = ui_state.get('package_name', '')
+                        
+                        if activity:
+                            page_name = activity.split('.')[-1] if '.' in activity else activity
+                        elif package:
+                            page_name = package.split('.')[-1] if '.' in package else package
+                    
+                    # 构建简化的页面信息
+                    page_info = {
+                        "page_name": page_name,
+                        "page_index": i,
+                        "page_features": f"UI state at step {i+1}",
+                        "transition_action": f"Action {i}" if i > 0 else "Initial state",
+                        "ui_elements": []  # 热启动不需要详细的UI元素列表
+                    }
+                    
+                    page_sequence.append(page_info)
+                    
+                except Exception as e:
+                    # 单个页面提取失败不影响整体
+                    logger.debug(f"Failed to extract page {i}: {e}")
+                    continue
+            
+            return page_sequence
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract simple page sequence: {e}")
+            return []
 
     def _load_macro_actions(self, experience_id: str = None) -> List[Dict]:
         """
