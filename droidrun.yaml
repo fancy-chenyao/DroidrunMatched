@@ -1,0 +1,61 @@
+# DroidRun 统一配置文件示例
+# 支持 YAML 格式，优先级：环境变量 > 配置文件 > 代码默认值
+
+droidrun:
+  # 系统核心配置
+  system:
+    debug: false
+    log_level: "INFO"
+    timeout: 300
+    step_timeout_seconds: 60
+    default_timeout: 300
+  
+  # 记忆系统配置
+  memory:
+    enabled: true
+    similarity_threshold: 0.85
+    perfect_match_threshold: 0.999
+    storage_dir: "experiences"
+    max_experiences: 1000
+    max_similar_experiences_display: 3
+    experience_quality_threshold: 0.7
+    fallback_enabled: true
+    monitoring_enabled: true
+    hot_start_enabled: true
+    parameter_adaptation_enabled: true
+    max_consecutive_failures: 3
+    step_timeout: 30.0
+    max_steps_before_fallback: 20
+  
+  # Agent配置  
+  agent:
+    max_steps: 20
+    default_max_steps: 20
+    max_micro_cold_steps: 5
+    micro_cold_timeout: 60
+    reasoning: false
+    reflection: false
+    vision: false
+    save_trajectories: "step"
+  
+  # 工具配置
+  tools:
+    # UI相关配置
+    default_index: -1
+    default_x_coordinate: 0
+    default_y_coordinate: 0
+    default_swipe_duration: 300
+    
+    # 时间相关配置
+    macro_generation_wait_time: 0.5
+    action_wait_time: 0.5
+    screenshot_wait_time: 1.0
+    long_wait_time: 2.0
+  
+  # API配置
+  api:
+    api_key: null  # 从环境变量 ALIYUN_API_KEY 获取
+    model: "qwen-plus"
+    api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    timeout: 30
+    max_retries: 3

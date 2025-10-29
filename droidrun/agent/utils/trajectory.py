@@ -17,6 +17,10 @@ from llama_index.core.workflow import Event
 
 logger = logging.getLogger("droidrun")
 
+# 为 trajectory 模块设置更高的日志级别，减少调试输出
+trajectory_logger = logging.getLogger("droidrun.agent.utils.trajectory")
+trajectory_logger.setLevel(logging.INFO)
+
 
 def make_serializable(obj):
     """Recursively make objects JSON serializable."""
@@ -158,16 +162,6 @@ class Trajectory:
 
         serializable_events = []
         for event in self.events:
-            # Debug: Check if tokens attribute exists
-            if hasattr(event, "tokens"):
-                logger.debug(
-                    f"Event {event.__class__.__name__} has tokens: {event.tokens}"
-                )
-            else:
-                logger.debug(
-                    f"Event {event.__class__.__name__} does NOT have tokens attribute"
-                )
-
             # Start with the basic event structure
             event_dict = {"type": event.__class__.__name__}
 
@@ -182,18 +176,7 @@ class Trajectory:
 
             # Explicitly check for and add tokens attribute if it exists
             if hasattr(event, "tokens") and "tokens" not in event_dict:
-                logger.debug(
-                    f"Manually adding tokens attribute for {event.__class__.__name__}"
-                )
                 event_dict["tokens"] = make_serializable(event.tokens)
-
-            # Debug: Check if tokens is in the serialized event
-            if "tokens" in event_dict:
-                logger.debug(
-                    f"Serialized event contains tokens: {event_dict['tokens']}"
-                )
-            else:
-                logger.debug(f"Serialized event does NOT contain tokens")
 
             serializable_events.append(event_dict)
 

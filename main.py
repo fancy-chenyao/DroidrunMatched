@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 import asyncio
+import os
 import time
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 from droidrun import AdbTools, DroidAgent
+from droidrun.config import get_config_manager
 from llama_index.llms.openai_like import OpenAILike
+
+# 加载环境变量
+load_dotenv()
 
 async def main():
     print("🧠 DroidRun 记忆系统测试")
@@ -19,37 +25,55 @@ async def main():
     tools_init_time = time.time()
     print(f"🔧 工具初始化完成 (耗时: {tools_init_time - start_time:.2f}秒)")
     
+    # 获取统一配置管理器
+    config_manager = get_config_manager()
+    
+    # 从配置管理器获取API配置
+    api_config = config_manager.get_api_config()
+    memory_config = config_manager.get_memory_config()
+    system_config = config_manager.get_system_config()
+    
+    # 验证必要的API密钥
+    if not api_config.api_key:
+        print("❌ 错误: 未找到 ALIYUN_API_KEY 环境变量")
+        print("请确保 .env 文件存在并包含正确的 API 密钥")
+        return
+    
+    print(f"🔑 使用模型: {api_config.model}")
+    print(f"🌐 API Base: {api_config.api_base}")
+    print(f"🎯 相似度阈值: {memory_config.similarity_threshold}")
+    print(f"📊 最大步数: {config_manager.get('agent.max_steps', 20)}")
+    print(f"🐛 调试模式: {'开启' if system_config.debug else '关闭'}")
+    
     # set up 阿里百炼 llm
     llm = OpenAILike(
-        model="qwen-plus",  # 阿里百炼的模型名称
-        api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",  # 阿里百炼的OpenAI兼容接口
-        api_key="sk-c2cc873160714661aa76b6d5ab7239bf",  # 你的阿里百炼API密钥
+        model=api_config.model,
+        api_base=api_config.api_base,
+        api_key=api_config.api_key,
         is_chat_model=True,  # droidrun需要聊天模型支持
     )
     
     llm_init_time = time.time()
     print(f"🤖 LLM 初始化完成 (耗时: {llm_init_time - tools_init_time:.2f}秒)")
     
-    # Create agent with memory system enabled
+    # Create agent with unified configuration
     agent_init_start = time.time()
     agent = DroidAgent(
         goal="打开EmpLab应用，进入请休假系统，提交2025年10月26日到2025年11月5日的年休假申请。请假事由：出去玩，拟前往地区：北京。请尝试完成整个流程，包括登录（如果需要的话）和提交申请。",
         llm=llm,
         tools=tools,
-        enable_memory=True,  # 启用记忆系统
-        memory_similarity_threshold=0.85,  # 相似度阈值
-        memory_storage_dir="experiences",  # 存储目录
-        save_trajectories="step",  # 保存轨迹
-        debug=True,  # 启用调试模式
-        max_steps=20,  # 增加最大步数
-        reasoning=False    # 启用推理模式，让Agent更智能地处理复杂任务
+        config_manager=config_manager,  # 使用统一配置管理器
     )
     
     agent_init_time = time.time()
     print(f"🧠 记忆系统已启用 (Agent初始化耗时: {agent_init_time - agent_init_start:.2f}秒)")
-    print("📁 经验存储目录: experiences/")
-    print("💾 轨迹保存级别: step")
+    print(f"📁 经验存储目录: {memory_config.storage_dir}")
+    print(f"💾 轨迹保存级别: {config_manager.get('agent.save_trajectories', 'step')}")
     print(f"🎯 目标: {agent.goal}")
+    
+    # 显示配置摘要
+    print(f"\n📋 配置摘要:")
+    print(config_manager.get_summary())
     
     print(f"\n🚀 开始执行任务... (总初始化耗时: {agent_init_time - start_time:.2f}秒)")
     

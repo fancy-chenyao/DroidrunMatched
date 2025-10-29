@@ -1,3 +1,25 @@
+"""
+DroidAgent - Android设备任务执行代理
+
+协调规划代理和执行代理，实现用户目标在Android设备上的自动化执行。
+支持热启动（复用历史经验）和冷启动（完整LLM规划）两种执行模式。
+
+主要功能：
+- 热启动执行：复用相似历史经验，快速完成任务
+- 微冷启动：对变更步骤进行局部LLM规划
+- 经验记忆：存储和检索历史执行经验
+- 参数适配：自动调整历史经验参数以匹配新目标
+- 执行监控：检测异常并提供回退机制
+
+使用示例：
+    agent = DroidAgent(
+        goal="打开计算器并计算2+2",
+        llm=llm,
+        tools=tools,
+        enable_memory=True
+    )
+    result = await agent.run()
+"""
 # 标准库导入
 import asyncio
 import glob
@@ -11,7 +33,7 @@ from typing import Dict, List, Optional
 
 # 第三方库导入
 from llama_index.core.llms.llm import LLM
-from llama_index.core.workflow import Context, StartEvent, StopEvent, Workflow, step
+from llama_index.core.workflow import Context, StartEvent, StopEvent, Workflow, step, Event
 from llama_index.core.workflow.handler import WorkflowHandler
 
 # 本地模块导入 - droidrun.agent
@@ -35,13 +57,22 @@ from droidrun.agent.context.experience_memory import ExperienceMemory, TaskExper
 from droidrun.agent.context.llm_services import LLMServices
 from droidrun.agent.context.memory_config import MemoryConfig, create_memory_config
 from droidrun.agent.context.personas import DEFAULT
-from droidrun.agent.context.task_manager import TaskManager
-from droidrun.agent.droid.events import *
+from droidrun.agent.context.task_manager import TaskManager, Task
+from droidrun.agent.droid.events import (
+    CodeActExecuteEvent,
+    CodeActResultEvent,
+    ReasoningLogicEvent,
+    FinalizeEvent,
+    ReflectionEvent,
+    TaskRunnerEvent,
+)
 from droidrun.agent.oneflows.reflector import Reflector
 from droidrun.agent.planner import PlannerAgent
 from droidrun.agent.utils.trajectory import Trajectory
 
 # 本地模块导入 - droidrun其他
+from droidrun.config import get_config_manager, UnifiedConfigManager, ExceptionConstants
+from droidrun.agent.utils.exception_handler import ExceptionHandler, safe_execute, log_error
 from droidrun.telemetry import (
     DroidAgentFinalizeEvent,
     DroidAgentInitEvent,
@@ -81,6 +112,15 @@ class DroidAgent(Workflow):
             logger.addHandler(handler)
             logger.setLevel(logging.DEBUG if debug else logging.INFO)
             logger.propagate = False
+        
+        # 为特定模块设置更高的日志级别，减少调试输出
+        if not debug:
+            logging.getLogger("droidrun.tools.adb").setLevel(logging.INFO)
+            logging.getLogger("droidrun.agent.codeact").setLevel(logging.INFO)
+            logging.getLogger("droidrun.agent.planner").setLevel(logging.INFO)
+            logging.getLogger("droidrun.agent.utils").setLevel(logging.INFO)
+            logging.getLogger("droidrun.agent.utils.trajectory").setLevel(logging.INFO)
+            logging.getLogger("droidrun.telemetry").setLevel(logging.INFO)
 
     def __init__(
         self,
@@ -88,20 +128,22 @@ class DroidAgent(Workflow):
         llm: LLM,
         tools: Tools,
         personas: List[AgentPersona] = [DEFAULT],
-        max_steps: int = 15,
-        timeout: int = 1000,
-        vision: bool = False,
-        reasoning: bool = False,
-        reflection: bool = False,
+        max_steps: Optional[int] = None,
+        timeout: Optional[int] = None,
+        vision: Optional[bool] = None,
+        reasoning: Optional[bool] = None,
+        reflection: Optional[bool] = None,
         enable_tracing: bool = False,
-        debug: bool = False,
-        save_trajectories: str = "none",
+        debug: Optional[bool] = None,
+        save_trajectories: Optional[str] = None,
         excluded_tools: List[str] = None,
-        # 新增记忆系统参数
-        enable_memory: bool = True,
-        memory_similarity_threshold: float = 0.7,
-        memory_storage_dir: str = "experiences",
+        # 新增记忆系统参数（向后兼容）
+        enable_memory: Optional[bool] = None,
+        memory_similarity_threshold: Optional[float] = None,
+        memory_storage_dir: Optional[str] = None,
         memory_config: Optional[MemoryConfig] = None,
+        # 新增统一配置管理器参数
+        config_manager: Optional[UnifiedConfigManager] = None,
         *args,
         **kwargs,
     ):
@@ -111,34 +153,69 @@ class DroidAgent(Workflow):
         Args:
             goal: The user's goal or command to execute
             llm: The language model to use for both agents
-            max_steps: Maximum number of steps for both agents
-            timeout: Timeout for agent execution in seconds
-            reasoning: Whether to use the PlannerAgent for complex reasoning (True)
-                      or send tasks directly to CodeActAgent (False)
-            reflection: Whether to reflect on steps the CodeActAgent did to give the PlannerAgent advice
+            max_steps: Maximum number of steps for both agents (None = use config)
+            timeout: Timeout for agent execution in seconds (None = use config)
+            reasoning: Whether to use the PlannerAgent for complex reasoning (None = use config)
+            reflection: Whether to reflect on steps the CodeActAgent did to give the PlannerAgent advice (None = use config)
             enable_tracing: Whether to enable Arize Phoenix tracing
-            debug: Whether to enable verbose debug logging
-            save_trajectories: Trajectory saving level. Can be:
-                - "none" (no saving)
-                - "step" (save per step)
-                - "action" (save per action)
+            debug: Whether to enable verbose debug logging (None = use config)
+            save_trajectories: Trajectory saving level (None = use config)
+            config_manager: Unified configuration manager (None = use global instance)
             **kwargs: Additional keyword arguments to pass to the agents
         """
         self.user_id = kwargs.pop("user_id", None)
-        super().__init__(timeout=timeout, *args, **kwargs)
-        # Configure default logging if not already configured
-        self._configure_default_logging(debug=debug)
         
-        # 初始化记忆系统
-        self.memory_enabled = enable_memory
+        # 初始化统一配置管理器
+        self.config_manager = config_manager or get_config_manager()
+        
+        # 从配置管理器获取配置值，参数优先于配置
+        self.max_steps = max_steps if max_steps is not None else self.config_manager.get("agent.max_steps", 20)
+        self.timeout = timeout if timeout is not None else self.config_manager.get("system.timeout", 300)
+        self.vision = vision if vision is not None else self.config_manager.get("agent.vision", False)
+        self.reasoning = reasoning if reasoning is not None else self.config_manager.get("agent.reasoning", False)
+        self.reflection = reflection if reflection is not None else self.config_manager.get("agent.reflection", False)
+        self.debug = debug if debug is not None else self.config_manager.get("system.debug", False)
+        self.save_trajectories = save_trajectories if save_trajectories is not None else self.config_manager.get("agent.save_trajectories", "step")
+        
+        super().__init__(timeout=self.timeout, *args, **kwargs)
+        
+        # Configure default logging if not already configured
+        self._configure_default_logging(debug=self.debug)
+        
+        # 初始化记忆系统（向后兼容）
+        memory_enabled = enable_memory if enable_memory is not None else self.config_manager.get("memory.enabled", True)
+        self.memory_enabled = memory_enabled
+        
         if self.memory_enabled:
-            # 创建记忆配置
+            # 使用统一配置管理器获取记忆配置
             if memory_config is None:
-                self.memory_config = create_memory_config(
-                    enabled=enable_memory,
-                    similarity_threshold=memory_similarity_threshold,
-                    storage_dir=memory_storage_dir
-                )
+                # 从统一配置管理器获取记忆配置
+                unified_memory_config = self.config_manager.get_memory_config()
+                
+                # 创建记忆配置字典（只包含旧的MemoryConfig类支持的字段）
+                memory_config_dict = {
+                    "enabled": unified_memory_config.enabled,
+                    "similarity_threshold": unified_memory_config.similarity_threshold,
+                    "storage_dir": unified_memory_config.storage_dir,
+                    "max_experiences": unified_memory_config.max_experiences,
+                    "llm_model": None,  # 旧类支持但新类没有，设为None
+                    "experience_quality_threshold": unified_memory_config.experience_quality_threshold,
+                    "fallback_enabled": unified_memory_config.fallback_enabled,
+                    "monitoring_enabled": unified_memory_config.monitoring_enabled,
+                    "hot_start_enabled": unified_memory_config.hot_start_enabled,
+                    "parameter_adaptation_enabled": unified_memory_config.parameter_adaptation_enabled,
+                    "max_consecutive_failures": unified_memory_config.max_consecutive_failures,
+                    "step_timeout": unified_memory_config.step_timeout,
+                    "max_steps_before_fallback": unified_memory_config.max_steps_before_fallback,
+                }
+                
+                # 如果提供了参数，覆盖配置值
+                if memory_similarity_threshold is not None:
+                    memory_config_dict["similarity_threshold"] = memory_similarity_threshold
+                if memory_storage_dir is not None:
+                    memory_config_dict["storage_dir"] = memory_storage_dir
+                
+                self.memory_config = MemoryConfig.from_dict(memory_config_dict)
             else:
                 self.memory_config = memory_config
             
@@ -175,29 +252,10 @@ class DroidAgent(Workflow):
 
         self.goal = goal
         self.llm = llm
-        self.vision = vision
-        self.max_steps = max_steps
-        self.max_codeact_steps = max_steps
-        self.timeout = timeout
-        self.reasoning = reasoning
-        self.reflection = reflection
-        self.debug = debug
+        self.max_codeact_steps = self.max_steps
 
         self.event_counter = 0
-        # Handle backward compatibility: bool -> str mapping
-        if isinstance(save_trajectories, bool):
-            self.save_trajectories = "step" if save_trajectories else "none"
-        else:
-            # Validate string values
-            valid_values = ["none", "step", "action"]
-            if save_trajectories not in valid_values:
-                logger.warning(
-                    f"Invalid save_trajectories value: {save_trajectories}. Using 'none' instead."
-                )
-                self.save_trajectories = "none"
-            else:
-                self.save_trajectories = save_trajectories
-
+        
         # 生成共享的experience_id，用于experiences和trajectories的一致性
         self.experience_id = str(uuid.uuid4())
         
@@ -221,17 +279,17 @@ class DroidAgent(Workflow):
             self.planner_agent = PlannerAgent(
                 goal=goal,
                 llm=llm,
-                vision=vision,
+                vision=self.vision,
                 personas=personas,
                 task_manager=self.task_manager,
                 tools_instance=tools,
-                timeout=timeout,
-                debug=debug,
+                timeout=self.timeout,
+                debug=self.debug,
             )
             self.max_codeact_steps = 5
 
             if self.reflection:
-                self.reflector = Reflector(llm=llm, debug=debug)
+                self.reflector = Reflector(llm=llm, debug=self.debug)
 
         else:
             logger.debug("🚫 Planning disabled - will execute tasks directly with CodeActAgent")
@@ -243,14 +301,14 @@ class DroidAgent(Workflow):
                 llm=llm.class_name(),
                 tools=",".join(self.tool_list),
                 personas=",".join([p.name for p in personas]),
-                max_steps=max_steps,
-                timeout=timeout,
-                vision=vision,
-                reasoning=reasoning,
-                reflection=reflection,
+                max_steps=self.max_steps,
+                timeout=self.timeout,
+                vision=self.vision,
+                reasoning=self.reasoning,
+                reflection=self.reflection,
                 enable_tracing=enable_tracing,
-                debug=debug,
-                save_trajectories=save_trajectories,
+                debug=self.debug,
+                save_trajectories=self.save_trajectories,
             ),
             self.user_id,
         )
@@ -355,10 +413,9 @@ class DroidAgent(Workflow):
                 )
 
         except Exception as e:
-            logger.error(f"Error during task execution: {e}")
+            log_error("[DroidAgent] Task execution", e, level="error")
             if self.debug:
                 import traceback
-
                 logger.error(traceback.format_exc())
             return CodeActResultEvent(success=False, reason=f"Error: {str(e)}", task=task, steps=0)
 
@@ -391,11 +448,10 @@ class DroidAgent(Workflow):
                 self.task_manager.fail_task(task, failure_reason=ev.reason)
                 return ReasoningLogicEvent(force_planning=True)
 
-        except Exception as e:
-            logger.error(f"❌ Error during DroidAgent execution: {e}")
+        except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
+            log_error("[DroidAgent] Execution", e, level="error")
             if self.debug:
                 import traceback
-
                 logger.error(traceback.format_exc())
             tasks = self.task_manager.get_task_history()
             return FinalizeEvent(
@@ -501,10 +557,9 @@ class DroidAgent(Workflow):
             return CodeActExecuteEvent(task=next(self.task_iter), reflection=None)
 
         except Exception as e:
-            logger.error(f"❌ Error during DroidAgent execution: {e}")
+            log_error("[DroidAgent] Planning", e, level="error")
             if self.debug:
                 import traceback
-
                 logger.error(traceback.format_exc())
             tasks = self.task_manager.get_task_history()
             return FinalizeEvent(
@@ -542,7 +597,8 @@ class DroidAgent(Workflow):
             # 打印用户友好的经验检查信息
             if similar_experiences:
                 print(f"🔥 发现 {len(similar_experiences)} 个相似经验，将使用热启动")
-                for i, exp in enumerate(similar_experiences[:3]):
+                max_display = self.config_manager.get("memory.max_similar_experiences_display", 3)
+                for i, exp in enumerate(similar_experiences[:max_display]):
                     print(f"  {i+1}. {exp.goal} (相似度: {exp.similarity_score:.2f})")
                 logger.info(f"🔥 Hot start: Found {len(similar_experiences)} similar experiences")
                 # 打印命中集合的相似度（检索阶段结果）
@@ -550,8 +606,8 @@ class DroidAgent(Workflow):
                     for exp in similar_experiences:
                         if hasattr(exp, "similarity_score") and exp.similarity_score is not None:
                             logger.info(f"[SIM][kept] similarity={exp.similarity_score:.2f} goal={exp.goal}")
-                except Exception:
-                    pass
+                except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+                    ExceptionHandler.handle_data_parsing_error(e, "[SIM] Similarity calculation")
             else:
                 print("❄️ 未发现相似经验，将使用冷启动")
                 logger.info(f"❄️ Cold start: No similar experiences found (threshold={self.memory_config.similarity_threshold})")
@@ -569,15 +625,17 @@ class DroidAgent(Workflow):
                             # 仅当没有缓存时才重新计算
                             score = self.memory_manager._calculate_similarity(self.goal, exp.goal)
                             logger.info(f"[SIM] Similarity {score:.2f} to experience goal: {exp.goal}")
-                    except Exception:
+                    except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+                        ExceptionHandler.handle_data_parsing_error(e, "[SIM] Similarity calculation")
                         continue
-            except Exception:
-                pass
+            except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+                ExceptionHandler.handle_data_parsing_error(e, "[SIM] Experience processing")
             
             if similar_experiences:
                 
                 # 优化：如果存在相似度=1.0的经验，直接选择，不调用LLM
-                perfect_matches = [exp for exp in similar_experiences if exp.similarity_score >= 0.999]
+                perfect_threshold = self.config_manager.get("memory.perfect_match_threshold", 0.999)
+                perfect_matches = [exp for exp in similar_experiences if exp.similarity_score >= perfect_threshold]
                 best_exp_obj = None  # 初始化变量，用于后续判断
                 
                 if perfect_matches:
@@ -675,16 +733,16 @@ class DroidAgent(Workflow):
                                     # 保存 index->reason，用于更具体的微冷启动子目标
                                     self.pending_hot_context["changed_index_reasons"] = det.get("index_reasons", [])
                                     logger.info(f"[HOT] Changed action indices predicted: {self.pending_hot_context['changed_indices']}")
-                            except Exception as _:
-                                pass
+                            except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+                                ExceptionHandler.handle_data_parsing_error(e, "[HOT] Change detection")
                             task = Task(
                                 description="[HOT] Directly execute adapted actions",
                                 status=self.task_manager.STATUS_PENDING,
                                 agent_type="Default",
                             )
                             return CodeActExecuteEvent(task=task, reflection=None)
-                    except Exception as e:
-                        logger.warning(f"Hot start failed, falling back to cold start: {e}")
+                    except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
+                        ExceptionHandler.handle_runtime_error(e, "[HOT] Hot start", reraise=False)
                         # 如果热启动失败，继续执行冷启动逻辑
             else:
                 logger.info("❄️ Cold start: No similar experiences found")
@@ -730,13 +788,17 @@ class DroidAgent(Workflow):
             # 轨迹保存完成后，保存经验到记忆系统
             if self.memory_enabled and ev.success:
                 try:
-                    await asyncio.sleep(0.5)  # 确保macro.json已经生成
+                    # 确保macro.json已经生成
+                    wait_time = self.config_manager.get("tools.macro_generation_wait_time", 0.5)
+                    await asyncio.sleep(wait_time)
                     
                     experience = self._build_experience_from_execution(ev)
                     saved_path = self.memory_manager.save_experience(experience)
                     logger.info(f"💾 Experience saved to: {saved_path}")
+                except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
+                    ExceptionHandler.handle_file_operation_error(e, "[Experience] Save")
                 except Exception as e:
-                    logger.warning(f"Failed to save experience: {e}")
+                    log_error("[Experience] Save", e, level="warning")
 
         return StopEvent(result)
 
@@ -750,8 +812,8 @@ class DroidAgent(Workflow):
             try:
                 if not hasattr(ev, "timestamp") or ev.timestamp is None:
                     setattr(ev, "timestamp", time.time())
-            except Exception:
-                pass
+            except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+                ExceptionHandler.handle_data_parsing_error(e, "[Event] Timestamp setting")
             ctx.write_event_to_stream(ev)
 
             if isinstance(ev, ScreenshotEvent):
@@ -790,10 +852,10 @@ class DroidAgent(Workflow):
                         screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
                         self.trajectory.screenshots.append(screenshot_event.screenshot)
                         logger.info("[HOT] 📸 Initial screenshot captured and recorded")
-                except Exception as e:
-                    logger.warning(f"[HOT] ⚠️ Failed to capture initial screenshot: {e}")
-            except Exception as e:
-                logger.error(f"[HOT] ❌ Failed to initialize UI state: {e}")
+                except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
+                    ExceptionHandler.handle_file_operation_error(e, "[HOT] Initial screenshot capture")
+            except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
+                ExceptionHandler.handle_file_operation_error(e, "[HOT] UI state initialization")
                 return False, f"Failed to initialize UI state: {e}"
             executed_actions = []
             # 基于 changed_indices 的微冷启动触发记录，避免重复触发同一索引
@@ -807,9 +869,11 @@ class DroidAgent(Workflow):
                     if name in ("tap_by_index", "tap", "tap_index"):
                         idx_val = params.get("index", params.get("idx"))
                         try:
-                            idx = int(idx_val) if idx_val is not None else -1
-                        except Exception:
-                            idx = -1
+                            default_idx = self.config_manager.get("tools.default_index", -1)
+                            idx = int(idx_val) if idx_val is not None else default_idx
+                        except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+                            ExceptionHandler.handle_data_parsing_error(e, "[HOT] Index parsing")
+                            idx = self.config_manager.get("tools.default_index", -1)
                         if idx >= 0:
                             # 变化参数且为点击 → 基于 changed_indices 直接触发微冷启动（无窗口 gating）
                             if self._is_changed_param_click_step(idx_action, act) and not triggered_changed_steps.get(idx_action):
@@ -817,51 +881,29 @@ class DroidAgent(Workflow):
                                 triggered_changed_steps[idx_action] = True
                                 if ok:
                                     step_count += 1
-                                    try:
-                                        # 在微冷启动后捕获UI状态和截图
-                                        ui_state = tools.get_state()
-                                        if ui_state and 'a11y_tree' in ui_state:
-                                            ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
-                                            self.trajectory.ui_states.append(ui_state_event.ui_state)
-                                        
-                                        screenshot = tools.take_screenshot()
-                                        if screenshot:
-                                            # take_screenshot返回(format, bytes)，我们需要bytes部分
-                                            screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
-                                            screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
-                                            self.trajectory.screenshots.append(screenshot_event.screenshot)
-                                    except Exception as e:
-                                        logger.warning(f"[HOT] Failed to capture state after micro-coldstart: {e}")
+                                    # 使用通用方法捕获UI状态和截图
+                                    self._capture_ui_state_and_screenshot("micro-coldstart")
                                     if idx_action < len(actions) - 1:
-                                        time.sleep(0.5)
+                                        wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
+                                        time.sleep(wait_time)
                                     # 成功后继续到下一步（不再执行原点击）
                                     continue
                                 else:
                                     logger.warning(f"[HOT] ⚠️ Micro-coldstart failed for step {idx_action}, fallback to direct tap")
                             tools.tap_by_index(idx)
-                            time.sleep(1.0)
-                            try:
-                                # 在每次动作后捕获UI状态和截图
-                                ui_state = tools.get_state()
-                                if ui_state and 'a11y_tree' in ui_state:
-                                    ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
-                                    self.trajectory.ui_states.append(ui_state_event.ui_state)
-                                
-                                screenshot = tools.take_screenshot()
-                                if screenshot:
-                                    # take_screenshot返回(format, bytes)，我们需要bytes部分
-                                    screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
-                                    screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
-                                    self.trajectory.screenshots.append(screenshot_event.screenshot)
-                            except Exception as e:
-                                logger.warning(f"[HOT] Failed to capture state after tap: {e}")
+                            screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
+                            time.sleep(screenshot_wait)
+                            # 使用通用方法捕获UI状态和截图
+                            self._capture_ui_state_and_screenshot("tap")
                             
                             # 创建TapActionEvent并添加到macro
+                            default_x = self.config_manager.get("tools.default_x_coordinate", 0)
+                            default_y = self.config_manager.get("tools.default_y_coordinate", 0)
                             tap_event = TapActionEvent(
                                 action_type="tap",
                                 description=f"Tap element at index {idx}",
-                                x=0,  # 热启动时没有具体坐标信息
-                                y=0,
+                                x=default_x,  # 热启动时没有具体坐标信息
+                                y=default_y,
                                 element_index=idx
                             )
                             self.trajectory.macro.append(tap_event)
@@ -879,22 +921,10 @@ class DroidAgent(Workflow):
                         # 不再在直执中做就地文本适配，保持经验参数或上层已适配结果
                         if text:
                             tools.input_text(text)
-                            time.sleep(0.5)
-                            try:
-                                # 在输入文本后捕获UI状态和截图
-                                ui_state = tools.get_state()
-                                if ui_state and 'a11y_tree' in ui_state:
-                                    ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
-                                    self.trajectory.ui_states.append(ui_state_event.ui_state)
-                                
-                                screenshot = tools.take_screenshot()
-                                if screenshot:
-                                    # take_screenshot返回(format, bytes)，我们需要bytes部分
-                                    screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
-                                    screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
-                                    self.trajectory.screenshots.append(screenshot_event.screenshot)
-                            except Exception as e:
-                                logger.warning(f"[HOT] Failed to capture state after input: {e}")
+                            wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
+                            time.sleep(wait_time)
+                            # 使用通用方法捕获UI状态和截图
+                            self._capture_ui_state_and_screenshot("input")
                             
                             # 创建InputTextActionEvent并添加到macro
                             
@@ -915,28 +945,19 @@ class DroidAgent(Workflow):
                     elif name == "swipe":
                         start = params.get("start") or params.get("from") or {}
                         end = params.get("end") or params.get("to") or {}
-                        sx = int(params.get("start_x", start[0] if isinstance(start, (list, tuple)) and len(start) >= 2 else start.get("x", 0)))
-                        sy = int(params.get("start_y", start[1] if isinstance(start, (list, tuple)) and len(start) >= 2 else start.get("y", 0)))
-                        ex = int(params.get("end_x", end[0] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("x", 0)))
-                        ey = int(params.get("end_y", end[1] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("y", 0)))
-                        dur = int(params.get("duration_ms", params.get("duration", 300)))
+                        default_x = self.config_manager.get("tools.default_x_coordinate", 0)
+                        default_y = self.config_manager.get("tools.default_y_coordinate", 0)
+                        default_duration = self.config_manager.get("tools.default_swipe_duration", 300)
+                        sx = int(params.get("start_x", start[0] if isinstance(start, (list, tuple)) and len(start) >= 2 else start.get("x", default_x)))
+                        sy = int(params.get("start_y", start[1] if isinstance(start, (list, tuple)) and len(start) >= 2 else start.get("y", default_y)))
+                        ex = int(params.get("end_x", end[0] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("x", default_x)))
+                        ey = int(params.get("end_y", end[1] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("y", default_y)))
+                        dur = int(params.get("duration_ms", params.get("duration", default_duration)))
                         tools.swipe(sx, sy, ex, ey, dur)
-                        time.sleep(1.0)
-                        try:
-                            # 在滑动后捕获UI状态和截图
-                            ui_state = tools.get_state()
-                            if ui_state and 'a11y_tree' in ui_state:
-                                ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
-                                self.trajectory.ui_states.append(ui_state_event.ui_state)
-                            
-                            screenshot = tools.take_screenshot()
-                            if screenshot:
-                                # take_screenshot返回(format, bytes)，我们需要bytes部分
-                                screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
-                                screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
-                                self.trajectory.screenshots.append(screenshot_event.screenshot)
-                        except Exception as e:
-                            logger.warning(f"[HOT] Failed to capture state after swipe: {e}")
+                        screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
+                        time.sleep(screenshot_wait)
+                        # 使用通用方法捕获UI状态和截图
+                        self._capture_ui_state_and_screenshot("swipe")
                         
                         # 创建SwipeActionEvent并添加到macro
                         
@@ -957,7 +978,8 @@ class DroidAgent(Workflow):
                         pkg = str(pkg) if pkg is not None else ""
                         if pkg and hasattr(tools, "start_app"):
                             tools.start_app(pkg)
-                            time.sleep(2.0)
+                            long_wait = self.config_manager.get("tools.long_wait_time", 2.0)
+                            time.sleep(long_wait)
                             try:
                                 # 在启动应用后捕获UI状态和截图
                                 ui_state = tools.get_state()
@@ -971,7 +993,7 @@ class DroidAgent(Workflow):
                                     screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
                                     screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
                                     self.trajectory.screenshots.append(screenshot_event.screenshot)
-                            except Exception as e:
+                            except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
                                 logger.warning(f"[HOT] Failed to capture state after start_app: {e}")
                             
                             # 创建StartAppEvent并添加到macro
@@ -988,26 +1010,15 @@ class DroidAgent(Workflow):
                         key_val = params.get("keycode", params.get("key", 0))
                         try:
                             keycode = int(key_val)
-                        except Exception:
+                        except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+                            ExceptionHandler.handle_data_parsing_error(e, "[HOT] Keycode parsing")
                             keycode = 0
                         if keycode:
                             tools.press_key(keycode)
-                            time.sleep(0.5)
-                            try:
-                                # 在按键后捕获UI状态和截图
-                                ui_state = tools.get_state()
-                                if ui_state and 'a11y_tree' in ui_state:
-                                    ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
-                                    self.trajectory.ui_states.append(ui_state_event.ui_state)
-                                
-                                screenshot = tools.take_screenshot()
-                                if screenshot:
-                                    # take_screenshot返回(format, bytes)，我们需要bytes部分
-                                    screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
-                                    screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
-                                    self.trajectory.screenshots.append(screenshot_event.screenshot)
-                            except Exception as e:
-                                logger.warning(f"[HOT] Failed to capture state after press_key: {e}")
+                            wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
+                            time.sleep(wait_time)
+                            # 使用通用方法捕获UI状态和截图
+                            self._capture_ui_state_and_screenshot("press_key")
                             
                             # 创建KeyPressActionEvent并添加到macro
                             
@@ -1032,15 +1043,16 @@ class DroidAgent(Workflow):
                         return True, reason
                     else:
                         logger.warning(f"[HOT] Unknown action type: {name}, skipping...")
-                except Exception as action_error:
-                    logger.error(f"[HOT] ❌ Action {idx_action+1} failed: {action_error}")
+                except ExceptionConstants.RUNTIME_EXCEPTIONS as action_error:
+                    ExceptionHandler.handle_runtime_error(action_error, f"[HOT] Action {idx_action+1}", reraise=False)
                     try:
                         tools.get_state()
-                    except Exception:
-                        pass
+                    except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
+                        ExceptionHandler.handle_file_operation_error(e, "[HOT] State capture after action failure")
                     continue
                 if idx_action < len(actions) - 1:
-                    time.sleep(0.5)
+                    wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
+                    time.sleep(wait_time)
             # 写回到轨迹 - 使用事件对象而不是字典
             if executed_actions:
                 try:
@@ -1061,14 +1073,85 @@ class DroidAgent(Workflow):
                             locals=event_data
                         )
                         self.trajectory.events.append(event)
-                except Exception as e:
-                    logger.warning(f"Failed to create trajectory events: {e}")
+                except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+                    ExceptionHandler.handle_data_parsing_error(e, "[HOT] Trajectory event creation")
             if step_count == 0:
                 return False, "No hot-start actions were executed (unrecognized schema)."
             return True, f"Hot-start direct execution finished with {step_count} actions"
-        except Exception as e:
-            logger.error(f"[HOT] ❌ Direct execution failed: {e}")
+        except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
+            ExceptionHandler.handle_runtime_error(e, "[HOT] Direct execution", reraise=False)
             return False, f"Direct execution failed: {e}"
+
+    def _capture_ui_state_and_screenshot(self, context: str) -> bool:
+        """
+        捕获UI状态和截图的通用方法
+        
+        Args:
+            context: 捕获上下文描述，用于日志记录
+            
+        Returns:
+            bool: 是否成功捕获
+        """
+        try:
+            tools = self.tools_instance
+            
+            # 捕获UI状态
+            ui_state = tools.get_state()
+            if ui_state and 'a11y_tree' in ui_state:
+                ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
+                self.trajectory.ui_states.append(ui_state_event.ui_state)
+            
+            # 捕获截图
+            screenshot = tools.take_screenshot()
+            if screenshot:
+                # take_screenshot返回(format, bytes)，我们需要bytes部分
+                screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
+                screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
+                self.trajectory.screenshots.append(screenshot_event.screenshot)
+            
+            return True
+            
+        except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
+            ExceptionHandler.handle_file_operation_error(e, f"[HOT] State capture after {context}")
+            return False
+
+    async def _save_experience_async(self, ev: FinalizeEvent) -> None:
+        """
+        异步保存经验到记忆系统，不阻塞主流程
+        
+        Args:
+            ev: 最终化事件
+        """
+        try:
+            # 确保macro.json已经生成
+            wait_time = self.config_manager.get("tools.macro_generation_wait_time", 0.5)
+            await asyncio.sleep(wait_time)
+            
+            # 构建经验
+            experience = self._build_experience_from_execution(ev)
+            
+            # 保存经验
+            saved_path = self.memory_manager.save_experience(experience)
+            logger.info(f"💾 Experience saved to: {saved_path}")
+            
+        except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
+            ExceptionHandler.handle_file_operation_error(e, "[Experience] Save")
+
+    def _get_time_constant(self, key: str, default: float = 0.5) -> float:
+        """从配置中获取时间常量"""
+        return self.config_manager.get(f"tools.{key}", default)
+    
+    def _get_ui_constant(self, key: str, default=0):
+        """从配置中获取UI常量"""
+        return self.config_manager.get(f"tools.{key}", default)
+    
+    def _get_memory_constant(self, key: str, default=0.85):
+        """从配置中获取内存系统常量"""
+        return self.config_manager.get(f"memory.{key}", default)
+    
+    def _get_agent_constant(self, key: str, default: int = 20) -> int:
+        """从配置中获取Agent常量"""
+        return self.config_manager.get(f"agent.{key}", default)
 
     def _is_changed_param_click_step(self, step_index: int, action: Dict) -> bool:
         try:
@@ -1078,7 +1161,8 @@ class DroidAgent(Workflow):
             # 仅在 LLM 识别出的索引上触发微冷启动
             changed = (self.pending_hot_context or {}).get("changed_indices", [])
             return step_index in changed
-        except Exception:
+        except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+            ExceptionHandler.handle_data_parsing_error(e, "[HOT] Click step detection")
             return False
 
     async def _micro_coldstart_handle_click_step(self, step_index: int, action: Dict) -> bool:
@@ -1094,7 +1178,8 @@ class DroidAgent(Workflow):
                     if ir.get("index") == step_index and ir.get("reason"):
                         micro_goal = str(ir.get("reason"))
                         break
-            except Exception:
+            except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+                ExceptionHandler.handle_data_parsing_error(e, "[MicroColdStart] Goal extraction")
                 micro_goal = None
             
             # 若未命中具体 reason，再调用通用生成逻辑
@@ -1106,15 +1191,16 @@ class DroidAgent(Workflow):
             logger.info(f"🔄 [MICRO-COLD] Task description: '{micro_goal}'")
             
             
+            max_micro_steps = self.config_manager.get("agent.max_micro_cold_steps", 5)
             agent = CodeActAgent(
                 llm=self.llm,
                 persona=self.cim.get_persona("Default"),
                 vision=self.vision,
-                max_steps=5,  # 限制为5步，避免长链思考
+                max_steps=max_micro_steps,  # 限制为5步，避免长链思考
                 all_tools_list=self.tool_list,
                 tools_instance=self.tools_instance,
                 debug=self.debug,
-                timeout=min(self.timeout, 60),  # 减少超时时间
+                timeout=min(self.timeout, self.config_manager.get("agent.micro_cold_timeout", 60)),  # 减少超时时间
             )
             
             # 执行聚焦的微冷启动
@@ -1131,8 +1217,8 @@ class DroidAgent(Workflow):
             
             return success
             
-        except Exception as e:
-            logger.error(f"❌ Micro cold start error for step {step_index}: {e}")
+        except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
+            ExceptionHandler.handle_runtime_error(e, f"[MicroColdStart] Step {step_index}", reraise=False)
             return False
 
     # 按你的要求移除不通用的就地适配辅助方法（保留占位以避免误调用）。
@@ -1231,8 +1317,8 @@ class DroidAgent(Workflow):
                 logger.warning("Failed to load macro.json, falling back to trajectory extraction")
                 return self._extract_actions_from_trajectory_fallback()
                 
-        except Exception as e:
-            logger.warning(f"Failed to extract actions from macro.json: {e}")
+        except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
+            ExceptionHandler.handle_file_operation_error(e, "[Macro] Extract actions from macro.json")
             return self._extract_actions_from_trajectory_fallback()
 
     def _extract_actions_from_trajectory_fallback(self) -> List[Dict]:
@@ -1302,15 +1388,15 @@ class DroidAgent(Workflow):
                     
                     page_sequence.append(page_info)
                     
-                except Exception as e:
+                except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                     # 单个页面提取失败不影响整体
-                    logger.debug(f"Failed to extract page {i}: {e}")
+                    ExceptionHandler.handle_data_parsing_error(e, f"[PageSequence] Extract page {i}")
                     continue
             
             return page_sequence
             
-        except Exception as e:
-            logger.warning(f"Failed to extract simple page sequence: {e}")
+        except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
+            ExceptionHandler.handle_data_parsing_error(e, "[PageSequence] Extract simple page sequence")
             return []
 
     def _load_macro_actions(self, experience_id: str = None) -> List[Dict]:
@@ -1493,3 +1579,58 @@ class DroidAgent(Workflow):
             })
         
         return actions
+
+    def _capture_ui_state_and_screenshot(self, context: str) -> bool:
+        """
+        捕获UI状态和截图的通用方法
+        
+        Args:
+            context: 捕获上下文描述，用于日志记录
+            
+        Returns:
+            bool: 是否成功捕获
+        """
+        try:
+            tools = self.tools_instance
+            
+            # 捕获UI状态
+            ui_state = tools.get_state()
+            if ui_state and 'a11y_tree' in ui_state:
+                ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
+                self.trajectory.ui_states.append(ui_state_event.ui_state)
+            
+            # 捕获截图
+            screenshot = tools.take_screenshot()
+            if screenshot:
+                # take_screenshot返回(format, bytes)，我们需要bytes部分
+                screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
+                screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
+                self.trajectory.screenshots.append(screenshot_event.screenshot)
+            
+            return True
+            
+        except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
+            ExceptionHandler.handle_file_operation_error(e, f"[HOT] State capture after {context}")
+            return False
+
+    async def _save_experience_async(self, ev: FinalizeEvent) -> None:
+        """
+        异步保存经验到记忆系统，不阻塞主流程
+        
+        Args:
+            ev: 最终化事件
+        """
+        try:
+            # 确保macro.json已经生成
+            wait_time = self.config_manager.get("tools.macro_generation_wait_time", 0.5)
+            await asyncio.sleep(wait_time)
+            
+            # 构建经验
+            experience = self._build_experience_from_execution(ev)
+            
+            # 保存经验
+            saved_path = self.memory_manager.save_experience(experience)
+            logger.info(f"💾 Experience saved to: {saved_path}")
+            
+        except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
+            ExceptionHandler.handle_file_operation_error(e, "[Experience] Save")
