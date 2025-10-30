@@ -11,6 +11,7 @@ import logging
 import time
 import os
 from typing import Dict, List, Any, Optional
+from droidrun.agent.utils.logging_utils import LoggingUtils
 from droidrun.tools.adb import AdbTools
 from droidrun.agent.utils.trajectory import Trajectory
 
@@ -41,7 +42,7 @@ class MacroPlayer:
         """Initialize ADB tools for the target device."""
         if self.adb_tools is None:
             self.adb_tools = AdbTools(serial=self.device_serial)
-            logger.info(f"🤖 Initialized ADB tools for device: {self.device_serial}")
+            LoggingUtils.log_info("MacroReplay", "Initialized ADB tools for device: {serial}", serial=self.device_serial)
         return self.adb_tools
 
     def load_macro_from_file(self, macro_file_path: str) -> Dict[str, Any]:
@@ -94,9 +95,10 @@ class MacroPlayer:
                 y = action.get("y", 0)
                 element_text = action.get("element_text", "")
 
-                logger.info(f"🫰 Tapping at ({x}, {y}) - Element: '{element_text}'")
+                LoggingUtils.log_info("MacroReplay", "Tapping at ({x}, {y}) - Element: '{text}'", 
+                                    x=x, y=y, text=element_text)
                 result = tools.tap_by_coordinates(x, y)
-                logger.debug(f"   Result: {result}")
+                LoggingUtils.log_debug("MacroReplay", "Result: {result}", result=result)
                 return True
 
             elif action_type == "swipe":
@@ -110,7 +112,7 @@ class MacroPlayer:
                     f"👆 Swiping from ({start_x}, {start_y}) to ({end_x}, {end_y}) in {duration_ms} milliseconds"
                 )
                 result = tools.swipe(start_x, start_y, end_x, end_y, duration_ms)
-                logger.debug(f"   Result: {result}")
+                LoggingUtils.log_debug("MacroReplay", "Result: {result}", result=result)
                 return True
 
             elif action_type == "drag":
@@ -124,38 +126,40 @@ class MacroPlayer:
                     f"👆 Dragging from ({start_x}, {start_y}) to ({end_x}, {end_y}) in {duration_ms} milliseconds"
                 )
                 result = tools.drag(start_x, start_y, end_x, end_y, duration_ms)
-                logger.debug(f"   Result: {result}")
+                LoggingUtils.log_debug("MacroReplay", "Result: {result}", result=result)
                 return True
 
             elif action_type == "input_text":
                 text = action.get("text", "")
 
-                logger.info(f"⌨️  Inputting text: '{text}'")
+                LoggingUtils.log_info("MacroReplay", "Inputting text: '{text}'", text=text)
                 result = tools.input_text(text)
-                logger.debug(f"   Result: {result}")
+                LoggingUtils.log_debug("MacroReplay", "Result: {result}", result=result)
                 return True
 
             elif action_type == "key_press":
                 keycode = action.get("keycode", 0)
                 key_name = action.get("key_name", "UNKNOWN")
 
-                logger.info(f"🔘 Pressing key: {key_name} (keycode: {keycode})")
+                LoggingUtils.log_info("MacroReplay", "Pressing key: {key} (keycode: {code})", 
+                                    key=key_name, code=keycode)
                 result = tools.press_key(keycode)
-                logger.debug(f"   Result: {result}")
+                LoggingUtils.log_debug("MacroReplay", "Result: {result}", result=result)
                 return True
 
             elif action_type == "back":
                 logger.info(f"⬅️  Pressing back button")
                 result = tools.back()
-                logger.debug(f"   Result: {result}")
+                LoggingUtils.log_debug("MacroReplay", "Result: {result}", result=result)
                 return True
 
             else:
-                logger.warning(f"⚠️  Unknown action type: {action_type}")
+                LoggingUtils.log_warning("MacroReplay", "Unknown action type: {type}", type=action_type)
                 return False
 
         except Exception as e:
-            logger.error(f"❌ Error executing action {action_type}: {e}")
+            LoggingUtils.log_error("MacroReplay", "Error executing action {type}: {error}", 
+                                 type=action_type, error=e)
             return False
 
     async def replay_macro(
@@ -186,14 +190,15 @@ class MacroPlayer:
         # Apply start_from_step and max_steps filters
         if start_from_step > 0:
             actions = actions[start_from_step:]
-            logger.info(f"📍 Starting from step {start_from_step + 1}")
+            LoggingUtils.log_info("MacroReplay", "Starting from step {step}", step=start_from_step + 1)
 
         if max_steps is not None:
             actions = actions[:max_steps]
-            logger.info(f"🎯 Limiting to {max_steps} steps")
+            LoggingUtils.log_info("MacroReplay", "Limiting to {steps} steps", steps=max_steps)
 
-        logger.info(f"🎬 Starting macro replay: '{description}'")
-        logger.info(f"📊 Total actions to execute: {len(actions)} / {total_actions}")
+        LoggingUtils.log_info("MacroReplay", "Starting macro replay: '{desc}'", desc=description)
+        LoggingUtils.log_info("MacroReplay", "Total actions to execute: {current} / {total}", 
+                            current=len(actions), total=total_actions)
 
         success_count = 0
         failed_count = 0
@@ -202,23 +207,24 @@ class MacroPlayer:
             action_type = action.get("action_type", action.get("type", "unknown"))
             description_text = action.get("description", "")
 
-            logger.info(f"\n📍 Step {i}/{total_actions}: {action_type}")
+            LoggingUtils.log_info("MacroReplay", "Step {current}/{total}: {type}", 
+                                current=i, total=total_actions, type=action_type)
             if description_text:
-                logger.info(f"   Description: {description_text}")
+                LoggingUtils.log_info("MacroReplay", "Description: {desc}", desc=description_text)
 
             # Execute the action
             success = self.replay_action(action)
 
             if success:
                 success_count += 1
-                logger.info(f"   ✅ Action completed successfully")
+                LoggingUtils.log_success("MacroReplay", "Action completed successfully")
             else:
                 failed_count += 1
-                logger.error(f"   ❌ Action failed")
+                LoggingUtils.log_error("MacroReplay", "Action failed")
 
             # Wait between actions (except for the last one)
             if i < len(actions):
-                logger.debug(f"   ⏳ Waiting {self.delay_between_actions}s...")
+                LoggingUtils.log_debug("MacroReplay", "Waiting {delay}s...", delay=self.delay_between_actions)
                 await asyncio.sleep(self.delay_between_actions)
 
         # Summary
@@ -233,7 +239,7 @@ class MacroPlayer:
         )
 
         if failed_count > 0:
-            logger.warning(f"⚠️  Failed actions: {failed_count}")
+            LoggingUtils.log_warning("MacroReplay", "Failed actions: {count}", count=failed_count)
 
         return failed_count == 0
 
@@ -271,7 +277,8 @@ async def replay_macro_file(
             macro_data, start_from_step=start_from_step, max_steps=max_steps
         )
     except Exception as e:
-        logger.error(f"❌ Error replaying macro file {macro_file_path}: {e}")
+        LoggingUtils.log_error("MacroReplay", "Error replaying macro file {path}: {error}", 
+                             path=macro_file_path, error=e)
         return False
 
 
@@ -305,5 +312,6 @@ async def replay_macro_folder(
             macro_data, start_from_step=start_from_step, max_steps=max_steps
         )
     except Exception as e:
-        logger.error(f"❌ Error replaying macro folder {trajectory_folder}: {e}")
+        LoggingUtils.log_error("MacroReplay", "Error replaying macro folder {folder}: {error}", 
+                             folder=trajectory_folder, error=e)
         return False

@@ -29,6 +29,7 @@ import os
 import re
 import time
 import uuid
+import traceback
 from typing import Dict, List, Optional
 
 # 第三方库导入
@@ -39,7 +40,6 @@ from llama_index.core.workflow.handler import WorkflowHandler
 # 本地模块导入 - droidrun.agent
 from droidrun.agent.codeact import CodeActAgent
 from droidrun.agent.codeact.events import EpisodicMemoryEvent, TaskEndEvent, TaskExecutionEvent
-from droidrun.agent.common.default import MockWorkflow
 from droidrun.agent.common.events import (
     InputTextActionEvent,
     KeyPressActionEvent,
@@ -55,7 +55,7 @@ from droidrun.agent.context.agent_persona import AgentPersona
 from droidrun.agent.context.execution_monitor import ExecutionMonitor, MonitorResult
 from droidrun.agent.context.experience_memory import ExperienceMemory, TaskExperience
 from droidrun.agent.context.llm_services import LLMServices
-from droidrun.agent.context.memory_config import MemoryConfig, create_memory_config
+from droidrun.agent.context.memory_config import MemoryConfig
 from droidrun.agent.context.personas import DEFAULT
 from droidrun.agent.context.task_manager import TaskManager, Task
 from droidrun.agent.droid.events import (
@@ -63,8 +63,7 @@ from droidrun.agent.droid.events import (
     CodeActResultEvent,
     ReasoningLogicEvent,
     FinalizeEvent,
-    ReflectionEvent,
-    TaskRunnerEvent,
+    ReflectionEvent
 )
 from droidrun.agent.oneflows.reflector import Reflector
 from droidrun.agent.planner import PlannerAgent
@@ -72,7 +71,8 @@ from droidrun.agent.utils.trajectory import Trajectory
 
 # 本地模块导入 - droidrun其他
 from droidrun.config import get_config_manager, UnifiedConfigManager, ExceptionConstants
-from droidrun.agent.utils.exception_handler import ExceptionHandler, safe_execute, log_error
+from droidrun.agent.utils.exception_handler import ExceptionHandler, log_error
+from droidrun.agent.utils.logging_utils import LoggingUtils
 from droidrun.telemetry import (
     DroidAgentFinalizeEvent,
     DroidAgentInitEvent,
@@ -80,6 +80,7 @@ from droidrun.telemetry import (
     flush,
 )
 from droidrun.tools import Tools, describe_tools
+from droidrun.tools.adb import AdbTools
 
 # 初始化日志
 logger = logging.getLogger("droidrun")
@@ -230,14 +231,14 @@ class DroidAgent(Workflow):
             self.pending_hot_actions: List[Dict] = []
             self.pending_hot_context: Dict = {}
             
-            logger.info("🧠 Memory system initialized")
+            LoggingUtils.log_info("DroidAgent", "Memory system initialized")
         else:
             self.memory_manager = None
             self.execution_monitor = None
             self.llm_services = None
             self.pending_hot_actions = []
             self.pending_hot_context = {}
-            logger.info("🚫 Memory system disabled")
+            LoggingUtils.log_info("DroidAgent", "Memory system disabled")
 
         # Setup global tracing first if enabled
         if enable_tracing:
@@ -245,9 +246,9 @@ class DroidAgent(Workflow):
                 from llama_index.core import set_global_handler
 
                 set_global_handler("arize_phoenix")
-                logger.info("🔍 Arize Phoenix tracing enabled globally")
+                LoggingUtils.log_info("DroidAgent", "Arize Phoenix tracing enabled globally")
             except ImportError:
-                logger.warning("⚠️ Arize Phoenix package not found, tracing disabled")
+                LoggingUtils.log_warning("DroidAgent", "Arize Phoenix package not found, tracing disabled")
                 enable_tracing = False
 
         self.goal = goal
@@ -266,8 +267,8 @@ class DroidAgent(Workflow):
         self.cim = ContextInjectionManager(personas=personas)
         self.current_episodic_memory = None
 
-        logger.info("🤖 Initializing DroidAgent...")
-        logger.info(f"💾 Trajectory saving level: {self.save_trajectories}")
+        LoggingUtils.log_info("DroidAgent", "Initializing DroidAgent...")
+        LoggingUtils.log_info("DroidAgent", "Trajectory saving level: {level}", level=self.save_trajectories)
 
         self.tool_list = describe_tools(tools, excluded_tools)
         self.tools_instance = tools
@@ -275,7 +276,7 @@ class DroidAgent(Workflow):
         self.tools_instance.save_trajectories = self.save_trajectories
 
         if self.reasoning:
-            logger.info("📝 Initializing Planner Agent...")
+            LoggingUtils.log_info("DroidAgent", "Initializing Planner Agent...")
             self.planner_agent = PlannerAgent(
                 goal=goal,
                 llm=llm,
@@ -292,7 +293,7 @@ class DroidAgent(Workflow):
                 self.reflector = Reflector(llm=llm, debug=self.debug)
 
         else:
-            logger.debug("🚫 Planning disabled - will execute tasks directly with CodeActAgent")
+            LoggingUtils.log_debug("DroidAgent", "Planning disabled - will execute tasks directly with CodeActAgent")
             self.planner_agent = None
 
         capture(
@@ -313,7 +314,7 @@ class DroidAgent(Workflow):
             self.user_id,
         )
 
-        logger.info("✅ DroidAgent initialized successfully.")
+        LoggingUtils.log_info("DroidAgent", "DroidAgent initialized successfully.")
 
     def run(self, *args, **kwargs) -> WorkflowHandler:
         """
@@ -336,7 +337,7 @@ class DroidAgent(Workflow):
         reflection = ev.reflection if ev.reflection is not None else None
         persona = self.cim.get_persona(task.agent_type)
 
-        logger.info(f"🔧 Executing task: {task.description}")
+        LoggingUtils.log_progress("DroidAgent", "Executing task: {description}", description=task.description)
 
         # 新增：执行监控
         if self.memory_enabled and self.memory_config.monitoring_enabled:
@@ -349,14 +350,14 @@ class DroidAgent(Workflow):
         try:
             # 热启动直执分支：若有待执行动作，直接绕过 CodeAct
             if self.memory_enabled and getattr(self, 'pending_hot_actions', None):
-                logger.info(f"🚀 Directly executing {len(self.pending_hot_actions)} hot-start actions")
+                LoggingUtils.log_progress("DroidAgent", "Directly executing {count} hot-start actions", count=len(self.pending_hot_actions))
                 # 设置热启动标志，用于后续判断（finalize阶段）
                 self.is_hot_start_execution = True
                 success, reason = await self._direct_execute_actions_async(self.pending_hot_actions)
                 # 记录热启动执行结果
                 if hasattr(self, 'trajectory') and self.trajectory:
                     self.trajectory.events.append(TaskEndEvent(success=success, reason=reason, task=task))
-                    logger.info(f"[HOT] 📝 Hot start execution recorded in trajectory")
+                    LoggingUtils.log_info("DroidAgent", "Hot start execution recorded in trajectory")
                 # 用完即清空（但保留is_hot_start_execution标志）
                 self.pending_hot_actions = []
                 return CodeActResultEvent(success=success, reason=reason, task=task, steps=self.step_counter)
@@ -393,7 +394,7 @@ class DroidAgent(Workflow):
                 })
                 
                 if monitor_result.fallback_needed:
-                    logger.warning(f"⚠️ Execution anomaly detected: {monitor_result.message}")
+                    LoggingUtils.log_warning("DroidAgent", "Execution anomaly detected: {message}", message=monitor_result.message)
                     # 触发回退逻辑
                     return self._handle_fallback(monitor_result, task)
 
@@ -415,8 +416,8 @@ class DroidAgent(Workflow):
         except Exception as e:
             log_error("[DroidAgent] Task execution", e, level="error")
             if self.debug:
-                import traceback
-                logger.error(traceback.format_exc())
+                
+                LoggingUtils.log_error("DroidAgent", "{error}", error=traceback.format_exc())
             return CodeActResultEvent(success=False, reason=f"Error: {str(e)}", task=task, steps=0)
 
     @step
@@ -451,8 +452,7 @@ class DroidAgent(Workflow):
         except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
             log_error("[DroidAgent] Execution", e, level="error")
             if self.debug:
-                import traceback
-                logger.error(traceback.format_exc())
+                LoggingUtils.log_error("DroidAgent", "{error}", error=traceback.format_exc())
             tasks = self.task_manager.get_task_history()
             return FinalizeEvent(
                 success=False,
@@ -514,9 +514,9 @@ class DroidAgent(Workflow):
                         task = next(self.task_iter)
                         return CodeActExecuteEvent(task=task, reflection=None)
                     except StopIteration as e:
-                        logger.info("Planning next steps...")
+                        LoggingUtils.log_info("DroidAgent", "Planning next steps...")
 
-                logger.debug(f"Planning step {self.step_counter}/{self.max_steps}")
+                LoggingUtils.log_debug("DroidAgent", "Planning step {current}/{max}", current=self.step_counter, max=self.max_steps)
 
                 handler = self.planner_agent.run(
                     remembered_info=self.tools_instance.memory, reflection=None
@@ -531,7 +531,7 @@ class DroidAgent(Workflow):
             self.task_iter = iter(self.tasks)
 
             if self.task_manager.goal_completed:
-                logger.info(f"✅ Goal completed: {self.task_manager.message}")
+                LoggingUtils.log_success("DroidAgent", "Goal completed: {message}", message=self.task_manager.message)
                 tasks = self.task_manager.get_task_history()
                 return FinalizeEvent(
                     success=True,
@@ -542,7 +542,7 @@ class DroidAgent(Workflow):
                     steps=self.step_counter,
                 )
             if not self.tasks:
-                logger.warning("No tasks generated by planner")
+                LoggingUtils.log_warning("DroidAgent", "No tasks generated by planner")
                 output = "Planner did not generate any tasks"
                 tasks = self.task_manager.get_task_history()
                 return FinalizeEvent(
@@ -559,8 +559,7 @@ class DroidAgent(Workflow):
         except Exception as e:
             log_error("[DroidAgent] Planning", e, level="error")
             if self.debug:
-                import traceback
-                logger.error(traceback.format_exc())
+                LoggingUtils.log_error("DroidAgent", "{error}", error=traceback.format_exc())
             tasks = self.task_manager.get_task_history()
             return FinalizeEvent(
                 success=False,
@@ -581,7 +580,7 @@ class DroidAgent(Workflow):
         Returns:
             Dict containing the execution result
         """
-        logger.info(f"🚀 Running DroidAgent to achieve goal: {self.goal}")
+        LoggingUtils.log_info("DroidAgent", "Running DroidAgent to achieve goal: {goal}", goal=self.goal)
         ctx.write_event_to_stream(ev)
 
         self.step_counter = 0
@@ -600,17 +599,19 @@ class DroidAgent(Workflow):
                 max_display = self.config_manager.get("memory.max_similar_experiences_display", 3)
                 for i, exp in enumerate(similar_experiences[:max_display]):
                     print(f"  {i+1}. {exp.goal} (相似度: {exp.similarity_score:.2f})")
-                logger.info(f"🔥 Hot start: Found {len(similar_experiences)} similar experiences")
+                LoggingUtils.log_info("DroidAgent", "Hot start: Found {count} similar experiences", count=len(similar_experiences))
                 # 打印命中集合的相似度（检索阶段结果）
                 try:
                     for exp in similar_experiences:
                         if hasattr(exp, "similarity_score") and exp.similarity_score is not None:
-                            logger.info(f"[SIM][kept] similarity={exp.similarity_score:.2f} goal={exp.goal}")
+                            LoggingUtils.log_debug("DroidAgent", "Similarity kept: {score:.2f} goal={goal}", 
+                                                 score=exp.similarity_score, goal=exp.goal)
                 except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                     ExceptionHandler.handle_data_parsing_error(e, "[SIM] Similarity calculation")
             else:
                 print("❄️ 未发现相似经验，将使用冷启动")
-                logger.info(f"❄️ Cold start: No similar experiences found (threshold={self.memory_config.similarity_threshold})")
+                LoggingUtils.log_info("DroidAgent", "Cold start: No similar experiences found (threshold={threshold})", 
+                                    threshold=self.memory_config.similarity_threshold)
             
             # 优化：直接使用已缓存的相似度分数，避免重复计算
             try:
@@ -620,11 +621,13 @@ class DroidAgent(Workflow):
                     try:
                         # 优先使用已缓存的similarity_score
                         if hasattr(exp, 'similarity_score') and exp.similarity_score is not None:
-                            logger.info(f"[SIM] Similarity {exp.similarity_score:.2f} to experience goal: {exp.goal}")
+                            LoggingUtils.log_debug("DroidAgent", "Similarity {score:.2f} to experience goal: {goal}", 
+                                                 score=exp.similarity_score, goal=exp.goal)
                         else:
                             # 仅当没有缓存时才重新计算
                             score = self.memory_manager._calculate_similarity(self.goal, exp.goal)
-                            logger.info(f"[SIM] Similarity {score:.2f} to experience goal: {exp.goal}")
+                            LoggingUtils.log_debug("DroidAgent", "Similarity {score:.2f} to experience goal: {goal}", 
+                                                 score=score, goal=exp.goal)
                     except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                         ExceptionHandler.handle_data_parsing_error(e, "[SIM] Similarity calculation")
                         continue
@@ -642,10 +645,12 @@ class DroidAgent(Workflow):
                     # 直接使用相似度最高的完美匹配
                     best_exp_obj = max(perfect_matches, key=lambda e: e.similarity_score)
                     best_experience = best_exp_obj.to_dict()
-                    logger.info(f"🎯 Perfect match found (similarity={best_exp_obj.similarity_score:.2f}), skipping LLM selection")
+                    LoggingUtils.log_success("DroidAgent", "Perfect match found (similarity={score:.2f}), skipping LLM selection", 
+                                            score=best_exp_obj.similarity_score)
                 else:
                     # 没有完美匹配时才调用LLM选择
-                    logger.info(f"🤔 No perfect match, using LLM to select best from {len(similar_experiences)} candidates")
+                    LoggingUtils.log_info("DroidAgent", "No perfect match, using LLM to select best from {count} candidates", 
+                                        count=len(similar_experiences))
                     best_experience = self.llm_services.select_best_experience(
                         [exp.to_dict() for exp in similar_experiences], 
                         self.goal
@@ -656,7 +661,7 @@ class DroidAgent(Workflow):
                         # 获取匹配经验的ID
                         experience_id = best_experience.get("id")
                         experience_goal = best_experience.get("goal", "")
-                        logger.info(f"🔥 Hot start using experience ID: {experience_id}")
+                        LoggingUtils.log_progress("DroidAgent", "Hot start using experience ID: {id}", id=experience_id)
                         
                         # 优化：检测目标是否完全匹配
                         is_perfect_match = (self.goal == experience_goal) or (
@@ -667,30 +672,32 @@ class DroidAgent(Workflow):
                         if self.memory_config.parameter_adaptation_enabled:
                             # 优化：完美匹配时跳过LLM参数适配
                             if is_perfect_match:
-                                logger.info(f"✨ Perfect match detected, skipping parameter adaptation")
+                                LoggingUtils.log_success("DroidAgent", "Perfect match detected, skipping parameter adaptation")
+                                self.skip_persist_for_perfect_match = True
                                 adapted_actions = best_experience.get("action_sequence", [])
                             else:
-                                logger.info(f"🔄 Adapting parameters for similar goal (similarity < 1.0)")
+                                LoggingUtils.log_progress("DroidAgent", "Adapting parameters for similar goal (similarity < 1.0)")
                                 adapted_actions = self.memory_manager.adapt_parameters(
                                     TaskExperience.from_dict(best_experience), 
                                     self.goal
                                 )
-                                logger.info(f"🔄 Parameters adapted for hot start")
+                                LoggingUtils.log_progress("DroidAgent", "Parameters adapted for hot start")
                         else:
                             # 优先从对应的trajectories子文件夹加载macro.json
                             macro_actions = self._load_macro_actions(experience_id)
                             if macro_actions:
-                                logger.info(f"📋 Using macro actions from trajectories/{experience_id}/macro.json")
+                                LoggingUtils.log_info("DroidAgent", "Using macro actions from trajectories/{id}/macro.json", id=experience_id)
                                 adapted_actions = macro_actions
                             else:
                                 # 回退到使用experience中的action_sequence
-                                logger.info(f"📋 Fallback to using action_sequence from experience")
+                                LoggingUtils.log_info("DroidAgent", "Fallback to using action_sequence from experience")
                                 adapted_actions = best_experience.get("action_sequence", [])
                         
                         # 直执：将动作放入队列，并用 LLM 预判哪些索引是"变更点击步"
                         self.pending_hot_actions = adapted_actions or []
                         if self.pending_hot_actions:
-                            logger.info(f"🔥 Hot start direct-execution prepared with {len(self.pending_hot_actions)} actions")
+                            LoggingUtils.log_progress("DroidAgent", "Hot start direct-execution prepared with {count} actions", 
+                                                    count=len(self.pending_hot_actions))
                             self.pending_hot_context = {
                                 "experience_goal": best_experience.get("goal", ""),
                                 "experience_actions": best_experience.get("action_sequence", []),
@@ -712,7 +719,7 @@ class DroidAgent(Workflow):
                             try:
                                 # 优化：完美匹配时跳过LLM变更检测
                                 if is_perfect_match:
-                                    logger.info(f"✨ Perfect match detected, skipping change detection (no changes expected)")
+                                    LoggingUtils.log_info("DroidAgent", "Perfect match detected, skipping change detection (no changes expected)")
                                     self.pending_hot_context["changed_indices"] = []
                                     self.pending_hot_context["changed_index_reasons"] = []
                                 else:
@@ -723,7 +730,7 @@ class DroidAgent(Workflow):
                                             params = (a or {}).get("params") or (a or {}).get("parameters") or {}
                                             a["description"] = f"{name} with params {json.dumps(params, ensure_ascii=False)}"
 
-                                    logger.info(f"🔍 Detecting changed actions for similar goal (similarity < 1.0)")
+                                    LoggingUtils.log_info("DroidAgent", "Detecting changed actions for similar goal (similarity < 1.0)")
                                     det = self.llm_services.detect_changed_actions(
                                         self.pending_hot_context["experience_goal"],
                                         self.goal,
@@ -732,7 +739,8 @@ class DroidAgent(Workflow):
                                     self.pending_hot_context["changed_indices"] = det.get("changed_indices", [])
                                     # 保存 index->reason，用于更具体的微冷启动子目标
                                     self.pending_hot_context["changed_index_reasons"] = det.get("index_reasons", [])
-                                    logger.info(f"[HOT] Changed action indices predicted: {self.pending_hot_context['changed_indices']}")
+                                    LoggingUtils.log_debug("DroidAgent", "Changed action indices predicted: {indices}", 
+                                                         indices=self.pending_hot_context['changed_indices'])
                             except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                                 ExceptionHandler.handle_data_parsing_error(e, "[HOT] Change detection")
                             task = Task(
@@ -745,10 +753,10 @@ class DroidAgent(Workflow):
                         ExceptionHandler.handle_runtime_error(e, "[HOT] Hot start", reraise=False)
                         # 如果热启动失败，继续执行冷启动逻辑
             else:
-                logger.info("❄️ Cold start: No similar experiences found")
+                LoggingUtils.log_info("DroidAgent", "Cold start: No similar experiences found")
 
         if not self.reasoning:
-            logger.info(f"🔄 Direct execution mode - executing goal: {self.goal}")
+            LoggingUtils.log_progress("DroidAgent", "Direct execution mode - executing goal: {goal}", goal=self.goal)
             task = Task(
                 description=self.goal,
                 status=self.task_manager.STATUS_PENDING,
@@ -781,24 +789,33 @@ class DroidAgent(Workflow):
             "output": ev.output,
             "steps": ev.steps,
         }
-
+        if getattr(self, 'skip_persist_for_perfect_match', False):
+            LoggingUtils.log_info("DroidAgent", "该任务已有高度重合的历史经验，不再持久化该任务")
+            return StopEvent(result)
+            
         if self.trajectory and self.save_trajectories != "none":
             self.trajectory.save_trajectory()
-            
-            # 轨迹保存完成后，保存经验到记忆系统
+
+            # 轨迹保存完成后，保存经验到记忆系统（尽量不阻塞收尾阶段）
             if self.memory_enabled and ev.success:
                 try:
-                    # 确保macro.json已经生成
                     wait_time = self.config_manager.get("tools.macro_generation_wait_time", 0.5)
                     await asyncio.sleep(wait_time)
-                    
                     experience = self._build_experience_from_execution(ev)
                     saved_path = self.memory_manager.save_experience(experience)
-                    logger.info(f"💾 Experience saved to: {saved_path}")
+                    LoggingUtils.log_success("DroidAgent", "Experience saved to: {path}", path=saved_path)
                 except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
                     ExceptionHandler.handle_file_operation_error(e, "[Experience] Save")
                 except Exception as e:
                     log_error("[Experience] Save", e, level="warning")
+
+        # Best-effort resource cleanup hooks (e.g., device TCP forwards)
+        try:
+            tools = getattr(self, "tools", None)
+            if tools and isinstance(tools, AdbTools):
+                tools.teardown_tcp_forward()
+        except Exception:
+            pass
 
         return StopEvent(result)
 
@@ -833,16 +850,17 @@ class DroidAgent(Workflow):
             tools = self.tools_instance
             step_count = 0
             # 初始化UI
-            logger.info("[HOT] Initializing UI state cache...")
+            LoggingUtils.log_debug("DroidAgent", "Initializing UI state cache...")
             try:
                 ui_state = tools.get_state()
-                logger.info(f"[HOT] ✅ UI state initialized with {len(ui_state.get('elements', []))} elements")
+                LoggingUtils.log_debug("DroidAgent", "UI state initialized with {count} elements", 
+                                     count=len(ui_state.get('elements', [])))
                 
                 # 创建RecordUIStateEvent并添加到trajectory
                 if ui_state and 'a11y_tree' in ui_state:
                     ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
                     self.trajectory.ui_states.append(ui_state_event.ui_state)
-                    logger.info("[HOT] 📋 Initial UI state recorded")
+                    LoggingUtils.log_info("DroidAgent", "Initial UI state recorded")
                 
                 try:
                     screenshot = tools.take_screenshot()
@@ -851,7 +869,7 @@ class DroidAgent(Workflow):
                         screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
                         screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
                         self.trajectory.screenshots.append(screenshot_event.screenshot)
-                        logger.info("[HOT] 📸 Initial screenshot captured and recorded")
+                        LoggingUtils.log_info("DroidAgent", "Initial screenshot captured and recorded")
                 except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
                     ExceptionHandler.handle_file_operation_error(e, "[HOT] Initial screenshot capture")
             except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
@@ -864,7 +882,8 @@ class DroidAgent(Workflow):
                 name = (act or {}).get("action") or (act or {}).get("name")
                 params = (act or {}).get("params", {}) or (act or {}).get("parameters", {})
                 desc = str((act or {}).get("description", ""))
-                logger.info(f"[HOT] executing action {idx_action+1}/{len(actions)}: {name} params={params}")
+                LoggingUtils.log_debug("DroidAgent", "Executing action {current}/{total}: {name} params={params}", 
+                                     current=idx_action+1, total=len(actions), name=name, params=params)
                 try:
                     if name in ("tap_by_index", "tap", "tap_index"):
                         idx_val = params.get("index", params.get("idx"))
@@ -889,7 +908,8 @@ class DroidAgent(Workflow):
                                     # 成功后继续到下一步（不再执行原点击）
                                     continue
                                 else:
-                                    logger.warning(f"[HOT] ⚠️ Micro-coldstart failed for step {idx_action}, fallback to direct tap")
+                                    LoggingUtils.log_warning("DroidAgent", "Micro-coldstart failed for step {step}, fallback to direct tap", 
+                                                           step=idx_action)
                             tools.tap_by_index(idx)
                             screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                             time.sleep(screenshot_wait)
@@ -994,7 +1014,7 @@ class DroidAgent(Workflow):
                                     screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
                                     self.trajectory.screenshots.append(screenshot_event.screenshot)
                             except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
-                                logger.warning(f"[HOT] Failed to capture state after start_app: {e}")
+                                LoggingUtils.log_warning("DroidAgent", "Failed to capture state after start_app: {error}", error=e)
                             
                             # 创建StartAppEvent并添加到macro
                             
@@ -1042,7 +1062,7 @@ class DroidAgent(Workflow):
                         reason = str(params.get("reason", "Hot start direct execution finished"))
                         return True, reason
                     else:
-                        logger.warning(f"[HOT] Unknown action type: {name}, skipping...")
+                        LoggingUtils.log_warning("DroidAgent", "Unknown action type: {name}, skipping...", name=name)
                 except ExceptionConstants.RUNTIME_EXCEPTIONS as action_error:
                     ExceptionHandler.handle_runtime_error(action_error, f"[HOT] Action {idx_action+1}", reraise=False)
                     try:
@@ -1132,7 +1152,7 @@ class DroidAgent(Workflow):
             
             # 保存经验
             saved_path = self.memory_manager.save_experience(experience)
-            logger.info(f"💾 Experience saved to: {saved_path}")
+            LoggingUtils.log_success("DroidAgent", "Experience saved to: {path}", path=saved_path)
             
         except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
             ExceptionHandler.handle_file_operation_error(e, "[Experience] Save")
@@ -1186,9 +1206,9 @@ class DroidAgent(Workflow):
             if not micro_goal:
                 micro_goal = self.llm_services.generate_micro_goal(action, {}, self.goal)
             
-            logger.info(f"🔄 Micro cold start for step {step_index}: {micro_goal}")
-            logger.info(f"🔄 Action details: {action_name} with params {params}")
-            logger.info(f"🔄 [MICRO-COLD] Task description: '{micro_goal}'")
+            LoggingUtils.log_progress("DroidAgent", "Micro cold start for step {step}: {goal}", step=step_index, goal=micro_goal)
+            LoggingUtils.log_debug("DroidAgent", "Action details: {name} with params {params}", name=action_name, params=params)
+            LoggingUtils.log_debug("DroidAgent", "Task description: '{goal}'", goal=micro_goal)
             
             
             max_micro_steps = self.config_manager.get("agent.max_micro_cold_steps", 5)
@@ -1211,9 +1231,9 @@ class DroidAgent(Workflow):
             
             success = bool(result.get("success", False))
             if success:
-                logger.info(f"✅ Micro cold start completed for step {step_index}")
+                LoggingUtils.log_success("DroidAgent", "Micro cold start completed for step {step}", step=step_index)
             else:
-                logger.warning(f"⚠️ Micro cold start failed for step {step_index}")
+                LoggingUtils.log_warning("DroidAgent", "Micro cold start failed for step {step}", step=step_index)
             
             return success
             
@@ -1227,12 +1247,12 @@ class DroidAgent(Workflow):
     def _handle_fallback(self, monitor_result: MonitorResult, task: Task) -> CodeActResultEvent:
         """处理回退逻辑"""
         fallback_strategy = self.execution_monitor.suggest_fallback(monitor_result)
-        logger.warning(f"🔄 Applying fallback strategy: {fallback_strategy}")
+        LoggingUtils.log_warning("DroidAgent", "Applying fallback strategy: {strategy}", strategy=fallback_strategy)
         
         # 根据回退类型选择策略
         if monitor_result.fallback_type == "consecutive_failures":
             # 回退到冷启动
-            logger.info("🔄 Falling back to cold start mode")
+            LoggingUtils.log_info("DroidAgent", "Falling back to cold start mode")
             return CodeActResultEvent(
                 success=False,
                 reason=f"Fallback triggered: {monitor_result.message}",
@@ -1241,7 +1261,7 @@ class DroidAgent(Workflow):
             )
         elif monitor_result.fallback_type == "timeout":
             # 简化任务
-            logger.info("🔄 Simplifying task due to timeout")
+            LoggingUtils.log_info("DroidAgent", "Simplifying task due to timeout")
             return CodeActResultEvent(
                 success=False,
                 reason=f"Task timeout: {monitor_result.message}",
@@ -1268,14 +1288,16 @@ class DroidAgent(Workflow):
             if is_hot_start:
                 # 热启动：使用快速的简化方法，不调用LLM（避免3+分钟的延迟）
                 page_sequence = self._extract_simple_page_sequence()
-                logger.info(f"📄 Hot start: Extracted {len(page_sequence)} pages using simplified method (no LLM)")
+                LoggingUtils.log_info("DroidAgent", "Hot start: Extracted {count} pages using simplified method (no LLM)", 
+                                    count=len(page_sequence))
             else:
                 # 冷启动：调用LLM提取详细的页面序列（保留完整语义信息）
                 page_sequence = self.llm_services.extract_page_sequence({
                     "ui_states": self.trajectory.ui_states,
                     "events": [e.__dict__ for e in self.trajectory.events]
                 })
-                logger.info(f"📄 Cold start: Extracted {len(page_sequence)} pages using LLM")
+                LoggingUtils.log_info("DroidAgent", "Cold start: Extracted {count} pages using LLM", 
+                                    count=len(page_sequence))
         
         # 提取动作序列
         action_sequence = []
@@ -1310,11 +1332,12 @@ class DroidAgent(Workflow):
             macro_actions = self._load_macro_actions()
             
             if macro_actions:
-                logger.info(f"🎬 Using {len(macro_actions)} actions from macro.json with original descriptions")
+                LoggingUtils.log_info("DroidAgent", "Using {count} actions from macro.json with original descriptions", 
+                                    count=len(macro_actions))
                 return macro_actions
             else:
                 # 如果无法加载macro.json，回退到原有逻辑
-                logger.warning("Failed to load macro.json, falling back to trajectory extraction")
+                LoggingUtils.log_warning("DroidAgent", "Failed to load macro.json, falling back to trajectory extraction")
                 return self._extract_actions_from_trajectory_fallback()
                 
         except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
@@ -1343,7 +1366,8 @@ class DroidAgent(Workflow):
                     }
                     actions.append(action_data)
         
-        logger.info(f"🎬 Extracted {len(actions)} actions from trajectory (fallback)")
+        LoggingUtils.log_info("DroidAgent", "Extracted {count} actions from trajectory (fallback)", 
+                            count=len(actions))
         return actions
 
     def _extract_simple_page_sequence(self) -> List[Dict]:
@@ -1416,23 +1440,25 @@ class DroidAgent(Workflow):
                 macro_file = f"trajectories/{experience_id}/macro.json"
                 
                 if os.path.exists(macro_file):
-                    logger.info(f"📋 Loading macro.json from matched experience: {macro_file}")
+                    LoggingUtils.log_info("DroidAgent", "Loading macro.json from matched experience: {file}", file=macro_file)
                     
                     with open(macro_file, 'r', encoding='utf-8') as f:
                         macro_data = json.load(f)
                         actions = macro_data.get('actions', [])
                         
-                        logger.info(f"📋 Found {len(actions)} actions in matched experience macro.json")
+                        LoggingUtils.log_info("DroidAgent", "Found {count} actions in matched experience macro.json", 
+                                            count=len(actions))
                         
                         if not actions:
-                            logger.warning("📋 No actions found in matched experience macro.json")
+                            LoggingUtils.log_warning("DroidAgent", "No actions found in matched experience macro.json")
                             return []
                         
                         # 转换格式以匹配 TaskExperience 的 action_sequence 格式
                         converted_actions = []
                         for i, action in enumerate(actions):
                             description = action.get('description', '')
-                            logger.info(f"📋 Action {i}: type={action.get('type')}, description='{description[:50]}...'")
+                            LoggingUtils.log_debug("DroidAgent", "Action {index}: type={type}, description='{desc}...'", 
+                                                 index=i, type=action.get('type'), desc=description[:50])
                             
                             converted_action = {
                                 "action": self._convert_action_type(action.get('type', '')),
@@ -1443,10 +1469,12 @@ class DroidAgent(Workflow):
                             }
                             converted_actions.append(converted_action)
                         
-                        logger.info(f"📋 Loaded {len(converted_actions)} actions from matched experience macro.json with descriptions")
+                        LoggingUtils.log_info("DroidAgent", "Loaded {count} actions from matched experience macro.json with descriptions", 
+                                            count=len(converted_actions))
                         return converted_actions
                 else:
-                    logger.warning(f"📋 Macro file not found for experience_id {experience_id}: {macro_file}")
+                    LoggingUtils.log_warning("DroidAgent", "Macro file not found for experience_id {id}: {file}", 
+                                           id=experience_id, file=macro_file)
                     # 回退到查找最新的macro.json
             
             # 回退逻辑：查找最新的 macro.json 文件
@@ -1455,23 +1483,24 @@ class DroidAgent(Workflow):
                 # 按修改时间排序，获取最新的
                 latest_macro = max(trajectory_dirs, key=os.path.getmtime)
                 
-                logger.info(f"📋 Loading macro.json from: {latest_macro}")
+                LoggingUtils.log_info("DroidAgent", "Loading macro.json from: {file}", file=latest_macro)
                 
                 with open(latest_macro, 'r', encoding='utf-8') as f:
                     macro_data = json.load(f)
                     actions = macro_data.get('actions', [])
                     
-                    logger.info(f"📋 Found {len(actions)} actions in macro.json")
+                    LoggingUtils.log_info("DroidAgent", "Found {count} actions in macro.json", count=len(actions))
                     
                     if not actions:
-                        logger.warning("📋 No actions found in macro.json")
+                        LoggingUtils.log_warning("DroidAgent", "No actions found in macro.json")
                         return []
                     
                     # 转换格式以匹配 TaskExperience 的 action_sequence 格式
                     converted_actions = []
                     for i, action in enumerate(actions):
                         description = action.get('description', '')
-                        logger.info(f"📋 Action {i}: type={action.get('type')}, description='{description[:50]}...'")
+                        LoggingUtils.log_debug("DroidAgent", "Action {index}: type={type}, description='{desc}...'", 
+                                             index=i, type=action.get('type'), desc=description[:50])
                         
                         converted_action = {
                             "action": self._convert_action_type(action.get('type', '')),
@@ -1482,13 +1511,14 @@ class DroidAgent(Workflow):
                         }
                         converted_actions.append(converted_action)
                     
-                    logger.info(f"📋 Loaded {len(converted_actions)} actions from macro.json with descriptions")
+                    LoggingUtils.log_info("DroidAgent", "Loaded {count} actions from macro.json with descriptions", 
+                                        count=len(converted_actions))
                     return converted_actions
             else:
-                logger.warning("📋 No macro.json files found in trajectories directory")
+                LoggingUtils.log_warning("DroidAgent", "No macro.json files found in trajectories directory")
                 return []
         except Exception as e:
-            logger.warning(f"Failed to load macro actions: {e}")
+            LoggingUtils.log_warning("DroidAgent", "Failed to load macro actions: {error}", error=e)
             return []
 
     def _convert_action_type(self, macro_type: str) -> str:
@@ -1630,7 +1660,7 @@ class DroidAgent(Workflow):
             
             # 保存经验
             saved_path = self.memory_manager.save_experience(experience)
-            logger.info(f"💾 Experience saved to: {saved_path}")
+            LoggingUtils.log_success("DroidAgent", "Experience saved to: {path}", path=saved_path)
             
         except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
             ExceptionHandler.handle_file_operation_error(e, "[Experience] Save")

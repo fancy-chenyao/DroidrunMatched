@@ -7,10 +7,10 @@ from droidrun.agent.planner.prompts import (
     DEFAULT_PLANNER_SYSTEM_PROMPT,
     DEFAULT_PLANNER_USER_PROMPT,
 )
-import logging
 import asyncio
 from typing import List, TYPE_CHECKING, Union
-import inspect
+from droidrun.agent.utils.logging_utils import LoggingUtils
+
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.llms.llm import LLM
@@ -24,14 +24,13 @@ from droidrun.tools import Tools
 from droidrun.agent.common.constants import LLM_HISTORY_LIMIT
 from droidrun.agent.common.events import RecordUIStateEvent, ScreenshotEvent
 from droidrun.agent.context.agent_persona import AgentPersona
+from droidrun.tools.adb import AdbTools
 from droidrun.agent.context.reflection import Reflection
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Setup logger
-logger = logging.getLogger("droidrun")
 
 if TYPE_CHECKING:
     from droidrun.tools import Tools
@@ -94,7 +93,7 @@ class PlannerAgent(Workflow):
 
     @step
     async def prepare_chat(self, ctx: Context, ev: StartEvent) -> PlanInputEvent:
-        logger.info("💬 Preparing planning session...")
+        LoggingUtils.log_info("PlannerAgent", "💬 Preparing planning session...")
 
         self.chat_memory: Memory = await ctx.store.get(
             "chat_memory", default=Memory.from_defaults()
@@ -114,7 +113,7 @@ class PlannerAgent(Workflow):
         await self.chat_memory.aput(ChatMessage(role="user", content=PromptTemplate(self.user_prompt or DEFAULT_PLANNER_USER_PROMPT.format(goal=self.goal))))
         
         input_messages = self.chat_memory.get_all()
-        logger.debug(f"  - Memory contains {len(input_messages)} messages")
+        LoggingUtils.log_debug("PlannerAgent", "Memory contains {count} messages", count=len(input_messages))
         return PlanInputEvent(input=input_messages)
 
     @step
@@ -128,7 +127,7 @@ class PlannerAgent(Workflow):
         ctx.write_event_to_stream(ev)
 
         self.steps_counter += 1
-        logger.info(f"🧠 Thinking about how to plan the goal...")
+        LoggingUtils.log_info("PlannerAgent", "🧠 Thinking about how to plan the goal...")
 
         if self.vision:
             screenshot = (self.tools_instance.take_screenshot())[1]
@@ -141,7 +140,7 @@ class PlannerAgent(Workflow):
             await ctx.store.set("phone_state", state["phone_state"])
             ctx.write_event_to_stream(RecordUIStateEvent(ui_state=state["a11y_tree"]))
         except Exception as e:
-            logger.warning(f"⚠️ Error retrieving state from the connected device. Is the Accessibility Service enabled?")
+            LoggingUtils.log_warning("PlannerAgent", "⚠️ Error retrieving state from the connected device. Is the Accessibility Service enabled?")
 
 
         await ctx.store.set("remembered_info", self.remembered_info)
@@ -151,7 +150,7 @@ class PlannerAgent(Workflow):
         try:
             usage = get_usage_from_response(self.llm.class_name(), response)
         except Exception as e:
-            logger.warning(f"Could not get llm usage from response: {e}")
+            LoggingUtils.log_warning("PlannerAgent", "Could not get llm usage from response: {error}", error=e)
             usage = None
         await self.chat_memory.aput(response.message)
 
@@ -166,15 +165,15 @@ class PlannerAgent(Workflow):
         self, ev: PlanThinkingEvent, ctx: Context
     ) -> Union[PlanInputEvent, PlanCreatedEvent]:
         """Handle LLM output."""
-        logger.debug("🤖 Processing planning output...")
+        LoggingUtils.log_debug("PlannerAgent", "🤖 Processing planning output...")
         code = ev.code
         thoughts = ev.thoughts
 
         if code:
             try:
                 result = await self.executer.execute(ctx, code)
-                logger.info(f"📝 Planning complete")
-                logger.debug(f"  - Planning code executed. Result: {result['output']}")
+                LoggingUtils.log_info("PlannerAgent", "Planning complete")
+                LoggingUtils.log_debug("PlannerAgent", "Planning code executed. Result: {output}", output=result['output'])
 
                 screenshots = result['screenshots']
                 for screenshot in screenshots[:-1]: # the last screenshot will be captured by next step
@@ -196,17 +195,16 @@ class PlannerAgent(Workflow):
                 event = PlanCreatedEvent(tasks=tasks)
 
                 if not self.task_manager.goal_completed:
-                    logger.info(f"📋 Current plan created with {len(tasks)} tasks:")
+                    LoggingUtils.log_info("PlannerAgent", "Current plan created with {count} tasks:", count=len(tasks))
                     for i, task in enumerate(tasks):
-                        logger.info(
-                            f"  Task {i}: [{task.status.upper()}] [{task.agent_type}] {task.description}"
-                        )
+                        LoggingUtils.log_info("PlannerAgent", "Task {index}: [{status}] [{agent_type}] {description}", 
+                                            index=i, status=task.status.upper(), agent_type=task.agent_type, description=task.description)
                     ctx.write_event_to_stream(event)
 
                 return event
 
             except Exception as e:
-                logger.debug(f"error handling Planner: {e}")
+                LoggingUtils.log_debug("PlannerAgent", "Error handling Planner: {error}", error=e)
                 await self.chat_memory.aput(
                     ChatMessage(
                         role="user",
@@ -217,7 +215,7 @@ wrap your code inside this:
 ```""",
                     )
                 )
-                logger.debug("🔄 Waiting for next plan or completion.")
+                LoggingUtils.log_debug("PlannerAgent", "🔄 Waiting for next plan or completion.")
                 return PlanInputEvent(input=self.chat_memory.get_all())
         else:
             await self.chat_memory.aput(
@@ -230,7 +228,7 @@ wrap your code inside this:
 ```""",
                 )
             )
-            logger.debug("🔄 Waiting for next plan or completion.")
+            LoggingUtils.log_debug("PlannerAgent", "🔄 Waiting for next plan or completion.")
             return PlanInputEvent(input=self.chat_memory.get_all())
 
     @step
@@ -238,13 +236,16 @@ wrap your code inside this:
         """Finalize the workflow."""
         await ctx.store.set("chat_memory", self.chat_memory)
 
-        result = {}
-        result.update(
-            {
-                "tasks": ev.tasks,
-            }
-        )
+        # Best-effort resource cleanup
+        try:
+            if hasattr(self, "tools_instance") and isinstance(self.tools_instance, AdbTools):
+                # Ensure any TCP forwardings are removed
+                self.tools_instance.teardown_tcp_forward()
+        except Exception:
+            # Cleanup errors should not break finalize
+            pass
 
+        result = {"tasks": ev.tasks}
         return StopEvent(result=result)
 
     async def _get_llm_response(
@@ -252,14 +253,13 @@ wrap your code inside this:
     ) -> ChatResponse:
         """Get streaming response from LLM."""
         try:
-            logger.debug(f"  - Sending {len(chat_history)} messages to LLM.")
+            LoggingUtils.log_debug("PlannerAgent", "Sending {count} messages to LLM", count=len(chat_history))
 
             model = self.llm.class_name()
             if self.vision == True:
                 if model == "DeepSeek":
-                    logger.warning(
-                        "[yellow]DeepSeek doesnt support images. Disabling screenshots[/]"
-                    )
+                    LoggingUtils.log_warning("PlannerAgent", "DeepSeek doesnt support images. Disabling screenshots")
+                    self.vision = False
                 else:
                     chat_history = await chat_utils.add_screenshot_image_block(
                         await ctx.store.get("screenshot"), chat_history
@@ -291,16 +291,16 @@ wrap your code inside this:
                 chat_utils.message_copy(msg) for msg in messages_to_send
             ]
 
-            logger.debug(f"  - Final message count: {len(messages_to_send)}")
+            LoggingUtils.log_debug("PlannerAgent", "Final message count: {count}", count=len(messages_to_send))
 
             response = await self.llm.achat(messages=messages_to_send)
             assert hasattr(
                 response, "message"
             ), f"LLM response does not have a message attribute.\nResponse: {response}"
-            logger.debug("  - Received response from LLM.")
+            LoggingUtils.log_debug("PlannerAgent", "Received response from LLM.")
             return response
         except Exception as e:
-            logger.error(f"Could not get an answer from LLM: {repr(e)}")
+            LoggingUtils.log_error("PlannerAgent", "Could not get an answer from LLM: {error}", error=repr(e))
             raise e
 
     def _limit_history(

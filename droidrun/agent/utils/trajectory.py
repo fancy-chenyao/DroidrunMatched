@@ -11,6 +11,7 @@ import os
 import time
 import uuid
 from typing import Dict, List, Any
+from droidrun.agent.utils.logging_utils import LoggingUtils
 from PIL import Image
 import io
 from llama_index.core.workflow import Event
@@ -50,7 +51,7 @@ def make_serializable(obj):
                     result[k] = make_serializable(v)
                 except (TypeError, ValueError) as e:
                     # If serialization fails, convert to string representation
-                    logger.warning(f"Failed to serialize attribute {k}: {e}")
+                    LoggingUtils.log_warning("Trajectory", "Failed to serialize attribute {key}: {error}", key=k, error=e)
                     result[k] = str(v)
         return result
     else:
@@ -171,7 +172,7 @@ class Trajectory:
                     try:
                         event_dict[k] = make_serializable(v)
                     except (TypeError, ValueError) as e:
-                        logger.warning(f"Failed to serialize attribute {k}: {e}")
+                        LoggingUtils.log_warning("Trajectory", "Failed to serialize attribute {key}: {error}", key=k, error=e)
                         event_dict[k] = str(v)
 
             # Explicitly check for and add tokens attribute if it exists
@@ -223,9 +224,9 @@ class Trajectory:
             screenshots_folder
         )
         if gif_path:
-            logger.info(f"🎬 Saved screenshot GIF to {gif_path}")
+            LoggingUtils.log_info("Trajectory", "Saved screenshot GIF to {path}", path=gif_path)
 
-        logger.info(f"📁 Trajectory saved to folder: {trajectory_folder}")
+        LoggingUtils.log_info("Trajectory", "Trajectory saved to folder: {folder}", folder=trajectory_folder)
 
         if len(self.ui_states) != len(self.screenshots):
             logger.warning("UI states and screenshots are not the same length!")
@@ -261,25 +262,26 @@ class Trajectory:
             if os.path.exists(trajectory_json_path):
                 with open(trajectory_json_path, "r") as f:
                     result["trajectory_data"] = json.load(f)
-                logger.info(f"📖 Loaded trajectory data from {trajectory_json_path}")
+                LoggingUtils.log_info("Trajectory", "Loaded trajectory data from {path}", path=trajectory_json_path)
 
             # Load macro sequence
             macro_json_path = os.path.join(trajectory_folder, "macro.json")
             if os.path.exists(macro_json_path):
                 with open(macro_json_path, "r") as f:
                     result["macro_data"] = json.load(f)
-                logger.info(f"📖 Loaded macro data from {macro_json_path}")
+                LoggingUtils.log_info("Trajectory", "Loaded macro data from {path}", path=macro_json_path)
 
             # Check for GIF
             gif_path = os.path.join(trajectory_folder, "screenshots.gif")
             if os.path.exists(gif_path):
                 result["gif_path"] = gif_path
-                logger.info(f"🎬 Found screenshot GIF at {gif_path}")
+                LoggingUtils.log_info("Trajectory", "Found screenshot GIF at {path}", path=gif_path)
 
             return result
 
         except Exception as e:
-            logger.error(f"❌ Error loading trajectory folder {trajectory_folder}: {e}")
+            LoggingUtils.log_error("Trajectory", "Error loading trajectory folder {folder}: {error}", 
+                                 folder=trajectory_folder, error=e)
             return result
 
     @staticmethod
@@ -301,15 +303,15 @@ class Trajectory:
             with open(macro_file_path, "r") as f:
                 macro_data = json.load(f)
 
-            logger.info(
-                f"📖 Loaded macro sequence with {macro_data.get('total_actions', 0)} actions from {macro_file_path}"
-            )
+            LoggingUtils.log_info("Trajectory", "Loaded macro sequence with {count} actions from {path}", 
+                                count=macro_data.get('total_actions', 0), path=macro_file_path)
             return macro_data
         except FileNotFoundError:
-            logger.error(f"❌ Macro file not found: {macro_file_path}")
+            LoggingUtils.log_error("Trajectory", "Macro file not found: {path}", path=macro_file_path)
             return {}
         except json.JSONDecodeError as e:
-            logger.error(f"❌ Error parsing macro file {macro_file_path}: {e}")
+            LoggingUtils.log_error("Trajectory", "Error parsing macro file {path}: {error}", 
+                                 path=macro_file_path, error=e)
             return {}
 
     @staticmethod

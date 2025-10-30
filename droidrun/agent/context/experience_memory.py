@@ -9,6 +9,7 @@ import os
 import re
 import uuid
 import logging
+from droidrun.agent.utils.logging_utils import LoggingUtils
 
 logger = logging.getLogger("droidrun")
 
@@ -50,7 +51,7 @@ class ExperienceMemory:
         self.experiences: List[TaskExperience] = []
         self._ensure_storage_dir()
         self._load_experiences()
-        logger.info(f"🧠 ExperienceMemory initialized with {len(self.experiences)} experiences")
+        LoggingUtils.log_info("ExperienceMemory", "ExperienceMemory initialized with {count} experiences", count=len(self.experiences))
     
     def _ensure_storage_dir(self):
         """确保存储目录存在"""
@@ -71,12 +72,13 @@ class ExperienceMemory:
                         experience = TaskExperience.from_dict(data)
                         self.experiences.append(experience)
                 except Exception as e:
-                    logger.warning(f"Failed to load experience from {filename}: {e}")
+                    LoggingUtils.log_warning("ExperienceMemory", "Failed to load experience from {filename}: {error}", 
+                                            filename=filename, error=e)
     
     def find_similar_experiences(self, goal: str, threshold: float = 0.8) -> List[TaskExperience]:
         """查找相似经验 - 使用LLM进行语义匹配"""
         if not self.llm:
-            logger.warning("No LLM provided for similarity matching")
+            LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for similarity matching")
             return []
         
         similar_experiences = []
@@ -86,7 +88,8 @@ class ExperienceMemory:
                 similarity = self._calculate_similarity(goal, experience.goal)
                 # 记录每条经验的相似度与阈值比较
                 try:
-                    logger.info(f"[SIM][calc] similarity={similarity:.2f} threshold={threshold:.2f} goal={experience.goal}")
+                    LoggingUtils.log_debug("ExperienceMemory", "Similarity calculation: {similarity:.2f} threshold={threshold:.2f} goal={goal}", 
+                                         similarity=similarity, threshold=threshold, goal=experience.goal)
                 except Exception:
                     pass
                 if similarity >= threshold:
@@ -94,15 +97,18 @@ class ExperienceMemory:
                     similar_experiences.append(experience)
                 else:
                     try:
-                        logger.info(f"[SIM][drop] similarity={similarity:.2f} < threshold={threshold:.2f} goal={experience.goal}")
+                        LoggingUtils.log_debug("ExperienceMemory", "Similarity below threshold: {similarity:.2f} < {threshold:.2f} goal={goal}", 
+                                             similarity=similarity, threshold=threshold, goal=experience.goal)
                     except Exception:
                         pass
             except Exception as e:
-                logger.warning(f"Failed to calculate similarity for experience {experience.id}: {e}")
+                LoggingUtils.log_warning("ExperienceMemory", "Failed to calculate similarity for experience {exp_id}: {error}", 
+                                        exp_id=experience.id, error=e)
         
         # 按相似度排序
         similar_experiences.sort(key=lambda x: x.similarity_score or 0, reverse=True)
-        logger.info(f"Found {len(similar_experiences)} similar experiences for goal: {goal}")
+        LoggingUtils.log_info("ExperienceMemory", "Found {count} similar experiences for goal: {goal}", 
+                             count=len(similar_experiences), goal=goal)
         return similar_experiences
     
     def _calculate_similarity(self, goal1: str, goal2: str) -> float:
@@ -130,11 +136,12 @@ class ExperienceMemory:
                 similarity = float(numbers[0])
                 return max(0.0, min(1.0, similarity))  # 确保在0-1范围内
             else:
-                logger.warning(f"Could not parse similarity score from: {similarity_text}")
+                LoggingUtils.log_warning("ExperienceMemory", "Could not parse similarity score from: {text}", 
+                                        text=similarity_text)
                 return self._simple_text_similarity(goal1, goal2)
                 
         except Exception as e:
-            logger.warning(f"LLM similarity calculation failed: {e}")
+            LoggingUtils.log_warning("ExperienceMemory", "LLM similarity calculation failed: {error}", error=e)
             return self._simple_text_similarity(goal1, goal2)
     
     def _simple_text_similarity(self, goal1: str, goal2: str) -> float:
@@ -162,17 +169,17 @@ class ExperienceMemory:
             # 添加到内存列表
             self.experiences.append(experience)
             
-            logger.info(f"💾 Experience saved: {filepath}")
+            LoggingUtils.log_success("ExperienceMemory", "Experience saved: {path}", path=filepath)
             return filepath
             
         except Exception as e:
-            logger.error(f"Failed to save experience: {e}")
+            LoggingUtils.log_error("ExperienceMemory", "Failed to save experience: {error}", error=e)
             raise
     
     def adapt_parameters(self, experience: TaskExperience, new_goal: str) -> List[Dict]:
         """参数自适应 - 使用LLM调整动作序列"""
         if not self.llm:
-            logger.warning("No LLM provided for parameter adaptation")
+            LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for parameter adaptation")
             return experience.action_sequence
         
         try:
@@ -206,14 +213,14 @@ class ExperienceMemory:
                                     a["description"] = desc
                 except Exception:
                     pass
-                logger.info(f"🔄 Parameters adapted for new goal: {new_goal}")
+                LoggingUtils.log_progress("ExperienceMemory", "Parameters adapted for new goal: {goal}", goal=new_goal)
                 return adapted_actions
             else:
-                logger.warning("Could not parse adapted actions from LLM response")
+                LoggingUtils.log_warning("ExperienceMemory", "Could not parse adapted actions from LLM response")
                 return experience.action_sequence
                 
         except Exception as e:
-            logger.warning(f"Parameter adaptation failed: {e}")
+            LoggingUtils.log_warning("ExperienceMemory", "Parameter adaptation failed: {error}", error=e)
             return experience.action_sequence
     
     def get_experience_by_id(self, experience_id: str) -> Optional[TaskExperience]:

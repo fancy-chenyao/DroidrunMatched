@@ -30,6 +30,7 @@ from droidrun.agent.codeact.prompts import (
 
 from droidrun.agent.context.episodic_memory import EpisodicMemory, EpisodicMemoryStep
 from droidrun.tools import Tools
+from droidrun.tools.adb import AdbTools
 from typing import Optional, Dict, Tuple, List, Any, Callable
 from droidrun.agent.context.agent_persona import AgentPersona
 
@@ -321,23 +322,28 @@ class CodeActAgent(Workflow):
     @step
     async def finalize(self, ev: TaskEndEvent, ctx: Context) -> StopEvent:
         """Finalize the workflow."""
-        self.tools.finished = False
+        # Mark tool usage ended and persist chat memory
+        self.tools.finished = True
         await ctx.store.set("chat_memory", self.chat_memory)
         
         # Add final state observation to episodic memory
         if self.vision:
             await self._add_final_state_observation(ctx)
         
-        result = {}
-        result.update(
-            {
-                "success": ev.success,
-                "reason": ev.reason,
-                "output": ev.reason,
-                "codeact_steps": self.steps_counter,
-                "code_executions": self.code_exec_counter,
-            }
-        )
+        # Best-effort resource cleanup
+        try:
+            if hasattr(self, "tools") and isinstance(self.tools, AdbTools):
+                self.tools.teardown_tcp_forward()
+        except Exception:
+            pass
+
+        result = {
+            "success": ev.success,
+            "reason": ev.reason,
+            "output": ev.reason,
+            "codeact_steps": self.steps_counter,
+            "code_executions": self.code_exec_counter,
+        }
 
         ctx.write_event_to_stream(
             EpisodicMemoryEvent(episodic_memory=self.episodic_memory)

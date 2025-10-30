@@ -5,9 +5,8 @@ from dataclasses import dataclass, asdict
 from typing import Optional, Dict, Any
 import json
 import os
-import logging
+from droidrun.agent.utils.logging_utils import LoggingUtils
 
-logger = logging.getLogger("droidrun")
 
 @dataclass
 class MemoryConfig:
@@ -40,9 +39,9 @@ class MemoryConfig:
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
-            logger.info(f"💾 Memory config saved to: {filepath}")
+            LoggingUtils.log_info("MemoryConfig", "Memory config saved to: {path}", path=filepath)
         except Exception as e:
-            logger.error(f"Failed to save memory config: {e}")
+            LoggingUtils.log_error("MemoryConfig", "Failed to save memory config: {error}", error=e)
             raise
     
     @classmethod
@@ -50,14 +49,15 @@ class MemoryConfig:
         """从文件加载配置"""
         try:
             if not os.path.exists(filepath):
-                logger.info(f"Config file not found: {filepath}, using default config")
+                LoggingUtils.log_info("MemoryConfig", "Config file not found: {path}, using default config", path=filepath)
                 return cls()
             
             with open(filepath, 'r', encoding='utf-8') as f:
                 config_dict = json.load(f)
             return cls.from_dict(config_dict)
         except Exception as e:
-            logger.warning(f"Failed to load memory config from {filepath}: {e}")
+            LoggingUtils.log_warning("MemoryConfig", "Failed to load memory config from {path}: {error}", 
+                                   path=filepath, error=e)
             return cls()
     
     def validate(self) -> bool:
@@ -65,27 +65,33 @@ class MemoryConfig:
         try:
             # 检查数值范围
             if not 0.0 <= self.similarity_threshold <= 1.0:
-                logger.error(f"Invalid similarity_threshold: {self.similarity_threshold}")
+                LoggingUtils.log_error("MemoryConfig", "Invalid similarity_threshold: {threshold}", 
+                                     threshold=self.similarity_threshold)
                 return False
             
             if not 0.0 <= self.experience_quality_threshold <= 1.0:
-                logger.error(f"Invalid experience_quality_threshold: {self.experience_quality_threshold}")
+                LoggingUtils.log_error("MemoryConfig", "Invalid experience_quality_threshold: {threshold}", 
+                                     threshold=self.experience_quality_threshold)
                 return False
             
             if self.max_experiences <= 0:
-                logger.error(f"Invalid max_experiences: {self.max_experiences}")
+                LoggingUtils.log_error("MemoryConfig", "Invalid max_experiences: {max_exp}", 
+                                     max_exp=self.max_experiences)
                 return False
             
             if self.max_consecutive_failures <= 0:
-                logger.error(f"Invalid max_consecutive_failures: {self.max_consecutive_failures}")
+                LoggingUtils.log_error("MemoryConfig", "Invalid max_consecutive_failures: {max_failures}", 
+                                     max_failures=self.max_consecutive_failures)
                 return False
             
             if self.step_timeout <= 0:
-                logger.error(f"Invalid step_timeout: {self.step_timeout}")
+                LoggingUtils.log_error("MemoryConfig", "Invalid step_timeout: {timeout}", 
+                                     timeout=self.step_timeout)
                 return False
             
             if self.max_steps_before_fallback <= 0:
-                logger.error(f"Invalid max_steps_before_fallback: {self.max_steps_before_fallback}")
+                LoggingUtils.log_error("MemoryConfig", "Invalid max_steps_before_fallback: {max_steps}", 
+                                     max_steps=self.max_steps_before_fallback)
                 return False
             
             # 检查存储目录
@@ -93,14 +99,15 @@ class MemoryConfig:
                 try:
                     os.makedirs(self.storage_dir, exist_ok=True)
                 except Exception as e:
-                    logger.error(f"Cannot create storage directory {self.storage_dir}: {e}")
+                    LoggingUtils.log_error("MemoryConfig", "Cannot create storage directory {dir}: {error}", 
+                                         dir=self.storage_dir, error=e)
                     return False
             
-            logger.info("✅ Memory config validation passed")
+            LoggingUtils.log_success("MemoryConfig", "Memory config validation passed")
             return True
             
         except Exception as e:
-            logger.error(f"Config validation error: {e}")
+            LoggingUtils.log_error("MemoryConfig", "Config validation error: {error}", error=e)
             return False
     
     def get_summary(self) -> str:
@@ -158,9 +165,9 @@ def create_memory_config(
     )
     
     if config.validate():
-        logger.info("✅ Memory config created successfully")
+        LoggingUtils.log_info("MemoryConfig", "✅ Memory config created successfully")
         return config
     else:
-        logger.error("❌ Invalid memory config, using defaults")
+        LoggingUtils.log_error("MemoryConfig", "❌ Invalid memory config, using defaults")
         return DEFAULT_MEMORY_CONFIG
 

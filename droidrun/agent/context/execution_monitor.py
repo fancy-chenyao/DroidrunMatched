@@ -5,11 +5,9 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 import time
-import logging
 import json
 import re
-
-logger = logging.getLogger("droidrun")
+from droidrun.agent.utils.logging_utils import LoggingUtils
 
 class MonitorStatus(Enum):
     NORMAL = "normal"
@@ -37,7 +35,7 @@ class ExecutionMonitor:
         self.consecutive_failures: int = 0
         self.max_consecutive_failures: int = 3
         
-        logger.info("🔍 ExecutionMonitor initialized")
+        LoggingUtils.log_info("ExecutionMonitor", "🔍 ExecutionMonitor initialized")
     
     def start_step_monitoring(self, step_data: Dict):
         """开始监控单个步骤"""
@@ -47,7 +45,7 @@ class ExecutionMonitor:
             "start_time": self.step_start_time,
             "data": step_data
         })
-        logger.debug(f"🔍 Started monitoring step {len(self.execution_history)}")
+        LoggingUtils.log_debug("ExecutionMonitor", "Started monitoring step {count}", count=len(self.execution_history))
     
     def monitor_step(self, step_data: Dict) -> MonitorResult:
         """监控单个执行步骤"""
@@ -58,7 +56,8 @@ class ExecutionMonitor:
             
             # 如果这是任务完成的情况，不进行超时检查
             if step_data.get("success", False) and step_data.get("steps", 0) > 10:
-                logger.info(f"🎯 Task completed successfully with {step_data.get('steps', 0)} steps, skipping timeout check")
+                LoggingUtils.log_info("ExecutionMonitor", "Task completed successfully with {steps} steps, skipping timeout check", 
+                                    steps=step_data.get('steps', 0))
                 return MonitorResult(
                     status=MonitorStatus.NORMAL,
                     message="Task completed successfully",
@@ -88,7 +87,7 @@ class ExecutionMonitor:
             )
             
         except Exception as e:
-            logger.error(f"Error in step monitoring: {e}")
+            LoggingUtils.log_error("ExecutionMonitor", "Error in step monitoring: {error}", error=e)
             return MonitorResult(
                 status=MonitorStatus.ERROR,
                 message=f"Monitoring error: {str(e)}",
@@ -189,7 +188,7 @@ class ExecutionMonitor:
             )
             
         except Exception as e:
-            logger.warning(f"LLM analysis failed: {e}")
+            LoggingUtils.log_warning("ExecutionMonitor", "LLM analysis failed: {error}", error=e)
             return MonitorResult(
                 status=MonitorStatus.NORMAL,
                 message="LLM analysis skipped",
@@ -234,7 +233,7 @@ class ExecutionMonitor:
             )
             
         except Exception as e:
-            logger.error(f"Error in anomaly detection: {e}")
+            LoggingUtils.log_error("ExecutionMonitor", "Error in anomaly detection: {error}", error=e)
             return MonitorResult(
                 status=MonitorStatus.ERROR,
                 message=f"Anomaly detection error: {str(e)}",
@@ -285,7 +284,7 @@ class ExecutionMonitor:
             )
             
         except Exception as e:
-            logger.warning(f"LLM execution analysis failed: {e}")
+            LoggingUtils.log_warning("ExecutionMonitor", "LLM execution analysis failed: {error}", error=e)
             return MonitorResult(
                 status=MonitorStatus.NORMAL,
                 message="LLM execution analysis skipped",
@@ -304,7 +303,7 @@ class ExecutionMonitor:
         }
         
         strategy = fallback_strategies.get(anomaly.fallback_type, "使用默认回退策略")
-        logger.info(f"🔄 Suggested fallback strategy: {strategy}")
+        LoggingUtils.log_info("ExecutionMonitor", "Suggested fallback strategy: {strategy}", strategy=strategy)
         return strategy
     
     def _update_performance_metrics(self, step_data: Dict, execution_time: float):
@@ -339,5 +338,5 @@ class ExecutionMonitor:
         self.performance_metrics = {}
         self.step_start_time = None
         self.consecutive_failures = 0
-        logger.info("🔄 ExecutionMonitor reset")
+        LoggingUtils.log_info("ExecutionMonitor", "🔄 ExecutionMonitor reset")
 

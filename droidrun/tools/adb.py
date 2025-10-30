@@ -8,6 +8,7 @@ import json
 import time
 import logging
 from llama_index.core.workflow import Context
+from droidrun.agent.utils.logging_utils import LoggingUtils
 from typing import Optional, Dict, Tuple, List, Any
 from droidrun.agent.common.events import (
     InputTextActionEvent,
@@ -99,11 +100,11 @@ class AdbTools(Tools):
                     )
                     return False
             except requests.exceptions.RequestException as e:
-                logger.warning(f"TCP connection test failed: {e}")
+                LoggingUtils.log_warning("ADBTools", "TCP connection test failed: {error}", error=e)
                 return False
 
         except Exception as e:
-            logger.error(f"Failed to set up TCP port forwarding: {e}")
+            LoggingUtils.log_error("ADBTools", "Failed to set up TCP port forwarding: {error}", error=e)
             self.tcp_forwarded = False
             return False
 
@@ -121,7 +122,7 @@ class AdbTools(Tools):
                 )
                 # remove forwarding
                 cmd = f"killforward:tcp:{self.local_tcp_port}"
-                logger.debug(f"Removing TCP port forwarding: {cmd}")
+                LoggingUtils.log_debug("ADBTools", "Removing TCP port forwarding: {cmd}", cmd=cmd)
                 c = self.device.open_transport(cmd)
                 c.close()
 
@@ -130,7 +131,7 @@ class AdbTools(Tools):
                 return True
             return True
         except Exception as e:
-            logger.error(f"Failed to remove TCP port forwarding: {e}")
+            LoggingUtils.log_error("ADBTools", "Failed to remove TCP port forwarding: {error}", error=e)
             return False
 
     def setup_keyboard(self) -> bool:
@@ -148,7 +149,7 @@ class AdbTools(Tools):
             return True
 
         except Exception as e:
-            logger.error(f"Failed to setup DroidRun keyboard: {e}")
+            LoggingUtils.log_error("ADBTools", "Failed to setup DroidRun keyboard: {error}", error=e)
             return False
 
     def __del__(self):
@@ -284,7 +285,8 @@ class AdbTools(Tools):
             )
             # Get the device and tap at the coordinates
             self.device.click(x, y)
-            logger.debug(f"Tapped element with index {index} at coordinates ({x}, {y})")
+            LoggingUtils.log_debug("ADBTools", "Tapped element with index {index} at coordinates ({x}, {y})", 
+                                 index=index, x=x, y=y)
 
             # Emit coordinate action event for trajectory recording
 
@@ -341,12 +343,12 @@ class AdbTools(Tools):
             Bool indicating success or failure
         """
         try:
-            logger.debug(f"Tapping at coordinates ({x}, {y})")
+            LoggingUtils.log_debug("ADBTools", "Tapping at coordinates ({x}, {y})", x=x, y=y)
             self.device.click(x, y)
-            logger.debug(f"Tapped at coordinates ({x}, {y})")
+            LoggingUtils.log_debug("ADBTools", "Tapped at coordinates ({x}, {y})", x=x, y=y)
             return True
         except ValueError as e:
-            logger.debug(f"Error: {str(e)}")
+            LoggingUtils.log_debug("ADBTools", "Error: {error}", error=str(e))
             return False
 
     # Replace the old tap function with the new one
@@ -568,9 +570,9 @@ class AdbTools(Tools):
                 )
                 self._ctx.write_event_to_stream(key_event)
 
-            logger.debug(f"Pressing key {key_name}")
+            LoggingUtils.log_debug("ADBTools", "Pressing key {key}", key=key_name)
             self.device.keyevent(keycode)
-            logger.debug(f"Pressed key {key_name}")
+            LoggingUtils.log_debug("ADBTools", "Pressed key {key}", key=key_name)
             return f"Pressed key {key_name}"
         except ValueError as e:
             return f"Error: {str(e)}"
@@ -586,7 +588,8 @@ class AdbTools(Tools):
         """
         try:
 
-            logger.debug(f"Starting app {package} with activity {activity}")
+            LoggingUtils.log_debug("ADBTools", "Starting app {package} with activity {activity}", 
+                                 package=package, activity=activity)
             if not activity:
                 dumpsys_output = self.device.shell(
                     f"cmd package resolve-activity --brief {package}"
@@ -605,7 +608,8 @@ class AdbTools(Tools):
             print(f"Activity: {activity}")
 
             self.device.app_start(package, activity)
-            logger.debug(f"App started: {package} with activity {activity}")
+            LoggingUtils.log_debug("ADBTools", "App started: {package} with activity {activity}", 
+                                 package=package, activity=activity)
             return f"App started: {package} with activity {activity}"
         except Exception as e:
             return f"Error: {str(e)}"
@@ -635,7 +639,8 @@ class AdbTools(Tools):
                 flags=["-g"] if grant_permissions else [],
                 silent=True,
             )
-            logger.debug(f"Installed app: {apk_path} with result: {result}")
+            LoggingUtils.log_debug("ADBTools", "Installed app: {path} with result: {result}", 
+                                 path=apk_path, result=result)
             return result
         except ValueError as e:
             return f"Error: {str(e)}"
@@ -912,7 +917,7 @@ class AdbTools(Tools):
                 if response.status_code == 200:
                     try:
                         tcp_response = response.json() if response.content else {}
-                        logger.debug(f"Ping TCP response: {tcp_response}")
+                        LoggingUtils.log_debug("ADBTools", "Ping TCP response: {response}", response=tcp_response)
                         return {
                             "status": "success",
                             "message": "Ping successful",

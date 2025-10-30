@@ -5,11 +5,9 @@ import os
 import yaml
 import toml
 import json
-from typing import Dict, Any, Optional
-from pathlib import Path
-import logging
+from typing import Dict, Any
+from droidrun.agent.utils.logging_utils import LoggingUtils
 
-logger = logging.getLogger("droidrun")
 
 class ConfigLoader:
     """配置加载器"""
@@ -54,7 +52,8 @@ class ConfigLoader:
                 # 类型转换
                 converted_value = self._convert_env_value(value)
                 self._set_nested_value(env_config, config_path, converted_value)
-                logger.debug(f"Loaded env var {env_var}={value} -> {config_path}={converted_value}")
+                LoggingUtils.log_debug("ConfigLoader", "Loaded env var {env_var}={value} -> {config_path}={converted_value}", 
+                                     env_var=env_var, value=value, config_path=config_path, converted_value=converted_value)
         
         return env_config
     
@@ -105,13 +104,14 @@ class ConfigLoader:
         for config_file in config_files:
             if os.path.exists(config_file):
                 try:
-                    logger.info(f"Loading config from: {config_file}")
+                    LoggingUtils.log_info("ConfigLoader", "Loading config from: {file}", file=config_file)
                     return self._parse_config_file(config_file)
                 except Exception as e:
-                    logger.warning(f"Failed to load config from {config_file}: {e}")
+                    LoggingUtils.log_warning("ConfigLoader", "Failed to load config from {file}: {error}", 
+                                           file=config_file, error=e)
                     continue
         
-        logger.info("No config file found, using defaults")
+        LoggingUtils.log_info("ConfigLoader", "No config file found, using defaults")
         return {}
     
     def _parse_config_file(self, filepath: str) -> Dict[str, Any]:
@@ -156,5 +156,6 @@ class ConfigLoader:
         # 3. 合并配置（环境变量优先）
         merged_config = self._deep_update(file_config, env_config)
         
-        logger.info(f"Configuration loaded: {len(env_config)} env vars, {len(file_config)} file configs")
+        LoggingUtils.log_info("ConfigLoader", "Configuration loaded: {env_count} env vars, {file_count} file configs", 
+                             env_count=len(env_config), file_count=len(file_config))
         return merged_config

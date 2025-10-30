@@ -2,10 +2,9 @@
 统一配置管理 - 分层配置类定义
 """
 from dataclasses import dataclass, asdict
-from typing import Optional, Dict, Any, List
-import logging
+from typing import Optional, Dict, Any
+from droidrun.agent.utils.logging_utils import LoggingUtils
 
-logger = logging.getLogger("droidrun")
 
 @dataclass
 class SystemConfig:
@@ -116,36 +115,40 @@ class DroidRunUnifiedConfig:
         try:
             # 验证记忆系统配置
             if not 0.0 <= self.memory.similarity_threshold <= 1.0:
-                logger.error(f"Invalid similarity_threshold: {self.memory.similarity_threshold}")
+                LoggingUtils.log_error("UnifiedConfig", "Invalid similarity_threshold: {threshold}", 
+                                     threshold=self.memory.similarity_threshold)
                 return False
             
             if not 0.0 <= self.memory.perfect_match_threshold <= 1.0:
-                logger.error(f"Invalid perfect_match_threshold: {self.memory.perfect_match_threshold}")
+                LoggingUtils.log_error("UnifiedConfig", "Invalid perfect_match_threshold: {threshold}", 
+                                     threshold=self.memory.perfect_match_threshold)
                 return False
             
             if not 0.0 <= self.memory.experience_quality_threshold <= 1.0:
-                logger.error(f"Invalid experience_quality_threshold: {self.memory.experience_quality_threshold}")
+                LoggingUtils.log_error("UnifiedConfig", "Invalid experience_quality_threshold: {threshold}", 
+                                     threshold=self.memory.experience_quality_threshold)
                 return False
             
             if self.memory.max_experiences <= 0:
-                logger.error(f"Invalid max_experiences: {self.memory.max_experiences}")
+                LoggingUtils.log_error("UnifiedConfig", "Invalid max_experiences: {max_exp}", 
+                                     max_exp=self.memory.max_experiences)
                 return False
             
             # 验证Agent配置
             if self.agent.max_steps <= 0:
-                logger.error(f"Invalid max_steps: {self.agent.max_steps}")
+                LoggingUtils.log_error("UnifiedConfig", "Invalid max_steps: {steps}", steps=self.agent.max_steps)
                 return False
             
             # 验证系统配置
             if self.system.timeout <= 0:
-                logger.error(f"Invalid timeout: {self.system.timeout}")
+                LoggingUtils.log_error("UnifiedConfig", "Invalid timeout: {timeout}", timeout=self.system.timeout)
                 return False
             
-            logger.info("✅ Unified config validation passed")
+            LoggingUtils.log_success("UnifiedConfig", "Unified config validation passed")
             return True
             
         except Exception as e:
-            logger.error(f"Config validation error: {e}")
+            LoggingUtils.log_error("UnifiedConfig", "Config validation error: {error}", error=e)
             return False
     
     def get(self, path: str, default: Any = None) -> Any:
@@ -163,7 +166,8 @@ class DroidRunUnifiedConfig:
             return value
             
         except Exception as e:
-            logger.warning(f"Failed to get config value for path '{path}': {e}")
+            LoggingUtils.log_warning("UnifiedConfig", "Failed to get config value for path '{path}': {error}", 
+                                   path=path, error=e)
             return default
     
     def set(self, path: str, value: Any) -> bool:
@@ -184,5 +188,6 @@ class DroidRunUnifiedConfig:
             return True
             
         except Exception as e:
-            logger.warning(f"Failed to set config value for path '{path}': {e}")
+            LoggingUtils.log_warning("UnifiedConfig", "Failed to set config value for path '{path}': {error}", 
+                                   path=path, error=e)
             return False

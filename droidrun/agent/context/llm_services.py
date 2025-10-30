@@ -3,22 +3,19 @@ LLM服务模块 - 封装所有LLM调用
 """
 # 标准库导入
 import json
-import logging
 import re
 from typing import Any, Dict, List, Optional
+from droidrun.agent.utils.logging_utils import LoggingUtils
 
 # 第三方库导入
 from llama_index.core.llms.llm import LLM
-
-# 初始化日志
-logger = logging.getLogger("droidrun")
 
 class LLMServices:
     """LLM服务封装类"""
     
     def __init__(self, llm: LLM):
         self.llm = llm
-        logger.info("🤖 LLMServices initialized")
+        LoggingUtils.log_info("LLMServices", "LLMServices initialized")
     
     
 #     def analyze_execution_anomaly(self, execution_log: List[Dict]) -> Dict[str, Any]:
@@ -88,14 +85,14 @@ class LLMServices:
             json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
             if json_match:
                 page_sequence = json.loads(json_match.group())
-                logger.info(f"📄 Extracted {len(page_sequence)} pages from trajectory")
+                LoggingUtils.log_info("LLMServices", "Extracted {count} pages from trajectory", count=len(page_sequence))
                 return page_sequence
             else:
-                logger.warning("Could not parse page sequence from LLM response")
+                LoggingUtils.log_warning("LLMServices", "Could not parse page sequence from LLM response")
                 return []
                 
         except Exception as e:
-            logger.warning(f"Page sequence extraction failed: {e}")
+            LoggingUtils.log_warning("LLMServices", "Page sequence extraction failed: {error}", error=e)
             return []
 
     
@@ -167,7 +164,8 @@ class LLMServices:
     "confidence": 0.0-1.0
 }}
 """
-            logger.info(f"📊 Selecting best from {len(summaries)} experience summaries (optimized input, ~95% token reduction)")
+            LoggingUtils.log_info("LLMServices", "Selecting best from {count} experience summaries (optimized input, ~95% token reduction)", 
+                                count=len(summaries))
             response = self.llm.complete(prompt)
             
             # 解析JSON响应
@@ -176,15 +174,16 @@ class LLMServices:
                 selection = json.loads(json_match.group())
                 best_index = selection.get("best_experience_index", 0)
                 if 0 <= best_index < len(experiences):
-                    logger.info(f"🎯 Selected best experience: {selection.get('reason', 'No reason provided')}")
+                    LoggingUtils.log_info("LLMServices", "Selected best experience: {reason}", 
+                                        reason=selection.get('reason', 'No reason provided'))
                     return experiences[best_index]
             
             # 如果解析失败，返回第一个经验
-            logger.warning("Could not parse best experience selection, using first experience")
+            LoggingUtils.log_warning("LLMServices", "Could not parse best experience selection, using first experience")
             return experiences[0]
                 
         except Exception as e:
-            logger.warning(f"Best experience selection failed: {e}")
+            LoggingUtils.log_warning("LLMServices", "Best experience selection failed: {error}", error=e)
             return experiences[0] if experiences else None
 
     def detect_changed_actions(self, experience_goal: str, new_goal: str, actions: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -227,7 +226,7 @@ class LLMServices:
             # logger.info(f"[LLM][detect_changed_actions] Prompt:\n{prompt}")
             rsp = self.llm.complete(prompt)
             text = getattr(rsp, 'text', str(rsp))
-            logger.info(f"[LLM][detect_changed_actions] Response:\n{text}")
+            LoggingUtils.log_debug("LLMServices", "Detect changed actions response: {text}", text=text)
             # 解析严格JSON
             m = re.search(r'\{[\s\S]*\}$', text.strip())
             data = json.loads(m.group()) if m else json.loads(text)
@@ -250,7 +249,7 @@ class LLMServices:
             changed_sorted = sorted(set(norm_indices))
             return {"changed_indices": changed_sorted, "index_reasons": index_reasons, "reasons": reasons_raw}
         except Exception:
-            logger.warning("detect_changed_actions: LLM解析失败，返回空集合作为兜底")
+            LoggingUtils.log_warning("LLMServices", "Detect changed actions: LLM解析失败，返回空集合作为兜底")
             return {"changed_indices": []}
 
     def generate_micro_goal(self, action: Dict[str, Any], diffs: Dict[str, Any], new_goal: str) -> str:
@@ -283,10 +282,10 @@ class LLMServices:
 新任务目标：{new_goal}
 差异摘要（供参考）：{diffs_text}
 """
-            logger.info(f"[LLM][generate_micro_goal] Prompt:\n{prompt}")
+            LoggingUtils.log_debug("LLMServices", "Generate micro goal prompt: {prompt}", prompt=prompt)
             rsp = self.llm.complete(prompt)
             text = getattr(rsp, 'text', str(rsp)).strip().splitlines()[0]
-            logger.info(f"[LLM][generate_micro_goal] Text:\n{text}")
+            LoggingUtils.log_debug("LLMServices", "Generate micro goal text: {text}", text=text)
             # 兜底：若返回空或包含明显实现细节，退回到更泛化的子阶段表达
             if not text:
                 raise ValueError("empty micro goal")
