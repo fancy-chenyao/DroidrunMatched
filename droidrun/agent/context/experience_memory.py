@@ -139,7 +139,7 @@ class ExperienceMemory:
             任务1: {goal1}
             任务2: {goal2}
 
-            请只返回一个0-1之间的数字（保留2位小数），例如0.95、1.0、0.3：
+            请只返回一个0-1之间的数字（保留2位小数），例如0.95、1.00、0.30：
             """
             response = self.llm.complete(prompt)
             similarity_text = response.text.strip()
