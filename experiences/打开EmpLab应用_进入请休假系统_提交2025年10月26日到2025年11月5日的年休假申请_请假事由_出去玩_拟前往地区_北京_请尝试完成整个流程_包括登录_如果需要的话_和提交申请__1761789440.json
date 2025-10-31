@@ -1,0 +1,3880 @@
+{
+  "id": "6b5fa0d6-efc3-48c4-8d31-9a4e263ffb12",
+  "goal": "打开EmpLab应用，进入请休假系统，提交2025年10月26日到2025年11月5日的年休假申请。请假事由：出去玩，拟前往地区：北京。请尝试完成整个流程，包括登录（如果需要的话）和提交申请。",
+  "success": true,
+  "timestamp": 1761789440.1656778,
+  "page_sequence": [],
+  "action_sequence": [
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 18
+      },
+      "success": true,
+      "timestamp": 1761789440.164672,
+      "description": "Tap element at index 18: '请休假' (ImageView) at coordinates (341, 791)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 6
+      },
+      "success": true,
+      "timestamp": 1761789440.164672,
+      "description": "Tap element at index 6: 'LinearLayout' (LinearLayout) at coordinates (620, 503)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 7
+      },
+      "success": true,
+      "timestamp": 1761789440.164672,
+      "description": "Tap element at index 7: 'layoutStartDate' (LinearLayout) at coordinates (620, 535)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 61
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 61: '26' (TextView) at coordinates (149, 1734)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 14
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 14: 'layoutEndDate' (LinearLayout) at coordinates (540, 724)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 25
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 25: '下一个月' (ImageView) at coordinates (943, 1128)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 43
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 43: '5' (TextView) at coordinates (539, 1443)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 76
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 76: 'OK' (TextView) at coordinates (936, 1982)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 23
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 23: '拟请假11天, 确认' (Button) at coordinates (540, 2232)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 7
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 7: '请输入, 100字以内' (EditText) at coordinates (540, 566)"
+    },
+    {
+      "action": "input_text",
+      "params": {
+        "text": "出去玩"
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Input text: '出去玩'"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 11
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 11: '请输入, 100字以内' (EditText) at coordinates (540, 1086)"
+    },
+    {
+      "action": "input_text",
+      "params": {
+        "text": "北京"
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Input text: '北京'"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 18
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 18: '提交' (Button) at coordinates (799, 2034)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 23
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 23: '确定' (Button) at coordinates (848, 1338)"
+    },
+    {
+      "action": "tap_by_index",
+      "params": {
+        "index": 22
+      },
+      "success": true,
+      "timestamp": 1761789440.1656778,
+      "description": "Tap element at index 22: '确定' (Button) at coordinates (848, 1338)"
+    }
+  ],
+  "ui_states": [
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_scan",
+            "className": "ImageView",
+            "text": "扫描",
+            "bounds": "42, 201, 105, 264",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "com.example.emplab:id/et_search",
+            "className": "EditText",
+            "text": "搜索功能、课程、直播、图书、人员",
+            "bounds": "137, 170, 943, 296",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "com.example.emplab:id/iv_robot",
+            "className": "ImageView",
+            "text": "智能助手",
+            "bounds": "975, 201, 1038, 264",
+            "children": []
+          },
+          {
+            "index": 5,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 338, 1080, 2109",
+            "children": [
+              {
+                "index": 6,
+                "resourceId": "com.example.emplab:id/iv_todo",
+                "className": "ImageView",
+                "text": "事务待办",
+                "bounds": "63, 401, 221, 559",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "事务待办",
+                "bounds": "77, 580, 205, 628",
+                "children": []
+              },
+              {
+                "index": 8,
+                "resourceId": "com.example.emplab:id/iv_calendar",
+                "className": "ImageView",
+                "text": "日程管理",
+                "bounds": "262, 401, 420, 559",
+                "children": []
+              },
+              {
+                "index": 9,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "日程管理",
+                "bounds": "276, 580, 404, 628",
+                "children": []
+              },
+              {
+                "index": 10,
+                "resourceId": "com.example.emplab:id/iv_learning",
+                "className": "ImageView",
+                "text": "建行学习",
+                "bounds": "461, 401, 619, 559",
+                "children": []
+              },
+              {
+                "index": 11,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "建行学习",
+                "bounds": "475, 580, 603, 628",
+                "children": []
+              },
+              {
+                "index": 12,
+                "resourceId": "com.example.emplab:id/iv_knowledge",
+                "className": "ImageView",
+                "text": "知识百科",
+                "bounds": "660, 401, 818, 559",
+                "children": []
+              },
+              {
+                "index": 13,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "知识百科",
+                "bounds": "674, 580, 802, 628",
+                "children": []
+              },
+              {
+                "index": 14,
+                "resourceId": "com.example.emplab:id/iv_benefits",
+                "className": "ImageView",
+                "text": "员工福利",
+                "bounds": "859, 401, 1017, 559",
+                "children": []
+              },
+              {
+                "index": 15,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "员工福利",
+                "bounds": "874, 580, 1002, 628",
+                "children": []
+              },
+              {
+                "index": 16,
+                "resourceId": "com.example.emplab:id/iv_travel",
+                "className": "ImageView",
+                "text": "员工差旅",
+                "bounds": "63, 712, 221, 870",
+                "children": []
+              },
+              {
+                "index": 17,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "员工差旅",
+                "bounds": "77, 891, 205, 939",
+                "children": []
+              },
+              {
+                "index": 18,
+                "resourceId": "com.example.emplab:id/iv_leave",
+                "className": "ImageView",
+                "text": "请休假",
+                "bounds": "262, 712, 420, 870",
+                "children": []
+              },
+              {
+                "index": 19,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "请休假",
+                "bounds": "292, 891, 388, 939",
+                "children": []
+              },
+              {
+                "index": 20,
+                "resourceId": "com.example.emplab:id/iv_products",
+                "className": "ImageView",
+                "text": "产品服务",
+                "bounds": "461, 712, 619, 870",
+                "children": []
+              },
+              {
+                "index": 21,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "产品服务",
+                "bounds": "475, 891, 603, 939",
+                "children": []
+              },
+              {
+                "index": 22,
+                "resourceId": "com.example.emplab:id/iv_hr",
+                "className": "ImageView",
+                "text": "人力资源",
+                "bounds": "660, 712, 818, 870",
+                "children": []
+              },
+              {
+                "index": 23,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "人力资源",
+                "bounds": "674, 891, 802, 939",
+                "children": []
+              },
+              {
+                "index": 24,
+                "resourceId": "com.example.emplab:id/iv_more",
+                "className": "ImageView",
+                "text": "更多功能",
+                "bounds": "859, 712, 1017, 870",
+                "children": []
+              },
+              {
+                "index": 25,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "更多功能",
+                "bounds": "874, 891, 1002, 939",
+                "children": []
+              }
+            ]
+          },
+          {
+            "index": 26,
+            "resourceId": "com.example.emplab:id/nav_home",
+            "className": "LinearLayout",
+            "text": "nav_home",
+            "bounds": "0, 2130, 270, 2316",
+            "children": [
+              {
+                "index": 27,
+                "resourceId": "com.example.emplab:id/iv_nav_home",
+                "className": "ImageView",
+                "text": "首页",
+                "bounds": "103, 2162, 166, 2225",
+                "children": []
+              },
+              {
+                "index": 28,
+                "resourceId": "com.example.emplab:id/tv_nav_home",
+                "className": "TextView",
+                "text": "首页",
+                "bounds": "103, 2236, 167, 2284",
+                "children": []
+              }
+            ]
+          },
+          {
+            "index": 29,
+            "resourceId": "com.example.emplab:id/nav_people",
+            "className": "LinearLayout",
+            "text": "nav_people",
+            "bounds": "270, 2130, 540, 2316",
+            "children": [
+              {
+                "index": 30,
+                "resourceId": "com.example.emplab:id/iv_nav_people",
+                "className": "ImageView",
+                "text": "人员",
+                "bounds": "373, 2162, 436, 2225",
+                "children": []
+              },
+              {
+                "index": 31,
+                "resourceId": "com.example.emplab:id/tv_nav_people",
+                "className": "TextView",
+                "text": "人员",
+                "bounds": "373, 2236, 437, 2284",
+                "children": []
+              }
+            ]
+          },
+          {
+            "index": 32,
+            "resourceId": "com.example.emplab:id/nav_message",
+            "className": "LinearLayout",
+            "text": "nav_message",
+            "bounds": "540, 2130, 810, 2316",
+            "children": [
+              {
+                "index": 33,
+                "resourceId": "com.example.emplab:id/iv_nav_message",
+                "className": "ImageView",
+                "text": "消息",
+                "bounds": "643, 2162, 706, 2225",
+                "children": []
+              },
+              {
+                "index": 34,
+                "resourceId": "com.example.emplab:id/tv_nav_message",
+                "className": "TextView",
+                "text": "消息",
+                "bounds": "643, 2236, 707, 2284",
+                "children": []
+              }
+            ]
+          },
+          {
+            "index": 35,
+            "resourceId": "com.example.emplab:id/nav_profile",
+            "className": "LinearLayout",
+            "text": "nav_profile",
+            "bounds": "810, 2130, 1080, 2316",
+            "children": [
+              {
+                "index": 36,
+                "resourceId": "com.example.emplab:id/iv_nav_profile",
+                "className": "ImageView",
+                "text": "我的",
+                "bounds": "913, 2162, 976, 2225",
+                "children": []
+              },
+              {
+                "index": 37,
+                "resourceId": "com.example.emplab:id/tv_nav_profile",
+                "className": "TextView",
+                "text": "我的",
+                "bounds": "913, 2236, 977, 2284",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "80, 0, 1160, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "122, 173, 185, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "请休假申请 (第1步)",
+            "bounds": "227, 170, 1055, 239",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "请选择拟请假类别",
+            "bounds": "164, 326, 500, 388",
+            "children": []
+          },
+          {
+            "index": 5,
+            "resourceId": "com.example.emplab:id/listViewLeaveTypes",
+            "className": "ListView",
+            "text": "listViewLeaveTypes",
+            "bounds": "122, 430, 1118, 2295",
+            "children": [
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 430, 1118, 576",
+                "children": [
+                  {
+                    "index": 7,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "年休假",
+                    "bounds": "164, 472, 1034, 534",
+                    "children": []
+                  },
+                  {
+                    "index": 8,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 482, 1076, 524",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "index": 9,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 579, 1118, 725",
+                "children": [
+                  {
+                    "index": 10,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "事假",
+                    "bounds": "164, 621, 1034, 683",
+                    "children": []
+                  },
+                  {
+                    "index": 11,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 631, 1076, 673",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "index": 12,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 728, 1118, 874",
+                "children": [
+                  {
+                    "index": 13,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "病假",
+                    "bounds": "164, 770, 1034, 832",
+                    "children": []
+                  },
+                  {
+                    "index": 14,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 780, 1076, 822",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "index": 15,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 877, 1118, 1023",
+                "children": [
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "婚假",
+                    "bounds": "164, 919, 1034, 981",
+                    "children": []
+                  },
+                  {
+                    "index": 17,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 929, 1076, 971",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "index": 18,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 1026, 1118, 1172",
+                "children": [
+                  {
+                    "index": 19,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "法定产假",
+                    "bounds": "164, 1068, 1034, 1130",
+                    "children": []
+                  },
+                  {
+                    "index": 20,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 1078, 1076, 1120",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "index": 21,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 1175, 1118, 1321",
+                "children": [
+                  {
+                    "index": 22,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "经组织批准产假",
+                    "bounds": "164, 1217, 1034, 1279",
+                    "children": []
+                  },
+                  {
+                    "index": 23,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 1227, 1076, 1269",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "index": 24,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 1324, 1118, 1470",
+                "children": [
+                  {
+                    "index": 25,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "探亲假",
+                    "bounds": "164, 1366, 1034, 1428",
+                    "children": []
+                  },
+                  {
+                    "index": 26,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 1376, 1076, 1418",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "index": 27,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 1473, 1118, 1619",
+                "children": [
+                  {
+                    "index": 28,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "丧假",
+                    "bounds": "164, 1515, 1034, 1577",
+                    "children": []
+                  },
+                  {
+                    "index": 29,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 1525, 1076, 1567",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "index": 30,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 1622, 1118, 1768",
+                "children": [
+                  {
+                    "index": 31,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "工伤假",
+                    "bounds": "164, 1664, 1034, 1726",
+                    "children": []
+                  },
+                  {
+                    "index": 32,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 1674, 1076, 1716",
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "index": 33,
+                "resourceId": "",
+                "className": "LinearLayout",
+                "text": "LinearLayout",
+                "bounds": "122, 1771, 1118, 1917",
+                "children": [
+                  {
+                    "index": 34,
+                    "resourceId": "com.example.emplab:id/tvLeaveType",
+                    "className": "TextView",
+                    "text": "其它假",
+                    "bounds": "164, 1813, 1034, 1875",
+                    "children": []
+                  },
+                  {
+                    "index": 35,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "进入",
+                    "bounds": "1034, 1823, 1076, 1865",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "80, 0, 1160, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "122, 173, 185, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "关闭",
+            "bounds": "206, 173, 290, 235",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "拟请假时间",
+            "bounds": "290, 170, 960, 239",
+            "children": []
+          },
+          {
+            "index": 5,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "80, 284, 1160, 2127",
+            "children": [
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "年休假 (工作日)",
+                "bounds": "122, 326, 1118, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/layoutStartDate",
+                "className": "LinearLayout",
+                "text": "layoutStartDate",
+                "bounds": "122, 451, 1118, 619",
+                "children": [
+                  {
+                    "index": 8,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "必填",
+                    "bounds": "164, 508, 217, 561",
+                    "children": []
+                  },
+                  {
+                    "index": 9,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "开始时间",
+                    "bounds": "249, 504, 417, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 10,
+                    "resourceId": "com.example.emplab:id/tvStartDate",
+                    "className": "TextView",
+                    "text": "2025年10月30日",
+                    "bounds": "578, 504, 896, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 11,
+                    "resourceId": "com.example.emplab:id/layoutStartTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutStartTimeType",
+                    "bounds": "917, 493, 1076, 577",
+                    "children": [
+                      {
+                        "index": 12,
+                        "resourceId": "com.example.emplab:id/tvStartTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "928, 504, 1012, 566",
+                        "children": []
+                      },
+                      {
+                        "index": 13,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "1023, 514, 1065, 556",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 14,
+                "resourceId": "com.example.emplab:id/layoutEndDate",
+                "className": "LinearLayout",
+                "text": "layoutEndDate",
+                "bounds": "122, 640, 1118, 808",
+                "children": [
+                  {
+                    "index": 15,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "结束时间",
+                    "bounds": "164, 693, 332, 755",
+                    "children": []
+                  },
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/tvEndDate",
+                    "className": "TextView",
+                    "text": "2025年10月30日",
+                    "bounds": "578, 693, 896, 755",
+                    "children": []
+                  },
+                  {
+                    "index": 17,
+                    "resourceId": "com.example.emplab:id/layoutEndTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutEndTimeType",
+                    "bounds": "917, 682, 1076, 766",
+                    "children": [
+                      {
+                        "index": 18,
+                        "resourceId": "com.example.emplab:id/tvEndTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "928, 693, 1012, 755",
+                        "children": []
+                      },
+                      {
+                        "index": 19,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "1023, 703, 1065, 745",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 20,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "年休假对应年份",
+                "bounds": "164, 871, 458, 933",
+                "children": []
+              },
+              {
+                "index": 21,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "2025年年假",
+                "bounds": "791, 871, 1013, 933",
+                "children": []
+              },
+              {
+                "index": 22,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "选择",
+                "bounds": "1034, 881, 1076, 923",
+                "children": []
+              }
+            ]
+          },
+          {
+            "index": 23,
+            "resourceId": "com.example.emplab:id/btnConfirm",
+            "className": "Button",
+            "text": "拟请假1天, 确认",
+            "bounds": "122, 2169, 1118, 2295",
+            "children": []
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "42, 173, 105, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "关闭",
+            "bounds": "126, 173, 210, 235",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "拟请假时间",
+            "bounds": "210, 170, 880, 239",
+            "children": []
+          },
+          {
+            "index": 5,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 284, 1080, 716",
+            "children": [
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "年休假 (工作日)",
+                "bounds": "42, 326, 1038, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/layoutStartDate",
+                "className": "LinearLayout",
+                "text": "layoutStartDate",
+                "bounds": "42, 451, 1038, 619",
+                "children": [
+                  {
+                    "index": 8,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "必填",
+                    "bounds": "84, 508, 137, 561",
+                    "children": []
+                  },
+                  {
+                    "index": 9,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "开始时间",
+                    "bounds": "169, 504, 337, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 10,
+                    "resourceId": "com.example.emplab:id/tvStartDate",
+                    "className": "TextView",
+                    "text": "2025年10月30日",
+                    "bounds": "498, 504, 816, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 11,
+                    "resourceId": "com.example.emplab:id/layoutStartTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutStartTimeType",
+                    "bounds": "837, 493, 996, 577",
+                    "children": [
+                      {
+                        "index": 12,
+                        "resourceId": "com.example.emplab:id/tvStartTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 504, 932, 566",
+                        "children": []
+                      },
+                      {
+                        "index": 13,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 514, 985, 556",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 14,
+                "resourceId": "com.example.emplab:id/layoutEndDate",
+                "className": "LinearLayout",
+                "text": "layoutEndDate",
+                "bounds": "42, 640, 1038, 716",
+                "children": [
+                  {
+                    "index": 15,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "结束时间",
+                    "bounds": "84, 693, 252, 716",
+                    "children": []
+                  },
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/tvEndDate",
+                    "className": "TextView",
+                    "text": "2025年10月30日",
+                    "bounds": "498, 693, 816, 716",
+                    "children": []
+                  },
+                  {
+                    "index": 17,
+                    "resourceId": "com.example.emplab:id/layoutEndTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutEndTimeType",
+                    "bounds": "837, 682, 996, 716",
+                    "children": [
+                      {
+                        "index": 18,
+                        "resourceId": "com.example.emplab:id/tvEndTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 693, 932, 716",
+                        "children": []
+                      },
+                      {
+                        "index": 19,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 703, 985, 716",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "index": 20,
+            "resourceId": "com.example.emplab:id/tvYear",
+            "className": "TextView",
+            "text": "2025",
+            "bounds": "126, 842, 270, 927",
+            "children": []
+          },
+          {
+            "index": 21,
+            "resourceId": "com.example.emplab:id/tvSelectedDate",
+            "className": "TextView",
+            "text": "周四, 10月 30",
+            "bounds": "126, 927, 380, 989",
+            "children": []
+          },
+          {
+            "index": 22,
+            "resourceId": "com.example.emplab:id/ivClose",
+            "className": "ImageView",
+            "text": "关闭",
+            "bounds": "891, 884, 954, 947",
+            "children": []
+          },
+          {
+            "index": 23,
+            "resourceId": "com.example.emplab:id/ivPrevMonth",
+            "className": "ImageView",
+            "text": "上一个月",
+            "bounds": "105, 1097, 168, 1160",
+            "children": []
+          },
+          {
+            "index": 24,
+            "resourceId": "com.example.emplab:id/tvMonth",
+            "className": "TextView",
+            "text": "十月 2025",
+            "bounds": "168, 1094, 912, 1163",
+            "children": []
+          },
+          {
+            "index": 25,
+            "resourceId": "com.example.emplab:id/ivNextMonth",
+            "className": "ImageView",
+            "text": "下一个月",
+            "bounds": "912, 1097, 975, 1160",
+            "children": []
+          },
+          {
+            "index": 26,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "S",
+            "bounds": "84, 1226, 214, 1277",
+            "children": []
+          },
+          {
+            "index": 27,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "M",
+            "bounds": "214, 1226, 344, 1277",
+            "children": []
+          },
+          {
+            "index": 28,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "T",
+            "bounds": "344, 1226, 474, 1277",
+            "children": []
+          },
+          {
+            "index": 29,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "W",
+            "bounds": "474, 1226, 604, 1277",
+            "children": []
+          },
+          {
+            "index": 30,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "T",
+            "bounds": "604, 1226, 734, 1277",
+            "children": []
+          },
+          {
+            "index": 31,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "F",
+            "bounds": "734, 1226, 865, 1277",
+            "children": []
+          },
+          {
+            "index": 32,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "S",
+            "bounds": "865, 1226, 996, 1277",
+            "children": []
+          },
+          {
+            "index": 33,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "88, 1302, 210, 1391",
+            "children": []
+          },
+          {
+            "index": 34,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "218, 1302, 340, 1391",
+            "children": []
+          },
+          {
+            "index": 35,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "348, 1302, 470, 1391",
+            "children": []
+          },
+          {
+            "index": 36,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "1",
+            "bounds": "478, 1302, 601, 1391",
+            "children": []
+          },
+          {
+            "index": 37,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "2",
+            "bounds": "609, 1302, 731, 1391",
+            "children": []
+          },
+          {
+            "index": 38,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "3",
+            "bounds": "739, 1302, 862, 1391",
+            "children": []
+          },
+          {
+            "index": 39,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "4",
+            "bounds": "870, 1302, 992, 1391",
+            "children": []
+          },
+          {
+            "index": 40,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "5",
+            "bounds": "88, 1399, 210, 1488",
+            "children": []
+          },
+          {
+            "index": 41,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "6",
+            "bounds": "218, 1399, 340, 1488",
+            "children": []
+          },
+          {
+            "index": 42,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "7",
+            "bounds": "348, 1399, 470, 1488",
+            "children": []
+          },
+          {
+            "index": 43,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "8",
+            "bounds": "478, 1399, 601, 1488",
+            "children": []
+          },
+          {
+            "index": 44,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "9",
+            "bounds": "609, 1399, 731, 1488",
+            "children": []
+          },
+          {
+            "index": 45,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "10",
+            "bounds": "739, 1399, 862, 1488",
+            "children": []
+          },
+          {
+            "index": 46,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "11",
+            "bounds": "870, 1399, 992, 1488",
+            "children": []
+          },
+          {
+            "index": 47,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "12",
+            "bounds": "88, 1496, 210, 1585",
+            "children": []
+          },
+          {
+            "index": 48,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "13",
+            "bounds": "218, 1496, 340, 1585",
+            "children": []
+          },
+          {
+            "index": 49,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "14",
+            "bounds": "348, 1496, 470, 1585",
+            "children": []
+          },
+          {
+            "index": 50,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "15",
+            "bounds": "478, 1496, 601, 1585",
+            "children": []
+          },
+          {
+            "index": 51,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "16",
+            "bounds": "609, 1496, 731, 1585",
+            "children": []
+          },
+          {
+            "index": 52,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "17",
+            "bounds": "739, 1496, 862, 1585",
+            "children": []
+          },
+          {
+            "index": 53,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "18",
+            "bounds": "870, 1496, 992, 1585",
+            "children": []
+          },
+          {
+            "index": 54,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "19",
+            "bounds": "88, 1593, 210, 1682",
+            "children": []
+          },
+          {
+            "index": 55,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "20",
+            "bounds": "218, 1593, 340, 1682",
+            "children": []
+          },
+          {
+            "index": 56,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "21",
+            "bounds": "348, 1593, 470, 1682",
+            "children": []
+          },
+          {
+            "index": 57,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "22",
+            "bounds": "478, 1593, 601, 1682",
+            "children": []
+          },
+          {
+            "index": 58,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "23",
+            "bounds": "609, 1593, 731, 1682",
+            "children": []
+          },
+          {
+            "index": 59,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "24",
+            "bounds": "739, 1593, 862, 1682",
+            "children": []
+          },
+          {
+            "index": 60,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "25",
+            "bounds": "870, 1593, 992, 1682",
+            "children": []
+          },
+          {
+            "index": 61,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "26",
+            "bounds": "88, 1690, 210, 1779",
+            "children": []
+          },
+          {
+            "index": 62,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "27",
+            "bounds": "218, 1690, 340, 1779",
+            "children": []
+          },
+          {
+            "index": 63,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "28",
+            "bounds": "348, 1690, 470, 1779",
+            "children": []
+          },
+          {
+            "index": 64,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "29",
+            "bounds": "478, 1690, 601, 1779",
+            "children": []
+          },
+          {
+            "index": 65,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "30",
+            "bounds": "609, 1690, 731, 1779",
+            "children": []
+          },
+          {
+            "index": 66,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "31",
+            "bounds": "739, 1690, 862, 1779",
+            "children": []
+          },
+          {
+            "index": 67,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "870, 1690, 992, 1779",
+            "children": []
+          },
+          {
+            "index": 68,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "88, 1787, 210, 1876",
+            "children": []
+          },
+          {
+            "index": 69,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "218, 1787, 340, 1876",
+            "children": []
+          },
+          {
+            "index": 70,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "348, 1787, 470, 1876",
+            "children": []
+          },
+          {
+            "index": 71,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "478, 1787, 601, 1876",
+            "children": []
+          },
+          {
+            "index": 72,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "609, 1787, 731, 1876",
+            "children": []
+          },
+          {
+            "index": 73,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "739, 1787, 862, 1876",
+            "children": []
+          },
+          {
+            "index": 74,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "870, 1787, 992, 1876",
+            "children": []
+          },
+          {
+            "index": 75,
+            "resourceId": "com.example.emplab:id/tvCancel",
+            "className": "TextView",
+            "text": "Cancel",
+            "bounds": "644, 1922, 835, 2043",
+            "children": []
+          },
+          {
+            "index": 76,
+            "resourceId": "com.example.emplab:id/tvOk",
+            "className": "TextView",
+            "text": "OK",
+            "bounds": "877, 1922, 996, 2043",
+            "children": []
+          },
+          {
+            "index": 77,
+            "resourceId": "com.example.emplab:id/btnConfirm",
+            "className": "Button",
+            "text": "拟请假1天, 确认",
+            "bounds": "42, 2169, 1038, 2295",
+            "children": []
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "42, 173, 105, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "关闭",
+            "bounds": "126, 173, 210, 235",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "拟请假时间",
+            "bounds": "210, 170, 880, 239",
+            "children": []
+          },
+          {
+            "index": 5,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 284, 1080, 2127",
+            "children": [
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "年休假 (工作日)",
+                "bounds": "42, 326, 1038, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/layoutStartDate",
+                "className": "LinearLayout",
+                "text": "layoutStartDate",
+                "bounds": "42, 451, 1038, 619",
+                "children": [
+                  {
+                    "index": 8,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "必填",
+                    "bounds": "84, 508, 137, 561",
+                    "children": []
+                  },
+                  {
+                    "index": 9,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "开始时间",
+                    "bounds": "169, 504, 337, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 10,
+                    "resourceId": "com.example.emplab:id/tvStartDate",
+                    "className": "TextView",
+                    "text": "2025年10月26日",
+                    "bounds": "498, 504, 816, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 11,
+                    "resourceId": "com.example.emplab:id/layoutStartTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutStartTimeType",
+                    "bounds": "837, 493, 996, 577",
+                    "children": [
+                      {
+                        "index": 12,
+                        "resourceId": "com.example.emplab:id/tvStartTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 504, 932, 566",
+                        "children": []
+                      },
+                      {
+                        "index": 13,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 514, 985, 556",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 14,
+                "resourceId": "com.example.emplab:id/layoutEndDate",
+                "className": "LinearLayout",
+                "text": "layoutEndDate",
+                "bounds": "42, 640, 1038, 808",
+                "children": [
+                  {
+                    "index": 15,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "结束时间",
+                    "bounds": "84, 693, 252, 755",
+                    "children": []
+                  },
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/tvEndDate",
+                    "className": "TextView",
+                    "text": "2025年10月30日",
+                    "bounds": "498, 693, 816, 755",
+                    "children": []
+                  },
+                  {
+                    "index": 17,
+                    "resourceId": "com.example.emplab:id/layoutEndTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutEndTimeType",
+                    "bounds": "837, 682, 996, 766",
+                    "children": [
+                      {
+                        "index": 18,
+                        "resourceId": "com.example.emplab:id/tvEndTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 693, 932, 755",
+                        "children": []
+                      },
+                      {
+                        "index": 19,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 703, 985, 745",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 20,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "年休假对应年份",
+                "bounds": "84, 871, 378, 933",
+                "children": []
+              },
+              {
+                "index": 21,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "2025年年假",
+                "bounds": "711, 871, 933, 933",
+                "children": []
+              },
+              {
+                "index": 22,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "选择",
+                "bounds": "954, 881, 996, 923",
+                "children": []
+              }
+            ]
+          },
+          {
+            "index": 23,
+            "resourceId": "com.example.emplab:id/btnConfirm",
+            "className": "Button",
+            "text": "拟请假5天, 确认",
+            "bounds": "42, 2169, 1038, 2295",
+            "children": []
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "42, 173, 105, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "关闭",
+            "bounds": "126, 173, 210, 235",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "拟请假时间",
+            "bounds": "210, 170, 880, 239",
+            "children": []
+          },
+          {
+            "index": 5,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 284, 1080, 716",
+            "children": [
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "年休假 (工作日)",
+                "bounds": "42, 326, 1038, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/layoutStartDate",
+                "className": "LinearLayout",
+                "text": "layoutStartDate",
+                "bounds": "42, 451, 1038, 619",
+                "children": [
+                  {
+                    "index": 8,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "必填",
+                    "bounds": "84, 508, 137, 561",
+                    "children": []
+                  },
+                  {
+                    "index": 9,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "开始时间",
+                    "bounds": "169, 504, 337, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 10,
+                    "resourceId": "com.example.emplab:id/tvStartDate",
+                    "className": "TextView",
+                    "text": "2025年10月26日",
+                    "bounds": "498, 504, 816, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 11,
+                    "resourceId": "com.example.emplab:id/layoutStartTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutStartTimeType",
+                    "bounds": "837, 493, 996, 577",
+                    "children": [
+                      {
+                        "index": 12,
+                        "resourceId": "com.example.emplab:id/tvStartTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 504, 932, 566",
+                        "children": []
+                      },
+                      {
+                        "index": 13,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 514, 985, 556",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 14,
+                "resourceId": "com.example.emplab:id/layoutEndDate",
+                "className": "LinearLayout",
+                "text": "layoutEndDate",
+                "bounds": "42, 640, 1038, 716",
+                "children": [
+                  {
+                    "index": 15,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "结束时间",
+                    "bounds": "84, 693, 252, 716",
+                    "children": []
+                  },
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/tvEndDate",
+                    "className": "TextView",
+                    "text": "2025年10月30日",
+                    "bounds": "498, 693, 816, 716",
+                    "children": []
+                  },
+                  {
+                    "index": 17,
+                    "resourceId": "com.example.emplab:id/layoutEndTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutEndTimeType",
+                    "bounds": "837, 682, 996, 716",
+                    "children": [
+                      {
+                        "index": 18,
+                        "resourceId": "com.example.emplab:id/tvEndTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 693, 932, 716",
+                        "children": []
+                      },
+                      {
+                        "index": 19,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 703, 985, 716",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "index": 20,
+            "resourceId": "com.example.emplab:id/tvYear",
+            "className": "TextView",
+            "text": "2025",
+            "bounds": "126, 842, 270, 927",
+            "children": []
+          },
+          {
+            "index": 21,
+            "resourceId": "com.example.emplab:id/tvSelectedDate",
+            "className": "TextView",
+            "text": "周四, 10月 30",
+            "bounds": "126, 927, 380, 989",
+            "children": []
+          },
+          {
+            "index": 22,
+            "resourceId": "com.example.emplab:id/ivClose",
+            "className": "ImageView",
+            "text": "关闭",
+            "bounds": "891, 884, 954, 947",
+            "children": []
+          },
+          {
+            "index": 23,
+            "resourceId": "com.example.emplab:id/ivPrevMonth",
+            "className": "ImageView",
+            "text": "上一个月",
+            "bounds": "105, 1097, 168, 1160",
+            "children": []
+          },
+          {
+            "index": 24,
+            "resourceId": "com.example.emplab:id/tvMonth",
+            "className": "TextView",
+            "text": "十月 2025",
+            "bounds": "168, 1094, 912, 1163",
+            "children": []
+          },
+          {
+            "index": 25,
+            "resourceId": "com.example.emplab:id/ivNextMonth",
+            "className": "ImageView",
+            "text": "下一个月",
+            "bounds": "912, 1097, 975, 1160",
+            "children": []
+          },
+          {
+            "index": 26,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "S",
+            "bounds": "84, 1226, 214, 1277",
+            "children": []
+          },
+          {
+            "index": 27,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "M",
+            "bounds": "214, 1226, 344, 1277",
+            "children": []
+          },
+          {
+            "index": 28,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "T",
+            "bounds": "344, 1226, 474, 1277",
+            "children": []
+          },
+          {
+            "index": 29,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "W",
+            "bounds": "474, 1226, 604, 1277",
+            "children": []
+          },
+          {
+            "index": 30,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "T",
+            "bounds": "604, 1226, 734, 1277",
+            "children": []
+          },
+          {
+            "index": 31,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "F",
+            "bounds": "734, 1226, 865, 1277",
+            "children": []
+          },
+          {
+            "index": 32,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "S",
+            "bounds": "865, 1226, 996, 1277",
+            "children": []
+          },
+          {
+            "index": 33,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "88, 1302, 210, 1391",
+            "children": []
+          },
+          {
+            "index": 34,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "218, 1302, 340, 1391",
+            "children": []
+          },
+          {
+            "index": 35,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "348, 1302, 470, 1391",
+            "children": []
+          },
+          {
+            "index": 36,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "1",
+            "bounds": "478, 1302, 601, 1391",
+            "children": []
+          },
+          {
+            "index": 37,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "2",
+            "bounds": "609, 1302, 731, 1391",
+            "children": []
+          },
+          {
+            "index": 38,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "3",
+            "bounds": "739, 1302, 862, 1391",
+            "children": []
+          },
+          {
+            "index": 39,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "4",
+            "bounds": "870, 1302, 992, 1391",
+            "children": []
+          },
+          {
+            "index": 40,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "5",
+            "bounds": "88, 1399, 210, 1488",
+            "children": []
+          },
+          {
+            "index": 41,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "6",
+            "bounds": "218, 1399, 340, 1488",
+            "children": []
+          },
+          {
+            "index": 42,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "7",
+            "bounds": "348, 1399, 470, 1488",
+            "children": []
+          },
+          {
+            "index": 43,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "8",
+            "bounds": "478, 1399, 601, 1488",
+            "children": []
+          },
+          {
+            "index": 44,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "9",
+            "bounds": "609, 1399, 731, 1488",
+            "children": []
+          },
+          {
+            "index": 45,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "10",
+            "bounds": "739, 1399, 862, 1488",
+            "children": []
+          },
+          {
+            "index": 46,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "11",
+            "bounds": "870, 1399, 992, 1488",
+            "children": []
+          },
+          {
+            "index": 47,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "12",
+            "bounds": "88, 1496, 210, 1585",
+            "children": []
+          },
+          {
+            "index": 48,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "13",
+            "bounds": "218, 1496, 340, 1585",
+            "children": []
+          },
+          {
+            "index": 49,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "14",
+            "bounds": "348, 1496, 470, 1585",
+            "children": []
+          },
+          {
+            "index": 50,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "15",
+            "bounds": "478, 1496, 601, 1585",
+            "children": []
+          },
+          {
+            "index": 51,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "16",
+            "bounds": "609, 1496, 731, 1585",
+            "children": []
+          },
+          {
+            "index": 52,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "17",
+            "bounds": "739, 1496, 862, 1585",
+            "children": []
+          },
+          {
+            "index": 53,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "18",
+            "bounds": "870, 1496, 992, 1585",
+            "children": []
+          },
+          {
+            "index": 54,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "19",
+            "bounds": "88, 1593, 210, 1682",
+            "children": []
+          },
+          {
+            "index": 55,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "20",
+            "bounds": "218, 1593, 340, 1682",
+            "children": []
+          },
+          {
+            "index": 56,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "21",
+            "bounds": "348, 1593, 470, 1682",
+            "children": []
+          },
+          {
+            "index": 57,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "22",
+            "bounds": "478, 1593, 601, 1682",
+            "children": []
+          },
+          {
+            "index": 58,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "23",
+            "bounds": "609, 1593, 731, 1682",
+            "children": []
+          },
+          {
+            "index": 59,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "24",
+            "bounds": "739, 1593, 862, 1682",
+            "children": []
+          },
+          {
+            "index": 60,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "25",
+            "bounds": "870, 1593, 992, 1682",
+            "children": []
+          },
+          {
+            "index": 61,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "26",
+            "bounds": "88, 1690, 210, 1779",
+            "children": []
+          },
+          {
+            "index": 62,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "27",
+            "bounds": "218, 1690, 340, 1779",
+            "children": []
+          },
+          {
+            "index": 63,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "28",
+            "bounds": "348, 1690, 470, 1779",
+            "children": []
+          },
+          {
+            "index": 64,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "29",
+            "bounds": "478, 1690, 601, 1779",
+            "children": []
+          },
+          {
+            "index": 65,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "30",
+            "bounds": "609, 1690, 731, 1779",
+            "children": []
+          },
+          {
+            "index": 66,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "31",
+            "bounds": "739, 1690, 862, 1779",
+            "children": []
+          },
+          {
+            "index": 67,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "870, 1690, 992, 1779",
+            "children": []
+          },
+          {
+            "index": 68,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "88, 1787, 210, 1876",
+            "children": []
+          },
+          {
+            "index": 69,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "218, 1787, 340, 1876",
+            "children": []
+          },
+          {
+            "index": 70,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "348, 1787, 470, 1876",
+            "children": []
+          },
+          {
+            "index": 71,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "478, 1787, 601, 1876",
+            "children": []
+          },
+          {
+            "index": 72,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "609, 1787, 731, 1876",
+            "children": []
+          },
+          {
+            "index": 73,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "739, 1787, 862, 1876",
+            "children": []
+          },
+          {
+            "index": 74,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "870, 1787, 992, 1876",
+            "children": []
+          },
+          {
+            "index": 75,
+            "resourceId": "com.example.emplab:id/tvCancel",
+            "className": "TextView",
+            "text": "Cancel",
+            "bounds": "644, 1922, 835, 2043",
+            "children": []
+          },
+          {
+            "index": 76,
+            "resourceId": "com.example.emplab:id/tvOk",
+            "className": "TextView",
+            "text": "OK",
+            "bounds": "877, 1922, 996, 2043",
+            "children": []
+          },
+          {
+            "index": 77,
+            "resourceId": "com.example.emplab:id/btnConfirm",
+            "className": "Button",
+            "text": "拟请假5天, 确认",
+            "bounds": "42, 2169, 1038, 2295",
+            "children": []
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "42, 173, 105, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "关闭",
+            "bounds": "126, 173, 210, 235",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "拟请假时间",
+            "bounds": "210, 170, 880, 239",
+            "children": []
+          },
+          {
+            "index": 5,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 284, 1080, 716",
+            "children": [
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "年休假 (工作日)",
+                "bounds": "42, 326, 1038, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/layoutStartDate",
+                "className": "LinearLayout",
+                "text": "layoutStartDate",
+                "bounds": "42, 451, 1038, 619",
+                "children": [
+                  {
+                    "index": 8,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "必填",
+                    "bounds": "84, 508, 137, 561",
+                    "children": []
+                  },
+                  {
+                    "index": 9,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "开始时间",
+                    "bounds": "169, 504, 337, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 10,
+                    "resourceId": "com.example.emplab:id/tvStartDate",
+                    "className": "TextView",
+                    "text": "2025年10月26日",
+                    "bounds": "498, 504, 816, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 11,
+                    "resourceId": "com.example.emplab:id/layoutStartTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutStartTimeType",
+                    "bounds": "837, 493, 996, 577",
+                    "children": [
+                      {
+                        "index": 12,
+                        "resourceId": "com.example.emplab:id/tvStartTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 504, 932, 566",
+                        "children": []
+                      },
+                      {
+                        "index": 13,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 514, 985, 556",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 14,
+                "resourceId": "com.example.emplab:id/layoutEndDate",
+                "className": "LinearLayout",
+                "text": "layoutEndDate",
+                "bounds": "42, 640, 1038, 716",
+                "children": [
+                  {
+                    "index": 15,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "结束时间",
+                    "bounds": "84, 693, 252, 716",
+                    "children": []
+                  },
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/tvEndDate",
+                    "className": "TextView",
+                    "text": "2025年10月30日",
+                    "bounds": "498, 693, 816, 716",
+                    "children": []
+                  },
+                  {
+                    "index": 17,
+                    "resourceId": "com.example.emplab:id/layoutEndTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutEndTimeType",
+                    "bounds": "837, 682, 996, 716",
+                    "children": [
+                      {
+                        "index": 18,
+                        "resourceId": "com.example.emplab:id/tvEndTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 693, 932, 716",
+                        "children": []
+                      },
+                      {
+                        "index": 19,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 703, 985, 716",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "index": 20,
+            "resourceId": "com.example.emplab:id/tvYear",
+            "className": "TextView",
+            "text": "2025",
+            "bounds": "126, 842, 270, 927",
+            "children": []
+          },
+          {
+            "index": 21,
+            "resourceId": "com.example.emplab:id/tvSelectedDate",
+            "className": "TextView",
+            "text": "周四, 10月 30",
+            "bounds": "126, 927, 380, 989",
+            "children": []
+          },
+          {
+            "index": 22,
+            "resourceId": "com.example.emplab:id/ivClose",
+            "className": "ImageView",
+            "text": "关闭",
+            "bounds": "891, 884, 954, 947",
+            "children": []
+          },
+          {
+            "index": 23,
+            "resourceId": "com.example.emplab:id/ivPrevMonth",
+            "className": "ImageView",
+            "text": "上一个月",
+            "bounds": "105, 1097, 168, 1160",
+            "children": []
+          },
+          {
+            "index": 24,
+            "resourceId": "com.example.emplab:id/tvMonth",
+            "className": "TextView",
+            "text": "十一月 2025",
+            "bounds": "168, 1094, 912, 1163",
+            "children": []
+          },
+          {
+            "index": 25,
+            "resourceId": "com.example.emplab:id/ivNextMonth",
+            "className": "ImageView",
+            "text": "下一个月",
+            "bounds": "912, 1097, 975, 1160",
+            "children": []
+          },
+          {
+            "index": 26,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "S",
+            "bounds": "84, 1226, 214, 1277",
+            "children": []
+          },
+          {
+            "index": 27,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "M",
+            "bounds": "214, 1226, 344, 1277",
+            "children": []
+          },
+          {
+            "index": 28,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "T",
+            "bounds": "344, 1226, 474, 1277",
+            "children": []
+          },
+          {
+            "index": 29,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "W",
+            "bounds": "474, 1226, 604, 1277",
+            "children": []
+          },
+          {
+            "index": 30,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "T",
+            "bounds": "604, 1226, 734, 1277",
+            "children": []
+          },
+          {
+            "index": 31,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "F",
+            "bounds": "734, 1226, 865, 1277",
+            "children": []
+          },
+          {
+            "index": 32,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "S",
+            "bounds": "865, 1226, 996, 1277",
+            "children": []
+          },
+          {
+            "index": 33,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "88, 1302, 210, 1391",
+            "children": []
+          },
+          {
+            "index": 34,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "218, 1302, 340, 1391",
+            "children": []
+          },
+          {
+            "index": 35,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "348, 1302, 470, 1391",
+            "children": []
+          },
+          {
+            "index": 36,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "478, 1302, 601, 1391",
+            "children": []
+          },
+          {
+            "index": 37,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "609, 1302, 731, 1391",
+            "children": []
+          },
+          {
+            "index": 38,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "739, 1302, 862, 1391",
+            "children": []
+          },
+          {
+            "index": 39,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "1",
+            "bounds": "870, 1302, 992, 1391",
+            "children": []
+          },
+          {
+            "index": 40,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "2",
+            "bounds": "88, 1399, 210, 1488",
+            "children": []
+          },
+          {
+            "index": 41,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "3",
+            "bounds": "218, 1399, 340, 1488",
+            "children": []
+          },
+          {
+            "index": 42,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "4",
+            "bounds": "348, 1399, 470, 1488",
+            "children": []
+          },
+          {
+            "index": 43,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "5",
+            "bounds": "478, 1399, 601, 1488",
+            "children": []
+          },
+          {
+            "index": 44,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "6",
+            "bounds": "609, 1399, 731, 1488",
+            "children": []
+          },
+          {
+            "index": 45,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "7",
+            "bounds": "739, 1399, 862, 1488",
+            "children": []
+          },
+          {
+            "index": 46,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "8",
+            "bounds": "870, 1399, 992, 1488",
+            "children": []
+          },
+          {
+            "index": 47,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "9",
+            "bounds": "88, 1496, 210, 1585",
+            "children": []
+          },
+          {
+            "index": 48,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "10",
+            "bounds": "218, 1496, 340, 1585",
+            "children": []
+          },
+          {
+            "index": 49,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "11",
+            "bounds": "348, 1496, 470, 1585",
+            "children": []
+          },
+          {
+            "index": 50,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "12",
+            "bounds": "478, 1496, 601, 1585",
+            "children": []
+          },
+          {
+            "index": 51,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "13",
+            "bounds": "609, 1496, 731, 1585",
+            "children": []
+          },
+          {
+            "index": 52,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "14",
+            "bounds": "739, 1496, 862, 1585",
+            "children": []
+          },
+          {
+            "index": 53,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "15",
+            "bounds": "870, 1496, 992, 1585",
+            "children": []
+          },
+          {
+            "index": 54,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "16",
+            "bounds": "88, 1593, 210, 1682",
+            "children": []
+          },
+          {
+            "index": 55,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "17",
+            "bounds": "218, 1593, 340, 1682",
+            "children": []
+          },
+          {
+            "index": 56,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "18",
+            "bounds": "348, 1593, 470, 1682",
+            "children": []
+          },
+          {
+            "index": 57,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "19",
+            "bounds": "478, 1593, 601, 1682",
+            "children": []
+          },
+          {
+            "index": 58,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "20",
+            "bounds": "609, 1593, 731, 1682",
+            "children": []
+          },
+          {
+            "index": 59,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "21",
+            "bounds": "739, 1593, 862, 1682",
+            "children": []
+          },
+          {
+            "index": 60,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "22",
+            "bounds": "870, 1593, 992, 1682",
+            "children": []
+          },
+          {
+            "index": 61,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "23",
+            "bounds": "88, 1690, 210, 1779",
+            "children": []
+          },
+          {
+            "index": 62,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "24",
+            "bounds": "218, 1690, 340, 1779",
+            "children": []
+          },
+          {
+            "index": 63,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "25",
+            "bounds": "348, 1690, 470, 1779",
+            "children": []
+          },
+          {
+            "index": 64,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "26",
+            "bounds": "478, 1690, 601, 1779",
+            "children": []
+          },
+          {
+            "index": 65,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "27",
+            "bounds": "609, 1690, 731, 1779",
+            "children": []
+          },
+          {
+            "index": 66,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "28",
+            "bounds": "739, 1690, 862, 1779",
+            "children": []
+          },
+          {
+            "index": 67,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "29",
+            "bounds": "870, 1690, 992, 1779",
+            "children": []
+          },
+          {
+            "index": 68,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "30",
+            "bounds": "88, 1787, 210, 1876",
+            "children": []
+          },
+          {
+            "index": 69,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "218, 1787, 340, 1876",
+            "children": []
+          },
+          {
+            "index": 70,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "348, 1787, 470, 1876",
+            "children": []
+          },
+          {
+            "index": 71,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "478, 1787, 601, 1876",
+            "children": []
+          },
+          {
+            "index": 72,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "609, 1787, 731, 1876",
+            "children": []
+          },
+          {
+            "index": 73,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "739, 1787, 862, 1876",
+            "children": []
+          },
+          {
+            "index": 74,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "TextView",
+            "bounds": "870, 1787, 992, 1876",
+            "children": []
+          },
+          {
+            "index": 75,
+            "resourceId": "com.example.emplab:id/tvCancel",
+            "className": "TextView",
+            "text": "Cancel",
+            "bounds": "644, 1922, 835, 2043",
+            "children": []
+          },
+          {
+            "index": 76,
+            "resourceId": "com.example.emplab:id/tvOk",
+            "className": "TextView",
+            "text": "OK",
+            "bounds": "877, 1922, 996, 2043",
+            "children": []
+          },
+          {
+            "index": 77,
+            "resourceId": "com.example.emplab:id/btnConfirm",
+            "className": "Button",
+            "text": "拟请假5天, 确认",
+            "bounds": "42, 2169, 1038, 2295",
+            "children": []
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "42, 173, 105, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "关闭",
+            "bounds": "126, 173, 210, 235",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "拟请假时间",
+            "bounds": "210, 170, 880, 239",
+            "children": []
+          },
+          {
+            "index": 5,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 284, 1080, 2127",
+            "children": [
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "年休假 (工作日)",
+                "bounds": "42, 326, 1038, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/layoutStartDate",
+                "className": "LinearLayout",
+                "text": "layoutStartDate",
+                "bounds": "42, 451, 1038, 619",
+                "children": [
+                  {
+                    "index": 8,
+                    "resourceId": "",
+                    "className": "ImageView",
+                    "text": "必填",
+                    "bounds": "84, 508, 137, 561",
+                    "children": []
+                  },
+                  {
+                    "index": 9,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "开始时间",
+                    "bounds": "169, 504, 337, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 10,
+                    "resourceId": "com.example.emplab:id/tvStartDate",
+                    "className": "TextView",
+                    "text": "2025年10月26日",
+                    "bounds": "498, 504, 816, 566",
+                    "children": []
+                  },
+                  {
+                    "index": 11,
+                    "resourceId": "com.example.emplab:id/layoutStartTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutStartTimeType",
+                    "bounds": "837, 493, 996, 577",
+                    "children": [
+                      {
+                        "index": 12,
+                        "resourceId": "com.example.emplab:id/tvStartTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 504, 932, 566",
+                        "children": []
+                      },
+                      {
+                        "index": 13,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 514, 985, 556",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 14,
+                "resourceId": "com.example.emplab:id/layoutEndDate",
+                "className": "LinearLayout",
+                "text": "layoutEndDate",
+                "bounds": "42, 640, 1038, 808",
+                "children": [
+                  {
+                    "index": 15,
+                    "resourceId": "",
+                    "className": "TextView",
+                    "text": "结束时间",
+                    "bounds": "84, 693, 252, 755",
+                    "children": []
+                  },
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/tvEndDate",
+                    "className": "TextView",
+                    "text": "2025年11月05日",
+                    "bounds": "498, 693, 816, 755",
+                    "children": []
+                  },
+                  {
+                    "index": 17,
+                    "resourceId": "com.example.emplab:id/layoutEndTimeType",
+                    "className": "LinearLayout",
+                    "text": "layoutEndTimeType",
+                    "bounds": "837, 682, 996, 766",
+                    "children": [
+                      {
+                        "index": 18,
+                        "resourceId": "com.example.emplab:id/tvEndTimeType",
+                        "className": "TextView",
+                        "text": "全天",
+                        "bounds": "848, 693, 932, 755",
+                        "children": []
+                      },
+                      {
+                        "index": 19,
+                        "resourceId": "",
+                        "className": "ImageView",
+                        "text": "选择",
+                        "bounds": "943, 703, 985, 745",
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 20,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "年休假对应年份",
+                "bounds": "84, 871, 378, 933",
+                "children": []
+              },
+              {
+                "index": 21,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "2025年年假",
+                "bounds": "711, 871, 933, 933",
+                "children": []
+              },
+              {
+                "index": 22,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "选择",
+                "bounds": "954, 881, 996, 923",
+                "children": []
+              }
+            ]
+          },
+          {
+            "index": 23,
+            "resourceId": "com.example.emplab:id/btnConfirm",
+            "className": "Button",
+            "text": "拟请假11天, 确认",
+            "bounds": "42, 2169, 1038, 2295",
+            "children": []
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "42, 173, 105, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "请休假申请 (第2步)",
+            "bounds": "105, 170, 975, 239",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 284, 1080, 2127",
+            "children": [
+              {
+                "index": 5,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 330, 95, 383",
+                "children": []
+              },
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "请假事由",
+                "bounds": "116, 326, 284, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/etReason",
+                "className": "EditText",
+                "text": "请输入, 100字以内",
+                "bounds": "42, 409, 1038, 724",
+                "children": []
+              },
+              {
+                "index": 8,
+                "resourceId": "com.example.emplab:id/tvReasonCount",
+                "className": "TextView",
+                "text": "剩余字数 100",
+                "bounds": "848, 735, 1038, 783",
+                "children": []
+              },
+              {
+                "index": 9,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 850, 95, 903",
+                "children": []
+              },
+              {
+                "index": 10,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "拟前往地区",
+                "bounds": "116, 846, 326, 908",
+                "children": []
+              },
+              {
+                "index": 11,
+                "resourceId": "com.example.emplab:id/etDestination",
+                "className": "EditText",
+                "text": "请输入, 100字以内",
+                "bounds": "42, 929, 1038, 1244",
+                "children": []
+              },
+              {
+                "index": 12,
+                "resourceId": "com.example.emplab:id/tvDestinationCount",
+                "className": "TextView",
+                "text": "剩余字数 100",
+                "bounds": "848, 1255, 1038, 1303",
+                "children": []
+              },
+              {
+                "index": 13,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 1370, 95, 1423",
+                "children": []
+              },
+              {
+                "index": 14,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "附件 (非必须, 最多一张图片)",
+                "bounds": "116, 1366, 639, 1428",
+                "children": []
+              },
+              {
+                "index": 15,
+                "resourceId": "com.example.emplab:id/layoutImageUpload",
+                "className": "LinearLayout",
+                "text": "layoutImageUpload",
+                "bounds": "42, 1449, 357, 1764",
+                "children": [
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/ivUploadIcon",
+                    "className": "ImageView",
+                    "text": "添加图片",
+                    "bounds": "157, 1564, 241, 1648",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "index": 17,
+            "resourceId": "com.example.emplab:id/btnPrevious",
+            "className": "Button",
+            "text": "上一步",
+            "bounds": "42, 2169, 519, 2295",
+            "children": []
+          },
+          {
+            "index": 18,
+            "resourceId": "com.example.emplab:id/btnSubmit",
+            "className": "Button",
+            "text": "提交",
+            "bounds": "561, 2169, 1038, 2295",
+            "children": []
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "42, 173, 105, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "请休假申请 (第2步)",
+            "bounds": "105, 170, 975, 239",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 284, 1080, 1929",
+            "children": [
+              {
+                "index": 5,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 330, 95, 383",
+                "children": []
+              },
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "请假事由",
+                "bounds": "116, 326, 284, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/etReason",
+                "className": "EditText",
+                "text": "出去玩",
+                "bounds": "42, 409, 1038, 724",
+                "children": []
+              },
+              {
+                "index": 8,
+                "resourceId": "com.example.emplab:id/tvReasonCount",
+                "className": "TextView",
+                "text": "剩余字数 97",
+                "bounds": "866, 735, 1038, 783",
+                "children": []
+              },
+              {
+                "index": 9,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 850, 95, 903",
+                "children": []
+              },
+              {
+                "index": 10,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "拟前往地区",
+                "bounds": "116, 846, 326, 908",
+                "children": []
+              },
+              {
+                "index": 11,
+                "resourceId": "com.example.emplab:id/etDestination",
+                "className": "EditText",
+                "text": "北京",
+                "bounds": "42, 929, 1038, 1244",
+                "children": []
+              },
+              {
+                "index": 12,
+                "resourceId": "com.example.emplab:id/tvDestinationCount",
+                "className": "TextView",
+                "text": "剩余字数 98",
+                "bounds": "866, 1255, 1038, 1303",
+                "children": []
+              },
+              {
+                "index": 13,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 1370, 95, 1423",
+                "children": []
+              },
+              {
+                "index": 14,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "附件 (非必须, 最多一张图片)",
+                "bounds": "116, 1366, 639, 1428",
+                "children": []
+              },
+              {
+                "index": 15,
+                "resourceId": "com.example.emplab:id/layoutImageUpload",
+                "className": "LinearLayout",
+                "text": "layoutImageUpload",
+                "bounds": "42, 1449, 357, 1764",
+                "children": [
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/ivUploadIcon",
+                    "className": "ImageView",
+                    "text": "添加图片",
+                    "bounds": "157, 1564, 241, 1648",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "index": 17,
+            "resourceId": "com.example.emplab:id/btnPrevious",
+            "className": "Button",
+            "text": "上一步",
+            "bounds": "42, 1971, 519, 2097",
+            "children": []
+          },
+          {
+            "index": 18,
+            "resourceId": "com.example.emplab:id/btnSubmit",
+            "className": "Button",
+            "text": "提交",
+            "bounds": "561, 1971, 1038, 2097",
+            "children": []
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "42, 173, 105, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "请休假申请 (第2步)",
+            "bounds": "105, 170, 975, 239",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 284, 1080, 2127",
+            "children": [
+              {
+                "index": 5,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 330, 95, 383",
+                "children": []
+              },
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "请假事由",
+                "bounds": "116, 326, 284, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/etReason",
+                "className": "EditText",
+                "text": "出去玩",
+                "bounds": "42, 409, 1038, 724",
+                "children": []
+              },
+              {
+                "index": 8,
+                "resourceId": "com.example.emplab:id/tvReasonCount",
+                "className": "TextView",
+                "text": "剩余字数 97",
+                "bounds": "866, 735, 1038, 783",
+                "children": []
+              },
+              {
+                "index": 9,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 850, 95, 903",
+                "children": []
+              },
+              {
+                "index": 10,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "拟前往地区",
+                "bounds": "116, 846, 326, 908",
+                "children": []
+              },
+              {
+                "index": 11,
+                "resourceId": "com.example.emplab:id/etDestination",
+                "className": "EditText",
+                "text": "北京",
+                "bounds": "42, 929, 1038, 1244",
+                "children": []
+              },
+              {
+                "index": 12,
+                "resourceId": "com.example.emplab:id/tvDestinationCount",
+                "className": "TextView",
+                "text": "剩余字数 98",
+                "bounds": "866, 1255, 1038, 1303",
+                "children": []
+              },
+              {
+                "index": 13,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 1370, 95, 1423",
+                "children": []
+              },
+              {
+                "index": 14,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "附件 (非必须, 最多一张图片)",
+                "bounds": "116, 1366, 639, 1428",
+                "children": []
+              },
+              {
+                "index": 15,
+                "resourceId": "com.example.emplab:id/layoutImageUpload",
+                "className": "LinearLayout",
+                "text": "layoutImageUpload",
+                "bounds": "42, 1449, 357, 1764",
+                "children": [
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/ivUploadIcon",
+                    "className": "ImageView",
+                    "text": "添加图片",
+                    "bounds": "157, 1564, 241, 1648",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "index": 17,
+            "resourceId": "com.example.emplab:id/btnPrevious",
+            "className": "Button",
+            "text": "上一步",
+            "bounds": "42, 2169, 519, 2295",
+            "children": []
+          },
+          {
+            "index": 18,
+            "resourceId": "com.example.emplab:id/btnSubmit",
+            "className": "Button",
+            "text": "提交",
+            "bounds": "561, 2169, 1038, 2295",
+            "children": []
+          },
+          {
+            "index": 19,
+            "resourceId": "com.example.emplab:id/confirmOverlay",
+            "className": "FrameLayout",
+            "text": "confirmOverlay",
+            "bounds": "0, 128, 1080, 2337",
+            "children": [
+              {
+                "index": 20,
+                "resourceId": "com.example.emplab:id/confirmTitle",
+                "className": "TextView",
+                "text": "提交确认",
+                "bounds": "116, 1063, 964, 1132",
+                "children": []
+              },
+              {
+                "index": 21,
+                "resourceId": "com.example.emplab:id/confirmMessage",
+                "className": "TextView",
+                "text": "确定要提交请假申请吗？",
+                "bounds": "116, 1164, 964, 1222",
+                "children": []
+              },
+              {
+                "index": 22,
+                "resourceId": "com.example.emplab:id/btnCancelOverlay",
+                "className": "Button",
+                "text": "取消",
+                "bounds": "470, 1275, 701, 1401",
+                "children": []
+              },
+              {
+                "index": 23,
+                "resourceId": "com.example.emplab:id/btnOkOverlay",
+                "className": "Button",
+                "text": "确定",
+                "bounds": "733, 1275, 964, 1401",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 1,
+        "resourceId": "",
+        "className": "FrameLayout",
+        "text": "FrameLayout",
+        "bounds": "0, 0, 1080, 2400",
+        "children": [
+          {
+            "index": 2,
+            "resourceId": "com.example.emplab:id/iv_back",
+            "className": "ImageView",
+            "text": "返回",
+            "bounds": "42, 173, 105, 236",
+            "children": []
+          },
+          {
+            "index": 3,
+            "resourceId": "",
+            "className": "TextView",
+            "text": "请休假申请 (第2步)",
+            "bounds": "105, 170, 975, 239",
+            "children": []
+          },
+          {
+            "index": 4,
+            "resourceId": "",
+            "className": "ScrollView",
+            "text": "ScrollView",
+            "bounds": "0, 284, 1080, 2127",
+            "children": [
+              {
+                "index": 5,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 330, 95, 383",
+                "children": []
+              },
+              {
+                "index": 6,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "请假事由",
+                "bounds": "116, 326, 284, 388",
+                "children": []
+              },
+              {
+                "index": 7,
+                "resourceId": "com.example.emplab:id/etReason",
+                "className": "EditText",
+                "text": "出去玩",
+                "bounds": "42, 409, 1038, 724",
+                "children": []
+              },
+              {
+                "index": 8,
+                "resourceId": "com.example.emplab:id/tvReasonCount",
+                "className": "TextView",
+                "text": "剩余字数 97",
+                "bounds": "866, 735, 1038, 783",
+                "children": []
+              },
+              {
+                "index": 9,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 850, 95, 903",
+                "children": []
+              },
+              {
+                "index": 10,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "拟前往地区",
+                "bounds": "116, 846, 326, 908",
+                "children": []
+              },
+              {
+                "index": 11,
+                "resourceId": "com.example.emplab:id/etDestination",
+                "className": "EditText",
+                "text": "北京",
+                "bounds": "42, 929, 1038, 1244",
+                "children": []
+              },
+              {
+                "index": 12,
+                "resourceId": "com.example.emplab:id/tvDestinationCount",
+                "className": "TextView",
+                "text": "剩余字数 98",
+                "bounds": "866, 1255, 1038, 1303",
+                "children": []
+              },
+              {
+                "index": 13,
+                "resourceId": "",
+                "className": "ImageView",
+                "text": "必填",
+                "bounds": "42, 1370, 95, 1423",
+                "children": []
+              },
+              {
+                "index": 14,
+                "resourceId": "",
+                "className": "TextView",
+                "text": "附件 (非必须, 最多一张图片)",
+                "bounds": "116, 1366, 639, 1428",
+                "children": []
+              },
+              {
+                "index": 15,
+                "resourceId": "com.example.emplab:id/layoutImageUpload",
+                "className": "LinearLayout",
+                "text": "layoutImageUpload",
+                "bounds": "42, 1449, 357, 1764",
+                "children": [
+                  {
+                    "index": 16,
+                    "resourceId": "com.example.emplab:id/ivUploadIcon",
+                    "className": "ImageView",
+                    "text": "添加图片",
+                    "bounds": "157, 1564, 241, 1648",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "index": 17,
+            "resourceId": "com.example.emplab:id/btnPrevious",
+            "className": "Button",
+            "text": "上一步",
+            "bounds": "42, 2169, 519, 2295",
+            "children": []
+          },
+          {
+            "index": 18,
+            "resourceId": "com.example.emplab:id/btnSubmit",
+            "className": "Button",
+            "text": "提交",
+            "bounds": "561, 2169, 1038, 2295",
+            "children": []
+          },
+          {
+            "index": 19,
+            "resourceId": "com.example.emplab:id/successOverlay",
+            "className": "FrameLayout",
+            "text": "successOverlay",
+            "bounds": "0, 128, 1080, 2337",
+            "children": [
+              {
+                "index": 20,
+                "resourceId": "com.example.emplab:id/successTitle",
+                "className": "TextView",
+                "text": "提交成功",
+                "bounds": "116, 1063, 964, 1132",
+                "children": []
+              },
+              {
+                "index": 21,
+                "resourceId": "com.example.emplab:id/successMessage",
+                "className": "TextView",
+                "text": "您的请假申请已提交",
+                "bounds": "116, 1164, 964, 1222",
+                "children": []
+              },
+              {
+                "index": 22,
+                "resourceId": "com.example.emplab:id/btnOkSuccess",
+                "className": "Button",
+                "text": "确定",
+                "bounds": "733, 1275, 964, 1401",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  ],
+  "metadata": {
+    "steps": 12,
+    "output": "已成功提交2025年10月26日至2025年11月5日的年休假申请，事由：出去玩，前往地区：北京",
+    "reason": "已成功提交2025年10月26日至2025年11月5日的年休假申请，事由：出去玩，前往地区：北京",
+    "execution_time": 0.0,
+    "model": "OpenAILike",
+    "is_hot_start": false
+  },
+  "similarity_score": null
+}

@@ -118,14 +118,29 @@ class ExperienceMemory:
             return self._simple_text_similarity(goal1, goal2)
         
         try:
+#             prompt = f"""
+# 请计算以下两个任务描述的语义相似度，返回0-1之间的数值：
+#
+# 任务1: {goal1}
+# 任务2: {goal2}
+#
+# 请只返回一个0-1之间的数字，表示相似度分数：
+# """
             prompt = f"""
-请计算以下两个任务描述的语义相似度，返回0-1之间的数值：
+            请判断以下两个任务是否为“相似任务”，并返回0-1之间的相似度分数（1表示完全相同，0表示完全无关）。
 
-任务1: {goal1}
-任务2: {goal2}
+            判断标准：
+1. 核心目标是否一致：最终要达成的结果是否相同（如“发送消息”和“提交信息”目标不同；“发送消息”和“发送一条文本”目标一致）；
+2. 关键对象是否一致：任务操作的核心实体是否相同（如“给张三发消息”和“给李四发消息”的关键对象都是“消息”，一致；“发消息”和“传文件”的关键对象不同）；
+3. 核心操作是否一致：完成任务的核心动作是否相同（如“发送消息”和“提交消息”的核心操作都是“发送/提交”，一致；“删除消息”和“转发消息”操作不同）。
 
-请只返回一个0-1之间的数字，表示相似度分数：
-"""
+忽略参数差异（如“给张三发消息”和“给李四发消息”仅参数不同，视为高相似度），也忽略表面表达差异（如同义词、句式变化）。
+
+            任务1: {goal1}
+            任务2: {goal2}
+
+            请只返回一个0-1之间的数字（保留2位小数），例如0.95、1.0、0.3：
+            """
             response = self.llm.complete(prompt)
             similarity_text = response.text.strip()
             
@@ -134,6 +149,7 @@ class ExperienceMemory:
             numbers = re.findall(r'0\.\d+|1\.0|0|1', similarity_text)
             if numbers:
                 similarity = float(numbers[0])
+                print("相似度：", similarity)
                 return max(0.0, min(1.0, similarity))  # 确保在0-1范围内
             else:
                 LoggingUtils.log_warning("ExperienceMemory", "Could not parse similarity score from: {text}", 
