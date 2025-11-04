@@ -163,7 +163,6 @@ class ExperienceMemory:
 
         all_experiences_goals = [exp.goal for exp in self.experiences]
         similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
-        print(similarity_scores)
 
         for i, experience in enumerate(self.experiences):
             try:
