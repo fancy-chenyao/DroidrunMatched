@@ -59,8 +59,8 @@ async def main():
     # Create agent with unified configuration
     agent_init_start = time.time()
     agent = DroidAgent(
-        goal="打开EmpLab应用，进入请休假系统，提交2025年10月26日到2025年11月5日的年休假申请。请假事由：出去玩，拟前往地区：北京。请尝试完成整个流程，包括登录（如果需要的话）和提交申请。",
-        # goal="帮我请本月5号到7号的年假，请假理由和地点分别为探亲和厦门。",
+        # goal="打开EmpLab应用，进入请休假系统，提交2025年11月24日到2025年12月5日的年休假申请。请假事由：出去玩，拟前往地区：北京。请尝试完成整个流程，包括登录（如果需要的话）和提交申请。",
+        goal="请帮我请十一月10号到15号的年假,去海南旅游。",
         llm=llm,
         tools=tools,
         config_manager=config_manager,  # 使用统一配置管理器

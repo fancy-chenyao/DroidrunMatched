@@ -86,6 +86,8 @@ class ExperienceMemory:
         for experience in self.experiences:
             try:
                 similarity = self._calculate_similarity(goal, experience.goal)
+                print("experience goal:", experience.goal)
+                print("similarity:", similarity)
                 # 记录每条经验的相似度与阈值比较
                 try:
                     LoggingUtils.log_debug("ExperienceMemory", "Similarity calculation: {similarity:.2f} threshold={threshold:.2f} goal={goal}", 
@@ -118,14 +120,6 @@ class ExperienceMemory:
             return self._simple_text_similarity(goal1, goal2)
         
         try:
-#             prompt = f"""
-# 请计算以下两个任务描述的语义相似度，返回0-1之间的数值：
-#
-# 任务1: {goal1}
-# 任务2: {goal2}
-#
-# 请只返回一个0-1之间的数字，表示相似度分数：
-# """
             prompt = f"""
             请判断以下两个任务是否为“相似任务”，并返回0-1之间的相似度分数（1表示完全相同，0表示完全无关）。
 
@@ -149,7 +143,6 @@ class ExperienceMemory:
             numbers = re.findall(r'0\.\d+|1\.0|0|1', similarity_text)
             if numbers:
                 similarity = float(numbers[0])
-                print("相似度：", similarity)
                 return max(0.0, min(1.0, similarity))  # 确保在0-1范围内
             else:
                 LoggingUtils.log_warning("ExperienceMemory", "Could not parse similarity score from: {text}", 
@@ -159,7 +152,96 @@ class ExperienceMemory:
         except Exception as e:
             LoggingUtils.log_warning("ExperienceMemory", "LLM similarity calculation failed: {error}", error=e)
             return self._simple_text_similarity(goal1, goal2)
-    
+
+    def batch_find_similar_experiences(self, goal: str, threshold: float = 0.8) -> List[TaskExperience]:
+        """查找相似经验 - 使用LLM进行语义匹配"""
+        if not self.llm:
+            LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for similarity matching")
+            return []
+
+        similar_experiences = []
+
+        all_experiences_goals = [exp.goal for exp in self.experiences]
+        similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
+        print(similarity_scores)
+
+        for i, experience in enumerate(self.experiences):
+            try:
+                similarity = similarity_scores[i]
+                # 记录相似度日志
+                try:
+                    LoggingUtils.log_debug("ExperienceMemory",
+                                       "Similarity calculation: {similarity:.2f} threshold={threshold:.2f} goal={goal}",
+                                       similarity=similarity, threshold=threshold, goal=experience.goal)
+                except Exception:
+                    pass
+                if similarity >= threshold:
+                    experience.similarity_score = similarity
+                    similar_experiences.append(experience)
+                else:
+                    try:
+                        LoggingUtils.log_debug("ExperienceMemory",
+                                               "Similarity below threshold: {similarity:.2f} < {threshold:.2f} goal={goal}",
+                                               similarity=similarity, threshold=threshold, goal=experience.goal)
+                    except Exception:
+                        pass
+            except Exception as e:
+                LoggingUtils.log_warning("ExperienceMemory", "Failed to process experience {exp_id}: {error}",
+                                         exp_id=experience.id, error=e)
+        # 按相似度排序
+        similar_experiences.sort(key=lambda x: x.similarity_score or 0, reverse=True)
+        LoggingUtils.log_info("ExperienceMemory", "Found {count} similar experiences for goal: {goal}",
+                                      count=len(similar_experiences), goal=goal)
+        return similar_experiences
+
+    def _batch_calculate_similarity(self, goal:str, experience_goals:List[str])-> List[float]:
+        """批量计算目标与所有经验的相似度"""
+        if not self.llm:
+            return [self._simple_text_similarity(goal, exp_goal) for exp_goal in experience_goals]
+        try:
+            batch_prompt = f"""
+            请判断以下目标与每条经验是否为“相似任务”，并为每条经验返回0-1之间的相似度分数（1表示完全相同，0表示完全无关）。
+            
+            判断标准：
+1. 核心目标是否一致：最终要达成的结果是否相同（如“发送消息”和“提交信息”目标不同；“发送消息”和“发送一条文本”目标一致）；
+2. 关键对象是否一致：任务操作的核心实体是否相同（如“给张三发消息”和“给李四发消息”的关键对象都是“消息”，一致；“发消息”和“传文件”的关键对象不同）；
+3. 核心操作是否一致：完成任务的核心动作是否相同（如“发送消息”和“提交消息”的核心操作都是“发送/提交”，一致；“删除消息”和“转发消息”操作不同）。
+
+忽略参数差异（如“给张三发消息”和“给李四发消息”仅参数不同，视为高相似度），也忽略表面表达差异（如同义词、句式变化）。
+
+            目标任务: {goal}
+
+请为以下每条经验返回相似度分数（保留2位小数），格式为“经验X: 分数”（例如“经验1: 0.95”）：
+            
+            """
+            for i, exp_goal in enumerate(experience_goals, 1):
+                batch_prompt += f"经验{i}: {exp_goal}\n"
+            batch_prompt += "\n请严格按照上述格式返回，不要添加额外解释，确保分数与经验顺序一一对应。"
+
+            response = self.llm.complete(batch_prompt)
+            similarity_text = response.text.strip()
+
+            scores = []
+            for line in similarity_text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                match = re.match(r'经验\d+:\s*(\d+\.\d+|\d+)', line)
+                if match:
+                    try:
+                        score = float(match.group(1))
+                        scores.append(max(0.0, min(1.0, score)))
+                    except ValueError:
+                        scores.append(0.0)
+            while len(scores) < len(experience_goals):
+                scores.append(0.0)
+            return scores[:len(experience_goals)]
+        except Exception as e:
+            LoggingUtils.log_warning("ExperienceMemory", "Batch LLM calculation failed, fallback to single calls",
+                                     error=e)
+            # 批量失败时，降级为逐条计算（保证功能可用）
+            return [self._calculate_similarity(goal, exp_goal) for exp_goal in experience_goals]
+
     def _simple_text_similarity(self, goal1: str, goal2: str) -> float:
         """简单的文本相似度计算（Jaccard相似度）"""
         words1 = set(goal1.lower().split())

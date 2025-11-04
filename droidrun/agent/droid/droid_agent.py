@@ -588,7 +588,7 @@ class DroidAgent(Workflow):
 
         # 新增：热启动检查
         if self.memory_enabled and self.memory_config.hot_start_enabled:
-            similar_experiences = self.memory_manager.find_similar_experiences(
+            similar_experiences = self.memory_manager.batch_find_similar_experiences(
                 self.goal, 
                 threshold=self.memory_config.similarity_threshold
             )
