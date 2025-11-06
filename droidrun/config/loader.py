@@ -40,6 +40,13 @@ class ConfigLoader:
             # 工具配置
             'ACTION_WAIT_TIME': 'tools.action_wait_time',
             'SCREENSHOT_WAIT_TIME': 'tools.screenshot_wait_time',
+            
+            # 服务端配置
+            'SERVER_MODE': 'server.mode',
+            'SERVER_PORT': 'server.server_port',
+            'SERVER_HOST': 'server.server_host',
+            'WEBSOCKET_PATH': 'server.websocket_path',
+            'HEARTBEAT_INTERVAL': 'server.heartbeat_interval',
         }
     
     def _load_env_vars(self) -> Dict[str, Any]:

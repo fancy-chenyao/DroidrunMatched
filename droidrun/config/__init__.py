@@ -7,7 +7,7 @@ DroidRun 配置管理模块
 """
 
 from .unified_manager import UnifiedConfigManager, get_config_manager
-from .unified_config import DroidRunUnifiedConfig, SystemConfig, MemoryConfig, AgentConfig, ToolsConfig, APIConfig
+from .unified_config import DroidRunUnifiedConfig, SystemConfig, MemoryConfig, AgentConfig, ToolsConfig, APIConfig, ServerConfig
 from .constants import ExceptionConstants
 
 # 导出主要接口
@@ -21,6 +21,7 @@ __all__ = [
     'AgentConfig',
     'ToolsConfig',
     'APIConfig',
+    'ServerConfig',
     # 代码级常量
     'ExceptionConstants'
 ]

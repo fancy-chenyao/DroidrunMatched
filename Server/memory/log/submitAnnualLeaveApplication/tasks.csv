@@ -1,0 +1,2 @@
+name,path
+submitAnnualLeaveApplication,"{""0"": [""open_leave_application""], ""1"": [""select_leave_type""], ""2"": [""set_leave_start_date"", ""fill_leave_reason_and_location""], ""3"": [""set_end_date""], ""4"": [""fill_reason_and_location"", ""finish""]}"

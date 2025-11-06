@@ -70,6 +70,18 @@ class APIConfig:
     max_retries: int = 3
 
 @dataclass
+class ServerConfig:
+    """服务端配置"""
+    mode: str = "client"  # "client" | "server"
+    server_port: int = 8765
+    server_host: str = "0.0.0.0"
+    websocket_path: str = "/ws"
+    device_id_header: str = "X-Device-ID"
+    timeout: int = 30
+    heartbeat_interval: int = 30
+    max_connections: int = 100
+
+@dataclass
 class DroidRunUnifiedConfig:
     """统一配置类"""
     system: SystemConfig
@@ -77,6 +89,7 @@ class DroidRunUnifiedConfig:
     agent: AgentConfig
     tools: ToolsConfig
     api: APIConfig
+    server: ServerConfig
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -85,7 +98,8 @@ class DroidRunUnifiedConfig:
             "memory": asdict(self.memory),
             "agent": asdict(self.agent),
             "tools": asdict(self.tools),
-            "api": asdict(self.api)
+            "api": asdict(self.api),
+            "server": asdict(self.server)
         }
     
     @classmethod
@@ -96,7 +110,8 @@ class DroidRunUnifiedConfig:
             memory=MemoryConfig(**data.get("memory", {})),
             agent=AgentConfig(**data.get("agent", {})),
             tools=ToolsConfig(**data.get("tools", {})),
-            api=APIConfig(**data.get("api", {}))
+            api=APIConfig(**data.get("api", {})),
+            server=ServerConfig(**data.get("server", {}))
         )
     
     @classmethod
@@ -107,7 +122,8 @@ class DroidRunUnifiedConfig:
             memory=MemoryConfig(),
             agent=AgentConfig(),
             tools=ToolsConfig(),
-            api=APIConfig()
+            api=APIConfig(),
+            server=ServerConfig()
         )
     
     def validate(self) -> bool:

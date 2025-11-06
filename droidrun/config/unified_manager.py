@@ -4,7 +4,7 @@
 import os
 from typing import Optional, Dict, Any
 import logging
-from .unified_config import DroidRunUnifiedConfig, SystemConfig, MemoryConfig, AgentConfig, ToolsConfig, APIConfig
+from .unified_config import DroidRunUnifiedConfig, SystemConfig, MemoryConfig, AgentConfig, ToolsConfig, APIConfig, ServerConfig
 from .loader import ConfigLoader
 
 logger = logging.getLogger("droidrun")
@@ -97,6 +97,10 @@ class UnifiedConfigManager:
         """获取API配置"""
         return self.config.api
     
+    def get_server_config(self) -> ServerConfig:
+        """获取服务端配置"""
+        return self.config.server
+    
     def reload(self):
         """重新加载配置"""
         logger.info("🔄 Reloading configuration...")
@@ -150,6 +154,12 @@ class UnifiedConfigManager:
   - Model: {self.config.api.model}
   - API Base: {self.config.api.api_base}
   - Timeout: {self.config.api.timeout}s
+
+🖥️ Server:
+  - Mode: {self.config.server.mode}
+  - Host: {self.config.server.server_host}
+  - Port: {self.config.server.server_port}
+  - WebSocket Path: {self.config.server.websocket_path}
 """
 
 # 全局配置管理器实例

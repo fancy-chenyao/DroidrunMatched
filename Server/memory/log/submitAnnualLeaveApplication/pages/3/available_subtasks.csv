@@ -1,0 +1,2 @@
+name,description,parameters
+set_end_date,设置请假结束日期为指定的日期。,{'date': '用户希望设置的结束日期（例如：2025年10月26日）'}
