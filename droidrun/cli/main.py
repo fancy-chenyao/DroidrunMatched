@@ -13,7 +13,9 @@ from rich.console import Console
 from adbutils import adb
 from droidrun.agent.droid import DroidAgent
 from droidrun.agent.utils.llm_picker import load_llm
-from droidrun.tools import AdbTools, IOSTools
+from droidrun.tools import AdbTools, IOSTools, WebSocketTools
+from droidrun.server import get_global_server
+from droidrun.config import get_config_manager
 from droidrun.agent.context.personas import DEFAULT, BIG_AGENT
 from functools import wraps
 from droidrun.cli.logs import LogHandler
@@ -114,27 +116,87 @@ async def run_command(
 
             log_handler.update_step("Setting up tools...")
 
-            # Device setup
-            if device is None and not ios:
-                logger.info("🔍 Finding connected device...")
-
-                devices = adb.list()
-                if not devices:
-                    raise ValueError("No connected devices found.")
-                device = devices[0].serial
-                logger.info(f"📱 Using device: {device}")
-            elif device is None and ios:
-                raise ValueError(
-                    "iOS device not specified. Please specify the device base url (http://device-ip:6643) via --device"
+            # 获取配置管理器（用于检查服务器模式）
+            config_manager = get_config_manager()
+            server_config = config_manager.get_server_config()
+            
+            # 根据配置选择工具类型
+            if server_config.mode == "server" and not ios:
+                # 服务端模式：使用 WebSocketTools
+                logger.info("🌐 使用 WebSocket 服务端模式")
+                
+                # 获取已运行的服务器实例
+                server = get_global_server()
+                if not server:
+                    raise ValueError(
+                        "WebSocket 服务器未运行。请先启动服务器：\n"
+                        "  droidrun server\n"
+                        "或：\n"
+                        "  python -m droidrun.server.start_server"
+                    )
+                
+                # 查询已连接设备
+                connected_devices = server.get_connected_devices()
+                
+                # 解析设备ID
+                if device:
+                    # 使用指定的设备ID
+                    if device not in connected_devices:
+                        raise ValueError(
+                            f"设备 '{device}' 未连接到服务器。\n"
+                            f"已连接设备: {connected_devices if connected_devices else '无'}\n"
+                            f"请先启动APP并连接到服务器。"
+                        )
+                    device_id = device
+                    logger.info(f"📱 使用指定设备: {device_id}")
+                elif connected_devices:
+                    # 使用第一个已连接设备
+                    device_id = list(connected_devices)[0]
+                    logger.info(f"📱 使用已连接设备: {device_id}")
+                    if len(connected_devices) > 1:
+                        logger.info(f"   其他已连接设备: {list(connected_devices)[1:]}")
+                else:
+                    raise ValueError(
+                        "没有设备连接到服务器。\n"
+                        "请先启动APP并连接到服务器。\n"
+                        f"服务器地址: ws://{server_config.server_host}:{server_config.server_port}{server_config.websocket_path}"
+                    )
+                
+                # 创建 WebSocketTools
+                tools = WebSocketTools(
+                    device_id=device_id,
+                    session_manager=server.session_manager,
+                    config_manager=config_manager,
+                    timeout=server_config.timeout,
                 )
+                
+                # 注册工具实例到服务器（用于响应处理）
+                server.register_tools_instance(device_id, tools)
+                
+                logger.info(f"✅ WebSocketTools 已创建 (设备ID: {device_id})")
             else:
-                logger.info(f"📱 Using device: {device}")
+                # 客户端模式：使用 AdbTools（原有逻辑）
+                # Device setup
+                if device is None and not ios:
+                    logger.info("🔍 Finding connected device...")
 
-            tools = (
-                AdbTools(serial=device, use_tcp=use_tcp)
-                if not ios
-                else IOSTools(url=device)
-            )
+                    devices = adb.list()
+                    if not devices:
+                        raise ValueError("No connected devices found.")
+                    device = devices[0].serial
+                    logger.info(f"📱 Using device: {device}")
+                elif device is None and ios:
+                    raise ValueError(
+                        "iOS device not specified. Please specify the device base url (http://device-ip:6643) via --device"
+                    )
+                else:
+                    logger.info(f"📱 Using device: {device}")
+
+                tools = (
+                    AdbTools(serial=device, use_tcp=use_tcp)
+                    if not ios
+                    else IOSTools(url=device)
+                )
             # Set excluded tools based on CLI flags
             excluded_tools = [] if allow_drag else ["drag"]
 
@@ -191,6 +253,8 @@ async def run_command(
                 memory_similarity_threshold=memory_threshold,
                 memory_storage_dir=memory_storage,
                 memory_config=memory_config,
+                # 传递配置管理器（用于服务端模式等）
+                config_manager=config_manager,
             )
 
             logger.info("▶️  Starting agent execution...")
@@ -428,7 +492,9 @@ def cli(
     default=False,
 )
 @click.option("--ios", is_flag=True, help="Run on iOS device", default=False)
+@click.pass_context
 def run(
+    ctx,
     command: str,
     device: str | None,
     provider: str,
@@ -448,6 +514,15 @@ def run(
     ios: bool,
 ):
     """Run a command on your Android device using natural language."""
+    # 从父上下文（group）获取记忆系统参数
+    parent = ctx.parent
+    enable_memory = parent.params.get("enable_memory", True) if parent else True
+    memory_threshold = parent.params.get("memory_threshold", 0.8) if parent else 0.8
+    memory_storage = parent.params.get("memory_storage", "experiences") if parent else "experiences"
+    disable_hot_start = parent.params.get("disable_hot_start", False) if parent else False
+    disable_parameter_adaptation = parent.params.get("disable_parameter_adaptation", False) if parent else False
+    disable_monitoring = parent.params.get("disable_monitoring", False) if parent else False
+    
     # Call our standalone function
     return run_command(
         command,
@@ -657,6 +732,10 @@ def ping(device: str | None, use_tcp: bool, debug: bool):
 
 # Add macro commands as a subgroup
 cli.add_command(macro_cli, name="macro")
+
+# Add server command
+from droidrun.server.server_cli import server_cli
+cli.add_command(server_cli, name="server")
 
 
 if __name__ == "__main__":

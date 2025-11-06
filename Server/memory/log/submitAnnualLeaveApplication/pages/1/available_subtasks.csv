@@ -1,0 +1,2 @@
+name,description,parameters
+select_leave_type,选择请假类别，如“年休假”、“事假”等。,{'leave_type': '请假类别，如“年休假”、“事假”等'}
