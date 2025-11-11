@@ -178,3 +178,9 @@ class SessionManager:
         """获取当前会话数量"""
         return len([s for s in self.sessions.values() if s.is_active])
 
+
+
+
+
+
+

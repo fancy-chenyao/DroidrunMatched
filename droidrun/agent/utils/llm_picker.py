@@ -49,9 +49,9 @@ def load_llm(provider_name: str, **kwargs: Any) -> LLM:
     install_package_name = f"llama-index-llms-{module_provider_part.replace('_', '-')}"
 
     try:
-        logger.debug(f"Attempting to import module: {module_path}")
+        logger.info(f"[load_llm] Attempting to import module: {module_path}")
         llm_module = importlib.import_module(module_path)
-        logger.debug(f"Successfully imported module: {module_path}")
+        logger.info(f"[load_llm] Successfully imported module: {module_path}")
 
     except ModuleNotFoundError:
         logger.error(
@@ -62,11 +62,11 @@ def load_llm(provider_name: str, **kwargs: Any) -> LLM:
         ) from None
 
     try:
-        logger.debug(
-            f"Attempting to get class '{provider_name}' from module {module_path}"
+        logger.info(
+            f"[load_llm] Attempting to get class '{provider_name}' from module {module_path}"
         )
         llm_class = getattr(llm_module, provider_name)
-        logger.debug(f"Found class: {llm_class.__name__}")
+        logger.info(f"[load_llm] Found class: {llm_class.__name__}")
 
         # Verify the class is a subclass of LLM
         if not isinstance(llm_class, type) or not issubclass(llm_class, LLM):
@@ -76,17 +76,23 @@ def load_llm(provider_name: str, **kwargs: Any) -> LLM:
 
         # Filter out None values from kwargs
         filtered_kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        # 移除敏感信息（api_key）用于日志
+        safe_kwargs = {k: "***" if "key" in k.lower() or "secret" in k.lower() else v 
+                      for k, v in filtered_kwargs.items()}
 
         # Initialize
-        logger.debug(
-            f"Initializing {llm_class.__name__} with kwargs: {list(filtered_kwargs.keys())}"
+        logger.info(
+            f"[load_llm] Initializing {llm_class.__name__} with kwargs: {list(filtered_kwargs.keys())}"
         )
+        logger.info(f"[load_llm] Safe kwargs (without secrets): {safe_kwargs}")
+        logger.info(f"[load_llm] About to call {llm_class.__name__}(**filtered_kwargs)...")
         llm_instance = llm_class(**filtered_kwargs)
-        logger.debug(f"Successfully loaded and initialized LLM: {provider_name}")
+        logger.info(f"[load_llm] Successfully initialized {llm_class.__name__} instance")
         if not llm_instance:
             raise RuntimeError(
                 f"Failed to initialize LLM instance for {provider_name}."
             )
+        logger.info(f"[load_llm] LLM instance created: {type(llm_instance).__name__}")
         return llm_instance
 
     except AttributeError:

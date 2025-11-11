@@ -1,2 +1,0 @@
-name,description,parameters
-open_leave_application,点击请休假按钮以开始请假申请流程,{'element_id': 'view_18763859'}

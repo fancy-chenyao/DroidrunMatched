@@ -29,6 +29,11 @@ class MessageType(Enum):
     # 状态相关
     STATUS_UPDATE = "status_update"
     NOTIFICATION = "notification"
+    
+    # 任务相关
+    TASK_REQUEST = "task_request"
+    TASK_RESPONSE = "task_response"
+    TASK_STATUS = "task_status"
 
 
 class MessageProtocol:
@@ -263,6 +268,20 @@ class MessageProtocol:
             if "request_id" not in message:
                 return False, "Command response missing 'request_id'"
         
+        # 任务请求必须包含 goal
+        if message_type == MessageType.TASK_REQUEST.value:
+            if "request_id" not in message:
+                return False, "Task request missing 'request_id'"
+            if "data" in message:
+                data = message["data"]
+                if not isinstance(data, dict) or "goal" not in data:
+                    return False, "Task request missing 'goal' in data"
+        
+        # 任务响应必须包含 request_id
+        if message_type == MessageType.TASK_RESPONSE.value:
+            if "request_id" not in message:
+                return False, "Task response missing 'request_id'"
+        
         return True, None
     
     @staticmethod
@@ -291,4 +310,110 @@ class MessageProtocol:
             return None, f"Invalid JSON: {str(e)}"
         except Exception as e:
             return None, f"Parse error: {str(e)}"
+     
+    @staticmethod
+    def create_task_request(
+        goal: str,
+        request_id: str,
+        device_id: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        创建任务请求消息
+        
+        Args:
+            goal: 任务目标（自然语言描述）
+            request_id: 请求ID
+            device_id: 设备ID（可选）
+            options: 任务选项（可选，如 max_steps, vision, reasoning 等）
+            
+        Returns:
+            任务请求消息字典
+        """
+        data = {
+            "goal": goal
+        }
+        if options:
+            data["options"] = options
+        
+        return MessageProtocol.create_message(
+            MessageType.TASK_REQUEST,
+            data=data,
+            request_id=request_id,
+            device_id=device_id
+        )
+    
+    @staticmethod
+    def create_task_response(
+        request_id: str,
+        status: str = "success",
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+        device_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        创建任务响应消息
+        
+        Args:
+            request_id: 原始请求ID
+            status: 响应状态 ("success", "error", "running")
+            result: 任务执行结果（成功时）
+            error: 错误信息（失败时）
+            device_id: 设备ID（可选）
+            
+        Returns:
+            任务响应消息字典
+        """
+        message = MessageProtocol.create_message(
+            MessageType.TASK_RESPONSE,
+            request_id=request_id,
+            device_id=device_id
+        )
+        
+        # 覆盖状态
+        message["status"] = status
+        
+        if status == "error":
+            message["error"] = error
+        else:
+            if result is not None:
+                message["result"] = result
+        
+        return message
+    
+    @staticmethod
+    def create_task_status(
+        request_id: str,
+        status: str,
+        progress: Optional[float] = None,
+        message: Optional[str] = None,
+        device_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        创建任务状态更新消息
+        
+        Args:
+            request_id: 请求ID
+            status: 状态 ("running", "completed", "failed")
+            progress: 进度（0.0-1.0，可选）
+            message: 状态消息（可选）
+            device_id: 设备ID（可选）
+            
+        Returns:
+            任务状态消息字典
+        """
+        data = {
+            "status": status
+        }
+        if progress is not None:
+            data["progress"] = progress
+        if message:
+            data["message"] = message
+        
+        return MessageProtocol.create_message(
+            MessageType.TASK_STATUS,
+            data=data,
+            request_id=request_id,
+            device_id=device_id
+        )
 

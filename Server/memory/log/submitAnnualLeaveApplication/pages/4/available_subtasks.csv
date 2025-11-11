@@ -1,2 +1,0 @@
-name,description,parameters
-fill_reason_and_location,填写请假事由和拟前往地区,"{'reason': '计划休息和恢复精力', 'location': '上海'}"

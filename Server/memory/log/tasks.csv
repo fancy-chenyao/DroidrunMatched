@@ -1,2 +1,0 @@
-name,description,parameters,app
-submitAnnualLeaveApplication,提交年休假申请，包括请假日期、事由和拟前往地区,"{'start_date': '请假开始日期', 'end_date': '请假结束日期', 'reason': '请假事由', 'destination': '拟前往地区'}",

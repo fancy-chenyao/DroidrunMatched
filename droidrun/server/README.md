@@ -17,7 +17,29 @@ DroidRun WebSocket 服务器提供了通过 WebSocket 协议与移动 APP 端通
 
 ### 1. 启动服务器
 
-#### 方式 1: 使用 CLI 命令
+#### 方式 1: 使用独立启动脚本（推荐）⭐
+
+```bash
+# 使用默认配置（最简单）
+python server.py
+
+# 自定义端口和主机
+python server.py --host 0.0.0.0 --port 8765
+
+# 启用调试模式
+python server.py --debug
+
+# 完整参数示例
+python server.py --host 0.0.0.0 --port 8765 --path /ws --heartbeat-interval 30 --debug
+```
+
+**优点**:
+- ✅ 不依赖 CLI 系统
+- ✅ 不需要 LLM 初始化
+- ✅ 一键启动，简单快速
+- ✅ 支持命令行参数配置
+
+#### 方式 2: 使用 CLI 命令
 
 ```bash
 # 使用默认配置
@@ -30,13 +52,13 @@ droidrun server --host 0.0.0.0 --port 8765
 droidrun server --debug
 ```
 
-#### 方式 2: 使用独立脚本
+#### 方式 3: 使用独立模块脚本
 
 ```bash
 python -m droidrun.server.start_server
 ```
 
-#### 方式 3: 在代码中启动
+#### 方式 4: 在代码中启动
 
 ```python
 import asyncio

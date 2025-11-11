@@ -1,3 +1,0 @@
-name,description,parameters
-set_leave_start_date,设置请假的开始日期。,{'date': '用户请求的开始日期，例如2025年10月25日'}
-fill_leave_reason_and_location,填写请假事由和拟前往地区。,"{'reason': '用户提供的请假事由，例如“计划休息和恢复精力”', 'location': '用户提供的拟前往地区，例如“上海”'}"

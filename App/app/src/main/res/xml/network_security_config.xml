@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 
+        允许明文通信到本地开发服务器
+        注意：仅用于开发环境，生产环境应使用HTTPS/WSS
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android模拟器访问宿主机 -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- 本地回环地址 -->
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- 局域网地址（开发环境） -->
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">192.168.1.0</domain>
+        <domain includeSubdomains="true">192.168.100.0</domain>
+    </domain-config>
+    
+    <!-- 
+        默认配置：生产环境应禁止明文通信
+        如果需要，可以添加更多域名
+    -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+
