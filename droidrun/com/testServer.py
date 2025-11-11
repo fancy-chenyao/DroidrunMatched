@@ -72,22 +72,16 @@ class TestComServer(ComServer):
             if mtype == Message_types.instruction:
                 # 对指令消息的动作决策
                 instruction_text = processed_data.get("instruction_text", "")
-                self.send_action(session, {
-                    "type": "ack_instruction", 
-                    "text": instruction_text,
-                    "timestamp": time.time()
-                })
-                log(f"[动作决策] 发送指令确认动作: {instruction_text}", role="server")
+                log(f"[接受指令] {instruction_text}", role="server")
                 
             elif mtype == Message_types.xml:
                 # 对XML消息的动作决策
                 xml_length = processed_data.get("xml_length", 0)
                 self.send_action(session, {
-                    "type": "ack_xml", 
-                    "length": xml_length,
-                    "timestamp": time.time()
+                    "name": "click",
+                    "parameters": {"index": 23}
                 })
-                log(f"[动作决策] 发送XML确认动作: 长度={xml_length}", role="server")
+                log(f"[接受XML] 确认XML长度: {xml_length}", role="server")
                 
             elif mtype == Message_types.screenshot:
                 # 对截图消息的动作决策
@@ -97,42 +91,28 @@ class TestComServer(ComServer):
                     "length": screenshot_length,
                     "timestamp": time.time()
                 })
-                log(f"[动作决策] 发送截图确认动作: 长度={screenshot_length}", role="server")
+                log(f"[接受截图] 确认截图长度: {screenshot_length}", role="server")
                 
             elif mtype == Message_types.qa:
                 # 对QA消息的动作决策
                 qa_text = processed_data.get("qa_text", "")
-                self.send_action(session, {
-                    "type": "ack_qa", 
-                    "text": qa_text,
-                    "timestamp": time.time()
-                })
-                log(f"[动作决策] 发送QA确认动作: {qa_text}", role="server")
+                log(f"[接受QA] 确认QA文本: {qa_text}", role="server")
                 
             elif mtype == Message_types.error:
                 # 对错误消息的动作决策
                 error_text = processed_data.get("error_text", "")
                 self.send_action(session, {
-                    "type": "ack_error", 
-                    "text": error_text,
-                    "timestamp": time.time()
+                    "name": "click",
+                    "parameters": {"index": 23}
                 })
-                log(f"[动作决策] 发送错误确认动作: {error_text}", role="server")
+                log(f"[接受错误] 确认错误文本: {error_text}", role="server")
                 
-            elif mtype == Message_types.get_actions:
-                # 对获取动作请求的动作决策
-                self.send_action(session, {
-                    "type": "actions", 
-                    "items": [],
-                    "timestamp": time.time()
-                })
-                log("[动作决策] 发送空动作列表", role="server")
                 
             else:
-                log(f"[动作决策] 未知消息类型: {mtype}", role="server")
+                log(f"[接受未知] 未知消息类型: {mtype}", role="server")
                 
         except Exception as e:
-            log(f"[动作决策] 处理异常[{mtype}]: {e}", role="server")
+            log(f"[接受未知] 处理异常[{mtype}]: {e}", role="server")
 
 
 def start_server(host: str = "127.0.0.1", port: int = 7777) -> TestComServer:
