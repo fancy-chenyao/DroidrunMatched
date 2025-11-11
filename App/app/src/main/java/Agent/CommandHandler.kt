@@ -148,6 +148,9 @@ object CommandHandler {
             "tap" -> {
                 handleTap(requestId, params, activity, protectedCallback)
             }
+            "tap_by_index" -> {
+                handleTapByIndex(requestId, params, activity, protectedCallback)
+            }
             "swipe" -> {
                 handleSwipe(requestId, params, activity, protectedCallback)
             }
@@ -481,6 +484,90 @@ object CommandHandler {
                 callback(createErrorResponse("Exception: ${e.message}"))
             }
         }
+    }
+    
+    /**
+     * 处理tap_by_index命令 - 通过索引点击元素
+     */
+    private fun handleTapByIndex(
+        requestId: String,
+        params: JSONObject,
+        activity: Activity?,
+        callback: (JSONObject) -> Unit
+    ) {
+        // 参数验证
+        if (!params.has("index")) {
+            Log.w(TAG, "tap_by_index命令缺少参数: index")
+            callback(createErrorResponse("Missing index parameter"))
+            return
+        }
+        
+        val index = params.getInt("index")
+        Log.d(TAG, "执行tap_by_index命令: index=$index")
+        
+        if (activity == null) {
+            Log.w(TAG, "tap_by_index命令执行失败: Activity为空")
+            callback(createErrorResponse("No active activity"))
+            return
+        }
+        
+        // 从缓存的元素树中查找目标元素
+        val targetElement = findElementByIndex(cachedElementTree, index)
+        if (targetElement == null) {
+            Log.w(TAG, "tap_by_index命令执行失败: 未找到索引为 $index 的元素")
+            callback(createErrorResponse("Element with index $index not found"))
+            return
+        }
+        
+        // 计算元素中心坐标（dp单位）
+        val centerX = (targetElement.bounds.left + targetElement.bounds.right) / 2f
+        val centerY = (targetElement.bounds.top + targetElement.bounds.bottom) / 2f
+        Log.d(TAG, "目标元素中心坐标: ($centerX, $centerY) dp")
+        
+        // 在主线程执行点击
+        Handler(Looper.getMainLooper()).post {
+            try {
+                // 使用NativeController执行坐标点击（dp单位）
+                NativeController.clickByCoordinateDp(activity, centerX, centerY) { success ->
+                    if (success) {
+                        // UI操作后清理缓存，因为页面可能已变化
+                        clearCache()
+                        Log.d(TAG, "tap_by_index命令执行成功: index=$index")
+                        callback(createSuccessResponse())
+                    } else {
+                        Log.w(TAG, "tap_by_index命令执行失败: NativeController返回false")
+                        callback(createErrorResponse("Tap by index action failed"))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "tap_by_index命令执行异常: ${e.message}", e)
+                callback(createErrorResponse("Exception: ${e.message}"))
+            }
+        }
+    }
+    
+    /**
+     * 从元素树中查找指定索引的元素
+     */
+    private fun findElementByIndex(root: GenericElement?, targetIndex: Int): GenericElement? {
+        if (root == null) return null
+        
+        // 深度优先搜索
+        fun searchElement(element: GenericElement): GenericElement? {
+            if (element.index == targetIndex) {
+                return element
+            }
+            
+            // 递归搜索子元素
+            for (child in element.children) {
+                val found = searchElement(child)
+                if (found != null) return found
+            }
+            
+            return null
+        }
+        
+        return searchElement(root)
     }
     
     /**
