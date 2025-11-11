@@ -286,3 +286,5 @@ async def handle_get_state_response(reader: asyncio.StreamReader, request_id: st
 - 文件I/O vs 内存传输
 - Base64编码 vs 二进制传输
 
+
+

@@ -28,25 +28,6 @@ object CommandHandler {
     
     private const val TAG = "CommandHandler"
     
-    // WebSocket客户端实例（用于二进制传输）
-    @Volatile
-    private var wsClient: WebSocketClient? = null
-    
-    /**
-     * 设置WebSocket客户端（用于二进制传输）
-     */
-    fun setWebSocketClient(client: WebSocketClient?) {
-        wsClient = client
-        Log.d(TAG, "WebSocket客户端已${if (client != null) "设置" else "清除"}")
-    }
-    
-    /**
-     * 获取WebSocket客户端
-     */
-    fun getWebSocketClient(): WebSocketClient? {
-        return wsClient
-    }
-    
     // UI树缓存相关变量
     @Volatile
     private var cachedElementTree: GenericElement? = null
@@ -118,7 +99,7 @@ object CommandHandler {
         
         when (command) {
             "take_screenshot" -> {
-                // 单独截图命令：优先使用WebSocket二进制传输，否则回退到HTTP上传
+                // 单独截图命令：HTTP上传后通过WS返回引用
                 if (activity == null) {
                     protectedCallback(createErrorResponse("No active activity"))
                     return
@@ -131,41 +112,26 @@ object CommandHandler {
                             val t1 = System.currentTimeMillis()
                             Log.d(TAG, "截图完成: hasBitmap=${bitmap != null && !bitmap.isRecycled}, captureTime=${t1 - t0}ms")
                             if (bitmap != null && !bitmap.isRecycled) {
-                                // 检查WebSocket是否可用
-                                val client = wsClient
-                                if (client != null && client.isConnected()) {
-                                    // 使用WebSocket二进制传输
-                                    Thread {
-                                        val screenshotBytes = bitmapToJpegBytes(bitmap)
-                                        if (screenshotBytes != null) {
-                                            val success = sendBinaryDataViaWebSocket(requestId, "screenshot", screenshotBytes)
-                                            Handler(Looper.getMainLooper()).post {
-                                                if (success) {
-                                                    // 发送成功的JSON响应，指示数据已通过二进制消息发送
-                                                    val data = JSONObject().apply {
-                                                        put("screenshot_transmitted", true)
-                                                        put("size", screenshotBytes.size)
-                                                        put("format", "jpeg")
-                                                    }
-                                                    Log.d(TAG, "截图已通过WebSocket二进制传输: size=${screenshotBytes.size} bytes")
-                                                    protectedCallback(createSuccessResponse(data))
-                                                } else {
-                                                    // WebSocket发送失败，回退到HTTP上传
-                                                    Log.w(TAG, "WebSocket二进制传输失败，回退到HTTP上传")
-                                                    fallbackToHttpUpload(activity, bitmap, requestId, protectedCallback)
-                                                }
+                                // 在后台线程执行网络上传，避免 NetworkOnMainThreadException
+                                Thread {
+                                    val uploadResp = HttpUploader.uploadBitmap(activity, bitmap, requestId)
+                                    Handler(Looper.getMainLooper()).post {
+                                        if (uploadResp != null && uploadResp.optString("status") == "success") {
+                                            val ref = JSONObject().apply {
+                                                put("file_id", uploadResp.optString("file_id"))
+                                                put("path", uploadResp.optString("path"))
+                                                put("url", uploadResp.optString("url"))
+                                                put("mime", uploadResp.optString("mime"))
+                                                put("size", uploadResp.optInt("size"))
                                             }
+                                            val data = JSONObject().apply { put("screenshot_ref", ref) }
+                                            Log.d(TAG, "截图回包: 使用引用 path=${ref.optString("path")}")
+                                            protectedCallback(createSuccessResponse(data))
                                         } else {
-                                            Handler(Looper.getMainLooper()).post {
-                                                protectedCallback(createErrorResponse("Failed to convert bitmap to bytes"))
-                                            }
+                                            protectedCallback(createErrorResponse("Upload screenshot failed"))
                                         }
-                                    }.start()
-                                } else {
-                                    // WebSocket不可用，使用HTTP上传
-                                    Log.d(TAG, "WebSocket不可用，使用HTTP上传")
-                                    fallbackToHttpUpload(activity, bitmap, requestId, protectedCallback)
-                                }
+                                    }
+                                }.start()
                             } else {
                                 protectedCallback(createErrorResponse("Failed to take screenshot"))
                             }
@@ -235,97 +201,115 @@ object CommandHandler {
                 // 缓存无效或不存在，重新获取
                 // 1. 获取元素树
                 ElementController.getCurrentElementTree(activity) { elementTree ->
-                    // 检查WebSocket是否可用
-                    val client = wsClient
-                    val useWebSocketBinary = client != null && client.isConnected()
+                    // 2. 异步获取截图（可选，不阻塞主线程），增加2秒降级超时
+                    val handler = Handler(Looper.getMainLooper())
+                    val completed = AtomicBoolean(false)
                     
-                    if (useWebSocketBinary) {
-                        // 使用WebSocket二进制传输
-                        handleGetStateWithWebSocketBinary(requestId, activity, elementTree, currentScreenHash, callback)
-                    } else {
-                        // 使用HTTP上传（原有逻辑）
-                        handleGetStateWithHttpUpload(requestId, activity, elementTree, currentScreenHash, callback)
+                    val finishWith: (Bitmap?, org.json.JSONObject?, org.json.JSONObject?) -> Unit = { screenshot, a11yRef, screenshotRef ->
+                        if (!completed.getAndSet(true)) {
+                            // 构建仅包含phone_state的基础响应
+                            val stateResponse = JSONObject()
+                            try {
+                                val phoneState = StateConverter.getPhoneState(activity)
+                                stateResponse.put("phone_state", phoneState)
+                                // 附加引用（若有）
+                                if (a11yRef != null) stateResponse.put("a11y_ref", a11yRef)
+                                if (screenshotRef != null) stateResponse.put("screenshot_ref", screenshotRef)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "构建get_state基础响应异常", e)
+                            }
+                            updateCache(elementTree, stateResponse, currentScreenHash)
+                            callback(stateResponse)
+                        }
                     }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "获取状态时发生异常", e)
-                callback(createErrorResponse("Failed to get state: ${e.message}"))
-            }
-        }
-    }
-    
-    /**
-     * 使用HTTP上传方式处理get_state命令
-     */
-    private fun handleGetStateWithHttpUpload(
-        requestId: String,
-        activity: Activity,
-        elementTree: GenericElement,
-        currentScreenHash: Int?,
-        callback: (JSONObject) -> Unit
-    ) {
-        val handler = Handler(Looper.getMainLooper())
-        val completed = AtomicBoolean(false)
-        
-        val finishWith: (Bitmap?, org.json.JSONObject?, org.json.JSONObject?) -> Unit = { screenshot, a11yRef, screenshotRef ->
-            if (!completed.getAndSet(true)) {
-                val stateResponse = JSONObject()
-                try {
-                    val phoneState = StateConverter.getPhoneState(activity)
-                    stateResponse.put("phone_state", phoneState)
-                    if (a11yRef != null) stateResponse.put("a11y_ref", a11yRef)
-                    if (screenshotRef != null) stateResponse.put("screenshot_ref", screenshotRef)
-                } catch (e: Exception) {
-                    Log.w(TAG, "构建get_state基础响应异常", e)
-                }
-                updateCache(elementTree, stateResponse, currentScreenHash)
-                callback(stateResponse)
-            }
-        }
-        
-        val fallback = Runnable {
-            Log.w(TAG, "状态构建超时，降级为无引用返回（2s）")
-            finishWith(null, null, null)
-        }
-        handler.postDelayed(fallback, 2000)
-        
-        Thread {
-            var a11yRef: JSONObject? = null
-            var a11yInline: org.json.JSONArray? = null
-            var screenshotRef: JSONObject? = null
-            try {
-                val pruned = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
-                val jsonStr = pruned.toString()
-                val a11yUpload = HttpUploader.uploadJson(activity, jsonStr, "a11y_${System.currentTimeMillis()}", "a11y.json")
-                if (a11yUpload != null && a11yUpload.optString("status") == "success") {
-                    a11yRef = JSONObject().apply {
-                        put("file_id", a11yUpload.optString("file_id"))
-                        put("path", a11yUpload.optString("path"))
-                        put("mime", a11yUpload.optString("mime"))
-                        put("size", a11yUpload.optInt("size"))
+                    
+                    // 降级超时：2秒后若上传仍未完成，返回仅有phone_state（无引用）
+                    val fallback = Runnable {
+                        Log.w(TAG, "状态构建超时，降级为无引用返回（2s）")
+                        finishWith(null, null, null)
                     }
-                } else {
-                    a11yInline = pruned
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "a11y上传异常", e)
-                try {
-                    a11yInline = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
-                } catch (_: Exception) { }
-            }
-            try {
-                takeScreenshotAsync(activity) { screenshot ->
-                    if (screenshot != null && !screenshot.isRecycled) {
-                        Thread {
-                            val up = HttpUploader.uploadBitmap(activity, screenshot, "state_${System.currentTimeMillis()}")
-                            if (up != null && up.optString("status") == "success") {
-                                screenshotRef = JSONObject().apply {
-                                    put("file_id", up.optString("file_id"))
-                                    put("path", up.optString("path"))
-                                    put("mime", up.optString("mime"))
-                                    put("size", up.optInt("size"))
+                    handler.postDelayed(fallback, 2000)
+                    
+                    // 并行任务：生成裁剪的a11y JSON并上传 + 截图并上传
+                    Thread {
+                        var a11yRef: JSONObject? = null
+                        var a11yInline: org.json.JSONArray? = null
+                        var screenshotRef: JSONObject? = null
+                        try {
+                            // 生成裁剪后的a11y_tree
+                            val pruned = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
+                            val jsonStr = pruned.toString()
+                            val a11yUpload = HttpUploader.uploadJson(activity, jsonStr, "a11y_${System.currentTimeMillis()}", "a11y.json")
+                            if (a11yUpload != null && a11yUpload.optString("status") == "success") {
+                                a11yRef = JSONObject().apply {
+                                    put("file_id", a11yUpload.optString("file_id"))
+                                    put("path", a11yUpload.optString("path"))
+                                    put("url", a11yUpload.optString("url"))
+                                    put("mime", a11yUpload.optString("mime"))
+                                    put("size", a11yUpload.optInt("size"))
+                                }
+                            } else {
+                                // 上传失败：降级为内联（受限大小）
+                                a11yInline = pruned
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "a11y上传异常", e)
+                            try {
+                                // 异常也尝试内联
+                                a11yInline = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
+                            } catch (_: Exception) { }
+                        }
+                        try {
+                            takeScreenshotAsync(activity) { screenshot ->
+                                if (screenshot != null && !screenshot.isRecycled) {
+                                    Thread {
+                                        val up = HttpUploader.uploadBitmap(activity, screenshot, "state_${System.currentTimeMillis()}")
+                                        if (up != null && up.optString("status") == "success") {
+                                            screenshotRef = JSONObject().apply {
+                                                put("file_id", up.optString("file_id"))
+                                                put("path", up.optString("path"))
+                                                put("url", up.optString("url"))
+                                                put("mime", up.optString("mime"))
+                                                put("size", up.optInt("size"))
+                                            }
+                                        }
+                                        Handler(Looper.getMainLooper()).post {
+                                            handler.removeCallbacks(fallback)
+                                            // 如果引用不可用，尝试将a11y内联到最终响应
+                                            if (a11yRef == null && a11yInline != null) {
+                                                try {
+                                                    val stateResponse = JSONObject()
+                                                    stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
+                                                    stateResponse.put("a11y_tree", a11yInline)
+                                                    if (screenshotRef != null) stateResponse.put("screenshot_ref", screenshotRef)
+                                                    updateCache(elementTree, stateResponse, currentScreenHash)
+                                                    callback(stateResponse)
+                                                    return@post
+                                                } catch (e: Exception) {
+                                                    Log.w(TAG, "内联a11y构建失败，继续走finish", e)
+                                                }
+                                            }
+                                            finishWith(null, a11yRef, screenshotRef)
+                                        }
+                                    }.start()
+                                } else {
+                                    Handler(Looper.getMainLooper()).post {
+                                        handler.removeCallbacks(fallback)
+                                        if (a11yRef == null && a11yInline != null) {
+                                            try {
+                                                val stateResponse = JSONObject()
+                                                stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
+                                                stateResponse.put("a11y_tree", a11yInline)
+                                                updateCache(elementTree, stateResponse, currentScreenHash)
+                                                callback(stateResponse)
+                                                return@post
+                                            } catch (_: Exception) { }
+                                        }
+                                        finishWith(null, a11yRef, null)
+                                    }
                                 }
                             }
+                        } catch (e: Exception) {
                             Handler(Looper.getMainLooper()).post {
                                 handler.removeCallbacks(fallback)
                                 if (a11yRef == null && a11yInline != null) {
@@ -333,158 +317,21 @@ object CommandHandler {
                                         val stateResponse = JSONObject()
                                         stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
                                         stateResponse.put("a11y_tree", a11yInline)
-                                        if (screenshotRef != null) stateResponse.put("screenshot_ref", screenshotRef)
                                         updateCache(elementTree, stateResponse, currentScreenHash)
                                         callback(stateResponse)
                                         return@post
-                                    } catch (e: Exception) {
-                                        Log.w(TAG, "内联a11y构建失败，继续走finish", e)
-                                    }
+                                    } catch (_: Exception) { }
                                 }
-                                finishWith(null, a11yRef, screenshotRef)
+                                finishWith(null, a11yRef, null)
                             }
-                        }.start()
-                    } else {
-                        Handler(Looper.getMainLooper()).post {
-                            handler.removeCallbacks(fallback)
-                            if (a11yRef == null && a11yInline != null) {
-                                try {
-                                    val stateResponse = JSONObject()
-                                    stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
-                                    stateResponse.put("a11y_tree", a11yInline)
-                                    updateCache(elementTree, stateResponse, currentScreenHash)
-                                    callback(stateResponse)
-                                    return@post
-                                } catch (_: Exception) { }
-                            }
-                            finishWith(null, a11yRef, null)
                         }
-                    }
+                    }.start()
                 }
             } catch (e: Exception) {
-                Handler(Looper.getMainLooper()).post {
-                    handler.removeCallbacks(fallback)
-                    if (a11yRef == null && a11yInline != null) {
-                        try {
-                            val stateResponse = JSONObject()
-                            stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
-                            stateResponse.put("a11y_tree", a11yInline)
-                            updateCache(elementTree, stateResponse, currentScreenHash)
-                            callback(stateResponse)
-                            return@post
-                        } catch (_: Exception) { }
-                    }
-                    finishWith(null, a11yRef, null)
-                }
+                Log.e(TAG, "获取状态时发生异常", e)
+                callback(createErrorResponse("Failed to get state: ${e.message}"))
             }
-        }.start()
-    }
-    
-    /**
-     * 使用WebSocket二进制传输方式处理get_state命令
-     * 
-     * 流程：
-     * 1. 先发送所有二进制数据（a11y_tree, screenshot）
-     * 2. 然后发送最终的command_response（包含phone_state和传输状态）
-     */
-    private fun handleGetStateWithWebSocketBinary(
-        requestId: String,
-        activity: Activity,
-        elementTree: GenericElement,
-        currentScreenHash: Int?,
-        callback: (JSONObject) -> Unit
-    ) {
-        Log.d(TAG, "使用WebSocket二进制传输获取状态")
-        
-        val phoneState = StateConverter.getPhoneState(activity)
-        val completed = AtomicBoolean(false)
-        
-        // 在后台线程准备所有数据并发送
-        Thread {
-            try {
-                // 生成a11y_tree
-                val pruned = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
-                val a11yTreeJson = pruned.toString()
-                val a11yTreeBytes = a11yTreeJson.toByteArray(Charsets.UTF_8)
-                
-                // 发送a11y_tree（通过二进制消息）
-                val a11ySuccess = sendBinaryDataViaWebSocket(requestId, "a11y_tree", a11yTreeBytes)
-                Log.d(TAG, "a11y_tree二进制传输: ${if (a11ySuccess) "成功" else "失败"}, size=${a11yTreeBytes.size} bytes")
-                
-                // 获取截图
-                takeScreenshotAsync(activity) { screenshot ->
-                    if (screenshot != null && !screenshot.isRecycled) {
-                        val screenshotBytes = bitmapToJpegBytes(screenshot)
-                        if (screenshotBytes != null) {
-                            // 发送screenshot（通过二进制消息）
-                            val screenshotSuccess = sendBinaryDataViaWebSocket(requestId, "screenshot", screenshotBytes)
-                            Log.d(TAG, "screenshot二进制传输: ${if (screenshotSuccess) "成功" else "失败"}, size=${screenshotBytes.size} bytes")
-                            
-                            Handler(Looper.getMainLooper()).post {
-                                if (!completed.getAndSet(true)) {
-                                    // 所有二进制数据已发送，现在发送最终的command_response
-                                    // 注意：这里不直接调用callback，而是通过WebSocket发送command_response
-                                    // 但是，为了保持接口一致性，我们仍然调用callback
-                                    // 实际上，callback会触发command_response的发送
-                                    
-                                    // 构建响应：包含phone_state和传输状态
-                                    val stateResponse = JSONObject().apply {
-                                        put("phone_state", phoneState)
-                                        put("a11y_tree_transmitted", a11ySuccess)
-                                        put("screenshot_transmitted", screenshotSuccess)
-                                        put("a11y_tree_size", a11yTreeBytes.size)
-                                        put("screenshot_size", screenshotBytes.size)
-                                    }
-                                    
-                                    // 更新缓存
-                                    updateCache(elementTree, stateResponse, currentScreenHash)
-                                    
-                                    // 返回响应（这会触发command_response的发送）
-                                    callback(stateResponse)
-                                }
-                            }
-                        } else {
-                            Handler(Looper.getMainLooper()).post {
-                                if (!completed.getAndSet(true)) {
-                                    Log.w(TAG, "截图转换失败")
-                                    val stateResponse = JSONObject().apply {
-                                        put("phone_state", phoneState)
-                                        put("a11y_tree_transmitted", a11ySuccess)
-                                        put("screenshot_transmitted", false)
-                                    }
-                                    updateCache(elementTree, stateResponse, currentScreenHash)
-                                    callback(stateResponse)
-                                }
-                            }
-                        }
-                    } else {
-                        Handler(Looper.getMainLooper()).post {
-                            if (!completed.getAndSet(true)) {
-                                Log.w(TAG, "截图获取失败")
-                                val stateResponse = JSONObject().apply {
-                                    put("phone_state", phoneState)
-                                    put("a11y_tree_transmitted", a11ySuccess)
-                                    put("screenshot_transmitted", false)
-                                }
-                                updateCache(elementTree, stateResponse, currentScreenHash)
-                                callback(stateResponse)
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "WebSocket二进制传输处理异常", e)
-                Handler(Looper.getMainLooper()).post {
-                    if (!completed.getAndSet(true)) {
-                        val stateResponse = JSONObject().apply {
-                            put("phone_state", phoneState)
-                            put("error", "Failed to transmit binary data: ${e.message}")
-                        }
-                        callback(stateResponse)
-                    }
-                }
-            }
-        }.start()
+        }
     }
     
     /**
@@ -1026,110 +873,6 @@ object CommandHandler {
         } catch (e: Exception) {
             Log.e(TAG, "截图异常", e)
             callback(null)
-        }
-    }
-    
-    /**
-     * 回退到HTTP上传（当WebSocket不可用时）
-     */
-    private fun fallbackToHttpUpload(
-        activity: Activity,
-        bitmap: Bitmap,
-        requestId: String,
-        callback: (JSONObject) -> Unit
-    ) {
-        Thread {
-            val uploadResp = HttpUploader.uploadBitmap(activity, bitmap, requestId)
-            Handler(Looper.getMainLooper()).post {
-                if (uploadResp != null && uploadResp.optString("status") == "success") {
-                    val ref = JSONObject().apply {
-                        put("file_id", uploadResp.optString("file_id"))
-                        put("path", uploadResp.optString("path"))
-                        put("mime", uploadResp.optString("mime"))
-                        put("size", uploadResp.optInt("size"))
-                    }
-                    val data = JSONObject().apply { put("screenshot_ref", ref) }
-                    Log.d(TAG, "截图回包: 使用HTTP上传引用 path=${ref.optString("path")}")
-                    callback(createSuccessResponse(data))
-                } else {
-                    callback(createErrorResponse("Upload screenshot failed"))
-                }
-            }
-        }.start()
-    }
-    
-    /**
-     * 将Bitmap转换为JPEG字节数组
-     */
-    private fun bitmapToJpegBytes(bitmap: Bitmap, quality: Int = 85): ByteArray? {
-        return try {
-            val outputStream = java.io.ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-            outputStream.toByteArray()
-        } catch (e: Exception) {
-            Log.e(TAG, "Bitmap转字节数组失败", e)
-            null
-        }
-    }
-    
-    /**
-     * 通过WebSocket发送二进制数据（截图或JSON）
-     * @param requestId 请求ID
-     * @param dataType 数据类型 ("screenshot" 或 "a11y_tree")
-     * @param bytes 二进制数据
-     * @return 是否发送成功
-     */
-    private fun sendBinaryDataViaWebSocket(requestId: String, dataType: String, bytes: ByteArray): Boolean {
-        val client = wsClient
-        if (client == null || !client.isConnected()) {
-            Log.w(TAG, "WebSocket未连接，无法发送二进制数据: $dataType")
-            return false
-        }
-        
-        return try {
-            // 构建二进制消息协议：
-            // [消息类型:1字节][请求ID长度:2字节][请求ID UTF-8][数据类型长度:1字节][数据类型 UTF-8][数据长度:4字节][数据二进制]
-            val requestIdBytes = requestId.toByteArray(Charsets.UTF_8)
-            val dataTypeBytes = dataType.toByteArray(Charsets.UTF_8)
-            
-            val message = ByteArray(1 + 2 + requestIdBytes.size + 1 + dataTypeBytes.size + 4 + bytes.size)
-            var offset = 0
-            
-            // 消息类型: 0x01 = 二进制数据消息
-            message[offset++] = 0x01
-            
-            // 请求ID长度 (2字节, big-endian)
-            message[offset++] = (requestIdBytes.size shr 8).toByte()
-            message[offset++] = requestIdBytes.size.toByte()
-            
-            // 请求ID
-            System.arraycopy(requestIdBytes, 0, message, offset, requestIdBytes.size)
-            offset += requestIdBytes.size
-            
-            // 数据类型长度 (1字节)
-            message[offset++] = dataTypeBytes.size.toByte()
-            
-            // 数据类型
-            System.arraycopy(dataTypeBytes, 0, message, offset, dataTypeBytes.size)
-            offset += dataTypeBytes.size
-            
-            // 数据长度 (4字节, big-endian)
-            message[offset++] = (bytes.size shr 24).toByte()
-            message[offset++] = (bytes.size shr 16).toByte()
-            message[offset++] = (bytes.size shr 8).toByte()
-            message[offset++] = bytes.size.toByte()
-            
-            // 数据
-            System.arraycopy(bytes, 0, message, offset, bytes.size)
-            
-            val success = client.sendBinaryMessage(message)
-            if (success) {
-                Log.d(TAG, "✓ 二进制数据已发送: type=$dataType, size=${bytes.size} bytes, requestId=$requestId")
-            }
-            success
-        } catch (e: Exception) {
-            Log.e(TAG, "发送二进制数据失败: type=$dataType", e)
-            false
         }
     }
     

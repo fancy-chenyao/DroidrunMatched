@@ -129,18 +129,35 @@ class PlannerAgent(Workflow):
         self.steps_counter += 1
         LoggingUtils.log_info("PlannerAgent", "🧠 Thinking about how to plan the goal...")
 
-        if self.vision:
-            screenshot = (self.tools_instance.take_screenshot())[1]
-            ctx.write_event_to_stream(ScreenshotEvent(screenshot=screenshot))
-            await ctx.store.set("screenshot", screenshot)
-
+        # 先获取一次状态（含截图引用），再决定是否抓取截图字节
+        state = await self.tools_instance.get_state_async(include_screenshot=True)
         try:
-            state = self.tools_instance.get_state()
-            await ctx.store.set("ui_state", state["a11y_tree"])
-            await ctx.store.set("phone_state", state["phone_state"])
-            ctx.write_event_to_stream(RecordUIStateEvent(ui_state=state["a11y_tree"]))
-        except Exception as e:
-            LoggingUtils.log_warning("PlannerAgent", "⚠️ Error retrieving state from the connected device. Is the Accessibility Service enabled?")
+            await ctx.store.set("ui_state", state.get("a11y_tree") or state.get("a11y_ref"))
+            await ctx.store.set("phone_state", state.get("phone_state"))
+            if state.get("a11y_tree"):
+                ctx.write_event_to_stream(RecordUIStateEvent(ui_state=state["a11y_tree"]))
+        except Exception:
+            pass
+
+        if self.vision:
+            # 尝试通过引用下载截图字节（有 URL 时）
+            screenshot_bytes = None
+            try:
+                ref = (state or {}).get("screenshot_ref") or {}
+                url = ref.get("url")
+                if url:
+                    import httpx
+                    async with httpx.AsyncClient(timeout=20.0) as client:
+                        resp = await client.get(url)
+                        resp.raise_for_status()
+                        screenshot_bytes = resp.content
+            except Exception:
+                screenshot_bytes = None
+            if screenshot_bytes:
+                ctx.write_event_to_stream(ScreenshotEvent(screenshot=screenshot_bytes))
+                await ctx.store.set("screenshot", screenshot_bytes)
+
+        # 上面已获取一次状态，这里不再重复同步阻塞调用
 
 
         await ctx.store.set("remembered_info", self.remembered_info)

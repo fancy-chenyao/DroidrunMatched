@@ -10,7 +10,7 @@ from droidrun.agent.utils.logging_utils import LoggingUtils
 class SystemConfig:
     """系统核心配置"""
     debug: bool = False
-    log_level: str = "INFO"
+    log_level: str = "DEBUG"
     timeout: int = 300
     step_timeout_seconds: int = 60
     default_timeout: int = 300

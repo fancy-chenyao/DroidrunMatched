@@ -45,7 +45,10 @@ class UploadHTTPServer:
             raise RuntimeError("aiohttp not installed")
 
         self._app = web.Application(client_max_size=10 * 1024 * 1024)  # 10MB
-        self._app.add_routes([web.post("/upload", self._handle_upload)])
+        self._app.add_routes([
+            web.post("/upload", self._handle_upload),
+            web.get("/files/{device_id}/{request_id}/{file_id}", self._handle_get_file),
+        ])
         self._runner = web.AppRunner(self._app)
         await self._runner.setup()
         self._site = web.TCPSite(self._runner, self._cfg.host, self._cfg.port)
@@ -170,6 +173,8 @@ class UploadHTTPServer:
             path=file_path,
             ms=elapsed,
         )
+        # 可公开访问的URL（用于客户端仅传引用）
+        public_url = f"http://{self._cfg.host}:{self._cfg.port}/files/{safe_device}/{safe_req}/{file_id}"
         return web.json_response(
             {
                 "status": "success",
@@ -177,10 +182,42 @@ class UploadHTTPServer:
                 "device_id": safe_device,
                 "request_id": safe_req,
                 "path": file_path,
+                "url": public_url,
                 "mime": content_type or "application/octet-stream",
                 "size": size,
             }
         )
+
+    async def _handle_get_file(self, request: "web.Request") -> "web.Response":
+        """按URL路径返回已上传文件内容"""
+        if web is None:
+            raise RuntimeError("aiohttp not installed")
+        device_id = request.match_info.get("device_id", "")
+        request_id = request.match_info.get("request_id", "")
+        file_id = request.match_info.get("file_id", "")
+        # 简单校验，避免路径穿越
+        def _safe(s: str) -> str:
+            return "".join(c for c in s if c.isalnum() or c in "-_.")
+        safe_device = _safe(device_id)
+        safe_req = _safe(request_id)
+        safe_file = _safe(file_id)
+        file_path = os.path.join(self._cfg.tmp_root, safe_device, safe_req, safe_file)
+        if not os.path.isfile(file_path):
+            return web.Response(status=404, text="Not Found")
+        # 猜测mime
+        mime = "application/octet-stream"
+        low = file_path.lower()
+        if low.endswith(".png"):
+            mime = "image/png"
+        elif low.endswith(".jpg") or low.endswith(".jpeg"):
+            mime = "image/jpeg"
+        elif low.endswith(".json"):
+            mime = "application/json"
+        try:
+            return web.FileResponse(path=file_path, headers={"Content-Type": mime})
+        except Exception as e:
+            LoggingUtils.log_error("UploadHTTP", "FileResponse error: {error}", error=e)
+            return web.Response(status=500, text="Internal Server Error")
 
     async def _ttl_cleanup_loop(self):
         while True:

@@ -164,3 +164,5 @@ Android端: 发送WebSocket响应（包含引用）
 - 对于远程控制场景，接受WebSocket的延迟，或实施上述优化
 - 考虑混合模式：小数据用WebSocket，大数据用ADB/TCP
 
+
+

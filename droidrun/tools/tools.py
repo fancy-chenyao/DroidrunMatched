@@ -33,10 +33,13 @@ class Tools(ABC):
                 step_screenshots = caller_globals.get('step_screenshots')
                 step_ui_states = caller_globals.get('step_ui_states')
                 
-                if step_screenshots is not None:
-                    step_screenshots.append(self.take_screenshot()[1])
-                if step_ui_states is not None:
-                    step_ui_states.append(self.get_state())
+                # 避免在事件循环线程内调用同步方法导致阻塞：
+                # 若工具实现了异步API（如 get_state_async），则不在装饰器里执行同步截图/取状态
+                if not hasattr(self, 'get_state_async'):
+                    if step_screenshots is not None:
+                        step_screenshots.append(self.take_screenshot()[1])
+                    if step_ui_states is not None:
+                        step_ui_states.append(self.get_state())
             return result
         return wrapper
 

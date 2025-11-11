@@ -76,10 +76,6 @@ class WebSocketServer:
         self._device_tools_map: Dict[str, Any] = {}
         # 设备ID -> TaskExecutor 实例的映射（用于任务执行）
         self._device_task_executors: Dict[str, Any] = {}
-        # 待处理的二进制数据（device_id -> request_id -> data）
-        self._pending_binary_data: Dict[str, Dict[str, Dict[str, Any]]] = {}
-        # 待处理的响应（device_id -> request_id -> response_message）
-        self._pending_responses: Dict[str, Dict[str, Dict[str, Any]]] = {}
         
         # 初始化消息路由器（Phase 3）
         self.message_router = MessageRouter()
@@ -236,16 +232,33 @@ class WebSocketServer:
             
             # 从查询参数或首部获取设备ID
             device_id = await self._extract_device_id(websocket, path_str)
+            # 解析协议协商（默认 json，可选 bin_v1）
+            protocol = "json"
+            try:
+                if "?" in path_str:
+                    query_string_local = path_str.split("?", 1)[1]
+                    params_local = {}
+                    for param in query_string_local.split("&"):
+                        if "=" in param:
+                            k, v = param.split("=", 1)
+                            params_local[k] = v
+                    proto = params_local.get("protocol")
+                    if proto in ("bin_v1", "json"):
+                        protocol = proto
+            except Exception as _:
+                pass
             if not device_id:
                 LoggingUtils.log_warning("WebSocketServer", "No device ID provided, rejecting connection from {address}", 
                                        address=client_address)
                 await websocket.close(code=4001, reason="Device ID required")
                 return
             
-            # 注册会话
-            await self.session_manager.register_session(device_id, websocket)
+            # 注册会话（记录协议）
+            await self.session_manager.register_session(device_id, websocket, protocol=protocol)
             LoggingUtils.log_info("WebSocketServer", "Device {device_id} connected from {address}", 
                                 device_id=device_id, address=client_address)
+            LoggingUtils.log_info("WebSocketServer", "Negotiated protocol for device {device_id}: {protocol}", 
+                                  device_id=device_id, protocol=protocol)
             
             # 发送欢迎消息
             await self._send_welcome_message(websocket, device_id)
@@ -255,27 +268,12 @@ class WebSocketServer:
                 try:
                     # 记录接收到的消息（用于调试）
                     if isinstance(message, bytes):
-                        # 检查是否是二进制数据消息（我们的自定义协议）
-                        if len(message) > 0 and message[0] == 0x01:
-                            # 二进制数据消息
-                            LoggingUtils.log_info("WebSocketServer", "Received binary data message from device {device_id}: size={size} bytes", 
-                                                 device_id=device_id, size=len(message))
-                            await self._handle_binary_message(device_id, message)
-                        else:
-                            # 尝试解码为文本
-                            try:
-                                message_str = message.decode('utf-8')
-                                LoggingUtils.log_info("WebSocketServer", "Received message from device {device_id}: {msg}", 
-                                                     device_id=device_id, msg=message_str[:200])
-                                await self._handle_message(device_id, message_str)
-                            except UnicodeDecodeError:
-                                LoggingUtils.log_warning("WebSocketServer", "Received binary message that cannot be decoded as UTF-8 from device {device_id}", 
-                                                        device_id=device_id)
+                        message_str = message.decode('utf-8')
                     else:
                         message_str = message
-                        LoggingUtils.log_info("WebSocketServer", "Received message from device {device_id}: {msg}", 
-                                             device_id=device_id, msg=message_str[:200])
-                        await self._handle_message(device_id, message_str)
+                    LoggingUtils.log_info("WebSocketServer", "Received message from device {device_id}: {msg}", 
+                                         device_id=device_id, msg=message_str[:200])  # 只记录前200个字符
+                    await self._handle_message(device_id, message)
                 except Exception as e:
                     LoggingUtils.log_error("WebSocketServer", "Error handling message from device {device_id}: {error}", 
                                          device_id=device_id, error=e)
@@ -432,20 +430,46 @@ class WebSocketServer:
             message: 消息内容（字符串或字节）
         """
         try:
-            # 解析消息
+            # 获取设备会话协议
+            session = await self.session_manager.get_session(device_id)
+            protocol = getattr(session, "protocol", "json") if session else "json"
+            parsed_message = None
+            parse_error = None
+            # 解析消息（按协议）
             if isinstance(message, bytes):
-                message_str = message.decode('utf-8')
+                if protocol == "bin_v1":
+                    try:
+                        import msgpack  # type: ignore
+                        obj = msgpack.unpackb(message, raw=False)
+                        if isinstance(obj, dict):
+                            # 可选：校验格式
+                            is_ok, err = MessageProtocol.validate_message(obj)
+                            if is_ok:
+                                parsed_message = obj
+                            else:
+                                parse_error = err or "Invalid message format"
+                        else:
+                            parse_error = "Binary payload is not a dict"
+                    except Exception as e:
+                        parse_error = f"MsgPack decode error: {str(e)}"
+                else:
+                    # 仍然兼容：按UTF-8文本解析
+                    try:
+                        message_str = message.decode('utf-8')
+                    except Exception as e:
+                        parse_error = f"UTF-8 decode error: {str(e)}"
             else:
                 message_str = message
             
-            msg_len = len(message_str or "")
-            t0 = datetime.now()
-            LoggingUtils.log_debug("WebSocketServer", "Processing message from device {device_id}: len={length}, head={head}", 
-                                 device_id=device_id, length=msg_len, head=message_str[:200])
-            
-            # 使用消息协议解析（Phase 3）
-            parsed_message, parse_error = MessageProtocol.parse_message(message_str)
-            parse_ms = int((datetime.now() - t0).total_seconds() * 1000)
+            # 若仍未得到 parsed_message 且存在文本，走 JSON 解析
+            parse_ms = 0
+            if parsed_message is None and 'message_str' in locals():
+                t0 = datetime.now()
+                msg_len = len(message_str or "")
+                LoggingUtils.log_debug("WebSocketServer", "Processing message from device {device_id}: len={length}, head={head}", 
+                                     device_id=device_id, length=msg_len, head=message_str[:200])
+                parsed_message, parse_error = MessageProtocol.parse_message(message_str)
+                parse_ms = int((datetime.now() - t0).total_seconds() * 1000)
             
             if parsed_message:
                 mtype = parsed_message.get("type")
@@ -659,303 +683,6 @@ class WebSocketServer:
         
         LoggingUtils.log_debug("WebSocketServer", "Heartbeat received from device {device_id}", device_id=device_id)
     
-    async def _handle_binary_message(self, device_id: str, message_bytes: bytes):
-        """
-        处理二进制消息（自定义协议）
-        
-        协议格式:
-        [消息类型:1字节][请求ID长度:2字节][请求ID UTF-8][数据类型长度:1字节][数据类型 UTF-8][数据长度:4字节][数据二进制]
-        
-        Args:
-            device_id: 设备ID
-            message_bytes: 二进制消息数据
-        """
-        try:
-            if len(message_bytes) < 8:
-                LoggingUtils.log_error("WebSocketServer", "Binary message too short: {size} bytes", size=len(message_bytes))
-                return
-            
-            offset = 0
-            
-            # 读取消息类型（应该是0x01）
-            msg_type = message_bytes[offset]
-            offset += 1
-            if msg_type != 0x01:
-                LoggingUtils.log_error("WebSocketServer", "Unknown binary message type: {type}", type=msg_type)
-                return
-            
-            # 读取请求ID长度（2字节，big-endian）
-            request_id_len = (message_bytes[offset] << 8) | message_bytes[offset + 1]
-            offset += 2
-            
-            if offset + request_id_len > len(message_bytes):
-                LoggingUtils.log_error("WebSocketServer", "Invalid request_id length: {len}", len=request_id_len)
-                return
-            
-            # 读取请求ID
-            request_id = message_bytes[offset:offset + request_id_len].decode('utf-8')
-            offset += request_id_len
-            
-            # 读取数据类型长度（1字节）
-            if offset >= len(message_bytes):
-                LoggingUtils.log_error("WebSocketServer", "Message truncated at data_type length")
-                return
-            data_type_len = message_bytes[offset]
-            offset += 1
-            
-            if offset + data_type_len > len(message_bytes):
-                LoggingUtils.log_error("WebSocketServer", "Invalid data_type length: {len}", len=data_type_len)
-                return
-            
-            # 读取数据类型
-            data_type = message_bytes[offset:offset + data_type_len].decode('utf-8')
-            offset += data_type_len
-            
-            # 读取数据长度（4字节，big-endian）
-            if offset + 4 > len(message_bytes):
-                LoggingUtils.log_error("WebSocketServer", "Message truncated at data length")
-                return
-            data_len = (message_bytes[offset] << 24) | (message_bytes[offset + 1] << 16) | (message_bytes[offset + 2] << 8) | message_bytes[offset + 3]
-            offset += 4
-            
-            if offset + data_len > len(message_bytes):
-                LoggingUtils.log_error("WebSocketServer", "Invalid data length: {len}, available: {avail}", 
-                                      len=data_len, avail=len(message_bytes) - offset)
-                return
-            
-            # 读取数据
-            data_bytes = message_bytes[offset:offset + data_len]
-            
-            LoggingUtils.log_info("WebSocketServer", "Parsed binary message: request_id={rid}, data_type={dtype}, data_size={size} bytes", 
-                                 rid=request_id, dtype=data_type, size=len(data_bytes))
-            
-            # 处理二进制数据
-            await self._process_binary_data(device_id, request_id, data_type, data_bytes)
-            
-        except Exception as e:
-            LoggingUtils.log_error("WebSocketServer", "Error parsing binary message: {error}", error=e)
-            import traceback
-            LoggingUtils.log_error("WebSocketServer", "Traceback: {tb}", tb=traceback.format_exc())
-    
-    async def _process_binary_data(self, device_id: str, request_id: str, data_type: str, data_bytes: bytes):
-        """
-        处理二进制数据
-        
-        Args:
-            device_id: 设备ID
-            request_id: 请求ID
-            data_type: 数据类型 ("screenshot" 或 "a11y_tree")
-            data_bytes: 二进制数据
-        """
-        try:
-            # 查找对应的WebSocketTools实例
-            if device_id not in self._device_tools_map:
-                LoggingUtils.log_warning("WebSocketServer", "No WebSocketTools instance for device {device_id}", device_id=device_id)
-                return
-            
-            tools_instance = self._device_tools_map[device_id]
-            
-            if data_type == "screenshot":
-                # 处理截图数据
-                # 对于take_screenshot命令，截图是单独的数据，可以直接完成响应
-                # 对于get_state命令，截图需要与a11y_tree和phone_state合并
-                
-                # 检查是否是get_state命令（通过检查是否有pending的a11y_tree）
-                if (hasattr(self, '_pending_binary_data') and 
-                    device_id in self._pending_binary_data and 
-                    request_id in self._pending_binary_data[device_id] and
-                    'a11y_tree' in self._pending_binary_data[device_id][request_id]):
-                    # 这是get_state命令，存储screenshot等待合并
-                    if not hasattr(self, '_pending_binary_data'):
-                        self._pending_binary_data = {}
-                    if device_id not in self._pending_binary_data:
-                        self._pending_binary_data[device_id] = {}
-                    if request_id not in self._pending_binary_data[device_id]:
-                        self._pending_binary_data[device_id][request_id] = {}
-                    
-                    self._pending_binary_data[device_id][request_id]['screenshot'] = data_bytes
-                    LoggingUtils.log_info("WebSocketServer", "Stored screenshot binary data for get_state: request_id={rid}, size={size} bytes", 
-                                         rid=request_id, size=len(data_bytes))
-                    
-                    # 检查是否可以直接完成响应
-                    await self._try_complete_response_with_binary_data(device_id, request_id, tools_instance)
-                else:
-                    # 这是take_screenshot命令，直接完成响应
-                    import base64
-                    screenshot_base64 = base64.b64encode(data_bytes).decode('utf-8')
-                    
-                    response_data = {
-                        "image_data": screenshot_base64,
-                        "screenshot_base64": screenshot_base64,
-                        "format": "JPEG",
-                        "size": len(data_bytes)
-                    }
-                    
-                    response_message = {
-                        "type": "command_response",
-                        "request_id": request_id,
-                        "status": "success",
-                        "data": response_data,
-                        "device_id": device_id
-                    }
-                    
-                    if hasattr(tools_instance, '_handle_response'):
-                        tools_instance._handle_response(response_message)
-                    
-                    LoggingUtils.log_info("WebSocketServer", "Processed screenshot binary data for take_screenshot: request_id={rid}, size={size} bytes", 
-                                         rid=request_id, size=len(data_bytes))
-                
-            elif data_type == "a11y_tree":
-                # 处理a11y_tree JSON数据
-                import json
-                try:
-                    a11y_tree_json = json.loads(data_bytes.decode('utf-8'))
-                    
-                    # 存储a11y_tree数据，等待与command_response合并
-                    if not hasattr(self, '_pending_binary_data'):
-                        self._pending_binary_data = {}
-                    
-                    if device_id not in self._pending_binary_data:
-                        self._pending_binary_data[device_id] = {}
-                    
-                    if request_id not in self._pending_binary_data[device_id]:
-                        self._pending_binary_data[device_id][request_id] = {}
-                    
-                    self._pending_binary_data[device_id][request_id]['a11y_tree'] = a11y_tree_json
-                    
-                    LoggingUtils.log_info("WebSocketServer", "Stored a11y_tree binary data: request_id={rid}, nodes={nodes}", 
-                                         rid=request_id, nodes=len(a11y_tree_json) if isinstance(a11y_tree_json, list) else "unknown")
-                    
-                    # 检查是否可以直接完成响应（如果command_response已经到达）
-                    await self._try_complete_response_with_binary_data(device_id, request_id, tools_instance)
-                    
-                except json.JSONDecodeError as e:
-                    LoggingUtils.log_error("WebSocketServer", "Failed to parse a11y_tree JSON: {error}", error=e)
-                except UnicodeDecodeError as e:
-                    LoggingUtils.log_error("WebSocketServer", "Failed to decode a11y_tree as UTF-8: {error}", error=e)
-            else:
-                LoggingUtils.log_warning("WebSocketServer", "Unknown data type: {dtype}", dtype=data_type)
-                
-        except Exception as e:
-            LoggingUtils.log_error("WebSocketServer", "Error processing binary data: {error}", error=e)
-            import traceback
-            LoggingUtils.log_error("WebSocketServer", "Traceback: {tb}", tb=traceback.format_exc())
-    
-    async def _try_complete_response_with_binary_data(self, device_id: str, request_id: str, tools_instance):
-        """
-        尝试使用二进制数据完成响应
-        
-        检查是否有pending的command_response，如果有则合并二进制数据并完成响应
-        
-        Args:
-            device_id: 设备ID
-            request_id: 请求ID
-            tools_instance: WebSocketTools实例
-        """
-        try:
-            if not hasattr(self, '_pending_binary_data'):
-                return
-            
-            if device_id not in self._pending_binary_data:
-                return
-            
-            if request_id not in self._pending_binary_data[device_id]:
-                return
-            
-            pending_data = self._pending_binary_data[device_id][request_id]
-            
-            # 检查是否有pending的command_response需要合并二进制数据
-            if hasattr(self, '_pending_responses'):
-                if device_id in self._pending_responses and request_id in self._pending_responses[device_id]:
-                    # 有pending的response，合并二进制数据
-                    pending_response = self._pending_responses[device_id][request_id]
-                    await self._merge_binary_data_into_response(device_id, request_id, pending_response, tools_instance)
-                else:
-                    # 没有pending的response，检查是否所有二进制数据都已到达
-                    # 对于get_state命令，我们需要等待command_response
-                    # 但如果command_response先到达，会存储在_pending_responses中
-                    # 所以这里我们只记录日志
-                    LoggingUtils.log_debug("WebSocketServer", "Binary data received but no pending response yet: request_id={rid}", rid=request_id)
-            
-        except Exception as e:
-            LoggingUtils.log_error("WebSocketServer", "Error completing response with binary data: {error}", error=e)
-    
-    async def _merge_binary_data_into_response(self, device_id: str, request_id: str, response_message: Dict[str, Any], tools_instance):
-        """
-        将二进制数据合并到响应消息中，并完成响应
-        
-        Args:
-            device_id: 设备ID
-            request_id: 请求ID
-            response_message: 响应消息
-            tools_instance: WebSocketTools实例
-        """
-        try:
-            if not hasattr(self, '_pending_binary_data'):
-                return
-            
-            if device_id not in self._pending_binary_data:
-                return
-            
-            if request_id not in self._pending_binary_data[device_id]:
-                return
-            
-            pending_data = self._pending_binary_data[device_id][request_id]
-            data = response_message.get("data") or {}
-            
-            # 合并a11y_tree
-            if 'a11y_tree' in pending_data:
-                data['a11y_tree'] = pending_data['a11y_tree']
-                LoggingUtils.log_info("WebSocketServer", "Merged a11y_tree from binary data: request_id={rid}, nodes={nodes}", 
-                                     rid=request_id, nodes=len(pending_data['a11y_tree']) if isinstance(pending_data['a11y_tree'], list) else "unknown")
-            
-            # 合并screenshot（如果有）
-            if 'screenshot' in pending_data:
-                import base64
-                screenshot_bytes = pending_data['screenshot']
-                screenshot_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')
-                data['image_data'] = screenshot_base64
-                data['screenshot_base64'] = screenshot_base64
-                data.setdefault('format', 'JPEG')
-                LoggingUtils.log_info("WebSocketServer", "Merged screenshot from binary data: request_id={rid}, size={size} bytes", 
-                                     rid=request_id, size=len(screenshot_bytes))
-            
-            # 移除传输状态标志（不再需要）
-            data.pop('binary_data_pending', None)
-            data.pop('a11y_tree_transmitted', None)
-            data.pop('screenshot_transmitted', None)
-            data.pop('a11y_tree_size', None)
-            data.pop('screenshot_size', None)
-            
-            # 更新response_message
-            response_message['data'] = data
-            
-            # 清理pending数据
-            del self._pending_binary_data[device_id][request_id]
-            if not self._pending_binary_data[device_id]:
-                del self._pending_binary_data[device_id]
-            
-            # 清理pending_response
-            if hasattr(self, '_pending_responses'):
-                if device_id in self._pending_responses and request_id in self._pending_responses[device_id]:
-                    del self._pending_responses[device_id][request_id]
-                    if not self._pending_responses[device_id]:
-                        del self._pending_responses[device_id]
-            
-            LoggingUtils.log_info("WebSocketServer", "Completed response with binary data: request_id={rid}, has_a11y={has_a11y}, has_screenshot={has_screenshot}", 
-                                 rid=request_id, has_a11y='a11y_tree' in data, has_screenshot='screenshot_base64' in data)
-            
-            # 转发到WebSocketTools
-            if hasattr(tools_instance, '_handle_response'):
-                tools_instance._handle_response(response_message)
-            else:
-                LoggingUtils.log_warning("WebSocketServer", "WebSocketTools instance has no _handle_response method")
-            
-        except Exception as e:
-            LoggingUtils.log_error("WebSocketServer", "Error merging binary data into response: {error}", error=e)
-            import traceback
-            LoggingUtils.log_error("WebSocketServer", "Traceback: {tb}", tb=traceback.format_exc())
-    
     async def _handle_command_response_async(self, device_id: str, message: Dict[str, Any]):
         """
         处理命令响应消息（Phase 3 - 异步版本，用于路由器）
@@ -964,8 +691,7 @@ class WebSocketServer:
             device_id: 设备ID
             message: 命令响应消息
         """
-        # 在转发前，若 data 中包含 screenshot_ref，则读取文件并回填为 image_data/screenshot_base64
-        # 或者检查是否有待处理的二进制数据
+        # 在转发前，若 data 中包含 screenshot_ref/a11y_ref，默认不回填，仅传引用
         try:
             # 忽略中间态回包（accepted），仅在最终 success/error 时完成请求
             status = message.get("status")
@@ -973,57 +699,10 @@ class WebSocketServer:
                 LoggingUtils.log_debug("WebSocketServer", "Received interim 'accepted' for device {device_id}, request_id={rid}", 
                                        device_id=device_id, rid=message.get("request_id"))
                 return
-            
-            request_id = message.get("request_id")
             data = message.get("data") or {}
-            
-            # 检查是否有binary_data_pending标志（表示还有二进制数据待发送）
-            binary_data_pending = data.get("binary_data_pending") or data.get("a11y_tree_transmitted") is not None or data.get("screenshot_transmitted") is not None
-            
-            # 检查是否有待处理的二进制数据
-            has_pending_binary = False
-            if request_id and hasattr(self, '_pending_binary_data'):
-                if device_id in self._pending_binary_data and request_id in self._pending_binary_data[device_id]:
-                    has_pending_binary = True
-                    pending_data = self._pending_binary_data[device_id][request_id]
-                    
-                    # 合并a11y_tree（如果有）
-                    if 'a11y_tree' in pending_data and 'a11y_tree' not in data:
-                        data['a11y_tree'] = pending_data['a11y_tree']
-                        LoggingUtils.log_info("WebSocketServer", "Merged a11y_tree from binary data: request_id={rid}", rid=request_id)
-                    
-                    # 合并screenshot（如果有）
-                    if 'screenshot' in pending_data:
-                        import base64
-                        screenshot_bytes = pending_data['screenshot']
-                        screenshot_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')
-                        data['image_data'] = screenshot_base64
-                        data['screenshot_base64'] = screenshot_base64
-                        data.setdefault('format', 'JPEG')
-                        LoggingUtils.log_info("WebSocketServer", "Merged screenshot from binary data: request_id={rid}, size={size} bytes", 
-                                             rid=request_id, size=len(screenshot_bytes))
-                    
-                    # 清理已处理的数据
-                    del self._pending_binary_data[device_id][request_id]
-                    if not self._pending_binary_data[device_id]:
-                        del self._pending_binary_data[device_id]
-                    
-                    # 更新message中的data
-                    message['data'] = data
-            
-            # 如果还有二进制数据待发送，等待二进制数据到达
-            if binary_data_pending and not has_pending_binary:
-                # 存储响应，等待二进制数据
-                if not hasattr(self, '_pending_responses'):
-                    self._pending_responses = {}
-                if device_id not in self._pending_responses:
-                    self._pending_responses[device_id] = {}
-                self._pending_responses[device_id][request_id] = message
-                LoggingUtils.log_info("WebSocketServer", "Stored command_response, waiting for binary data: request_id={rid}", rid=request_id)
-                return  # 不立即转发，等待二进制数据
-            
-            # 处理screenshot_ref（原有逻辑）
-            if isinstance(data, dict) and "screenshot_ref" in data:
+            # 守护开关：默认不进行任何回填
+            resolve_inline_refs = False
+            if resolve_inline_refs and isinstance(data, dict) and "screenshot_ref" in data and "screenshot_base64" not in data and "image_data" not in data:
                 ref = data.get("screenshot_ref") or {}
                 ref_path = ref.get("path")
                 if ref_path and os.path.exists(ref_path):
@@ -1044,7 +723,7 @@ class WebSocketServer:
                 else:
                     LoggingUtils.log_warning("WebSocketServer", "screenshot_ref path not found: {path}", path=ref_path)
             # 解析 a11y_ref -> a11y_tree
-            if isinstance(data, dict) and "a11y_ref" in data and "a11y_tree" not in data:
+            if resolve_inline_refs and isinstance(data, dict) and "a11y_ref" in data and "a11y_tree" not in data:
                 aref = data.get("a11y_ref") or {}
                 apath = aref.get("path")
                 if apath and os.path.exists(apath):

@@ -19,6 +19,7 @@ class WebSocketClient {
         private const val TAG = "WebSocketClient"
         private const val MAX_RECONNECT_ATTEMPTS = 3
         private const val RECONNECT_DELAY_MS = 5000L
+        private const val PENDING_MAX = 200
     }
     
     private var client: OkHttpClient? = null
@@ -58,8 +59,9 @@ class WebSocketClient {
         connectionPort = port
         connectionDeviceId = deviceId
         
-        // 构建WebSocket URL
-        val url = "ws://$host:$port/ws?device_id=$deviceId"
+        // 构建WebSocket URL（可选协商协议）
+        val protoParam = if (MobileGPTGlobal.USE_BIN_PROTOCOL) "&protocol=bin_v1" else ""
+        val url = "ws://$host:$port/ws?device_id=$deviceId$protoParam"
         Log.d(TAG, "正在连接到WebSocket服务器: $url")
         
         // 创建OkHttpClient
@@ -78,6 +80,14 @@ class WebSocketClient {
         val wsListener = object : okhttp3.WebSocketListener() {
             override fun onOpen(webSocket: okhttp3.WebSocket, response: Response) {
                 Log.d(TAG, "WebSocket连接已建立")
+                try {
+                    val ext = response.header("Sec-WebSocket-Extensions")
+                    if (!ext.isNullOrEmpty()) {
+                        Log.d(TAG, "协商的WS扩展: $ext")
+                    } else {
+                        Log.d(TAG, "未协商到WS扩展 (permessage-deflate可能未启用)")
+                    }
+                } catch (_: Exception) { }
                 this@WebSocketClient.webSocket = webSocket
                 isConnected = true
                 reconnectAttempts = 0
@@ -175,7 +185,14 @@ class WebSocketClient {
     fun sendMessage(message: JSONObject): Boolean {
         if (!isConnected || webSocket == null) {
             Log.w(TAG, "WebSocket未连接，消息将加入待发送队列")
-            pendingMessages.add(message)
+            // 背压：队列满则丢弃最早的一条
+            synchronized(pendingMessages) {
+                if (pendingMessages.size >= PENDING_MAX) {
+                    try { pendingMessages.removeAt(0) } catch (_: Exception) {}
+                    Log.w(TAG, "待发送队列已满，丢弃最早一条")
+                }
+                pendingMessages.add(message)
+            }
             return false
         }
         
@@ -194,57 +211,6 @@ class WebSocketClient {
         } catch (e: Exception) {
             Log.e(TAG, "发送消息时发生异常", e)
             pendingMessages.add(message)
-            false
-        }
-    }
-    
-    /**
-     * 发送二进制消息
-     * @param bytes 二进制数据
-     * @return 是否发送成功
-     */
-    fun sendBinaryMessage(bytes: ByteArray): Boolean {
-        if (!isConnected || webSocket == null) {
-            Log.w(TAG, "WebSocket未连接，无法发送二进制消息")
-            return false
-        }
-        
-        return try {
-            val byteString = ByteString.of(*bytes)
-            val result = webSocket!!.send(byteString)
-            if (result) {
-                Log.d(TAG, "✓ 二进制消息已成功发送: size=${bytes.size} bytes")
-            } else {
-                Log.w(TAG, "✗ 二进制消息发送失败")
-            }
-            result
-        } catch (e: Exception) {
-            Log.e(TAG, "发送二进制消息时发生异常", e)
-            false
-        }
-    }
-    
-    /**
-     * 发送文本消息（字符串）
-     * @param text 文本内容
-     * @return 是否发送成功
-     */
-    fun sendTextMessage(text: String): Boolean {
-        if (!isConnected || webSocket == null) {
-            Log.w(TAG, "WebSocket未连接，无法发送文本消息")
-            return false
-        }
-        
-        return try {
-            val result = webSocket!!.send(text)
-            if (result) {
-                Log.d(TAG, "✓ 文本消息已成功发送: length=${text.length}")
-            } else {
-                Log.w(TAG, "✗ 文本消息发送失败")
-            }
-            result
-        } catch (e: Exception) {
-            Log.e(TAG, "发送文本消息时发生异常", e)
             false
         }
     }

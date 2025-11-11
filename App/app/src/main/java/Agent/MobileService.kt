@@ -2170,13 +2170,6 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
                 override fun onConnected() {
                     Log.d(TAG, "WebSocket连接成功")
                     isConnecting = false
-                    
-                    // 设置WebSocketClient到CommandHandler（用于二进制传输）
-                    wsClient?.let { client ->
-                        CommandHandler.setWebSocketClient(client)
-                        Log.d(TAG, "WebSocketClient已设置到CommandHandler")
-                    }
-                    
                     // 启动心跳任务
                     startHeartbeatTask()
                     // 连接成功，调用回调
@@ -2192,11 +2185,6 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
                 override fun onDisconnected(reason: String) {
                     Log.w(TAG, "WebSocket断开连接: $reason")
                     isConnecting = false
-                    
-                    // 清除CommandHandler中的WebSocketClient
-                    CommandHandler.setWebSocketClient(null)
-                    Log.d(TAG, "WebSocketClient已从CommandHandler清除")
-                    
                     // 停止心跳任务
                     stopHeartbeatTask()
                     // 可选：实现自动重连（WebSocketClient已实现）

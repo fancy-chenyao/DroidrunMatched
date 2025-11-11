@@ -26,10 +26,11 @@ class MobileGPTGlobal private constructor() {
         const val UPLOAD_PORT = WS_PORT + 1
         const val UPLOAD_PATH = "/upload"
         fun uploadBaseUrl(): String = "http://$WS_HOST_IP:$UPLOAD_PORT$UPLOAD_PATH"
+        const val USE_BIN_PROTOCOL = false
         
         // 设备ID配置
         const val DEVICE_ID_KEY = "device_id"     // SharedPreferences键名
-        const val HEARTBEAT_INTERVAL = 30000L     // 心跳间隔30秒
+        const val HEARTBEAT_INTERVAL = 60000L     // 心跳间隔60秒
         const val CONNECTION_TIMEOUT = 10L        // 连接超时10秒
         const val COMMAND_TIMEOUT = 30000L        // 命令执行超时30秒
         

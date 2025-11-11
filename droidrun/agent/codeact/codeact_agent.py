@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 from typing import List, Optional, Tuple, Union
+import httpx
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.llms.llm import LLM
@@ -168,33 +169,40 @@ class CodeActAgent(Workflow):
             await ctx.store.set("remembered_info", self.remembered_info)
             chat_history = await chat_utils.add_memory_block(self.remembered_info, chat_history)
 
+        # 统一先取一次状态（包含截图引用），后续根据需要下载截图字节
+        state = await self.tools.get_state_async(include_screenshot=True)
+        try:
+            a11y_tree = state.get("a11y_tree")
+            phone_state = state.get("phone_state")
+            if a11y_tree:
+                await ctx.store.set("ui_state", a11y_tree)
+                ctx.write_event_to_stream(RecordUIStateEvent(ui_state=a11y_tree))
+                chat_history = await chat_utils.add_ui_text_block(a11y_tree, chat_history)
+            if phone_state:
+                chat_history = await chat_utils.add_phone_state_block(phone_state, chat_history)
+        except Exception:
+            logger.warning("⚠️ Error processing ui_state/phone_state from get_state_async response")
+
+        # 如需截图并且 vision 开启，则通过引用下载字节
+        if any(c == "screenshot" for c in self.required_context):
+            screenshot_bytes: Optional[bytes] = None
+            try:
+                ref = (state or {}).get("screenshot_ref") or {}
+                url = ref.get("url")
+                if url:
+                    async with httpx.AsyncClient(timeout=20.0) as client:
+                        resp = await client.get(url)
+                        resp.raise_for_status()
+                        screenshot_bytes = resp.content
+            except Exception as e:
+                screenshot_bytes = None
+            if screenshot_bytes:
+                ctx.write_event_to_stream(ScreenshotEvent(screenshot=screenshot_bytes))
+                await ctx.store.set("screenshot", screenshot_bytes)
+                if self.vision and model != "DeepSeek":
+                    chat_history = await chat_utils.add_screenshot_image_block(screenshot_bytes, chat_history)
+        # 处理其他上下文需求（例如应用包列表）
         for context in self.required_context:
-            if context == "screenshot":
-                # if vision is disabled, screenshot should save to trajectory
-                screenshot = (self.tools.take_screenshot())[1]
-                ctx.write_event_to_stream(ScreenshotEvent(screenshot=screenshot))
-
-                await ctx.store.set("screenshot", screenshot)
-                if model == "DeepSeek":
-                    logger.warning(
-                        "[yellow]DeepSeek doesnt support images. Disabling screenshots[/]"
-                    )
-                elif self.vision == True: # if vision is enabled, add screenshot to chat history
-                    chat_history = await chat_utils.add_screenshot_image_block(screenshot, chat_history)
-
-            if context == "ui_state":
-                try:
-                    state = self.tools.get_state()
-                    await ctx.store.set("ui_state", state["a11y_tree"])
-                    ctx.write_event_to_stream(RecordUIStateEvent(ui_state=state["a11y_tree"]))
-                    chat_history = await chat_utils.add_ui_text_block(
-                        state["a11y_tree"], chat_history
-                    )
-                    chat_history = await chat_utils.add_phone_state_block(state["phone_state"], chat_history)
-                except Exception as e:
-                    logger.warning(f"⚠️ Error retrieving state from the connected device. Is the Accessibility Service enabled?")
-
-
             if context == "packages":
                 chat_history = await chat_utils.add_packages_block(
                     self.tools.list_packages(include_system_apps=True),
@@ -461,21 +469,23 @@ class CodeActAgent(Workflow):
             ui_state = None
             
             try:
-                _, screenshot_bytes = self.tools.take_screenshot()
-                screenshot = screenshot_bytes
+                state = await self.tools.get_state_async(include_screenshot=True)
+                a11y_tree = state.get("a11y_tree")
+                ref = (state or {}).get("screenshot_ref") or {}
+                url = ref.get("url")
+                if url:
+                    async with httpx.AsyncClient(timeout=20.0) as client:
+                        resp = await client.get(url)
+                        resp.raise_for_status()
+                        screenshot = resp.content
             except Exception as e:
-                logger.warning(f"Failed to capture final screenshot: {e}")
-            
-            try:
-                (a11y_tree, phone_state) = self.tools.get_state()
-            except Exception as e:
-                logger.warning(f"Failed to capture final UI state: {e}")
+                logger.warning(f"Failed to capture final UI state and screenshot: {e}")
             
             # Create final observation chat history and response
             final_chat_history = [{"role": "system", "content": "Final state observation after task completion"}]
             final_response = {
                 "role": "user", 
-                "content": f"Final State Observation:\nUI State: {a11y_tree}\nScreenshot: {'Available' if screenshot else 'Not available'}"
+                "content": f"Final State Observation:\nUI State: {'Available' if a11y_tree is not None else 'Not available'}\nScreenshot: {'Available' if screenshot else 'Not available'}"
             }
             
             # Create final episodic memory step

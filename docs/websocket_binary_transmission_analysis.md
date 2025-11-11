@@ -281,3 +281,5 @@ fun sendGetStateResponse(phoneState: JSONObject, a11yTree: JSONArray, screenshot
 3. 可以利用WebSocket的压缩和错误处理
 4. 保持WebSocket的协议优势（心跳、重连等）
 
+
+

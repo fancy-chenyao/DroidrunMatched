@@ -96,6 +96,11 @@ class WebSocketTools(Tools):
         """
         request_id = self._generate_request_id()
         timeout = timeout or self.timeout
+        t_create = time.time()
+        try:
+            LoggingUtils.log_debug("WebSocketTools", "Create request {rid} cmd={cmd} timeout={to}s", rid=request_id, cmd=command, to=timeout)
+        except Exception:
+            pass
         
         # 创建 Future 用于等待响应
         future = asyncio.Future()
@@ -126,11 +131,26 @@ class WebSocketTools(Tools):
                 response = await asyncio.wait_for(future, timeout=timeout)
                 # response 是完整响应，提取 data 部分（如果存在）
                 if isinstance(response, dict) and "data" in response:
+                    try:
+                        waited_ms = int((time.time() - t_create) * 1000)
+                        LoggingUtils.log_debug("WebSocketTools", "Request {rid} completed in {ms}ms (cmd={cmd})", rid=request_id, ms=waited_ms, cmd=command)
+                    except Exception:
+                        pass
                     return response["data"]
+                try:
+                    waited_ms = int((time.time() - t_create) * 1000)
+                    LoggingUtils.log_debug("WebSocketTools", "Request {rid} completed in {ms}ms (cmd={cmd})", rid=request_id, ms=waited_ms, cmd=command)
+                except Exception:
+                    pass
                 return response
             except asyncio.TimeoutError:
                 async with self._request_lock:
                     self.pending_requests.pop(request_id, None)
+                try:
+                    waited_ms = int((time.time() - t_create) * 1000)
+                    LoggingUtils.log_error("WebSocketTools", "Request {rid} timeout after {to}s (waited {ms}ms, cmd={cmd})", rid=request_id, to=timeout, ms=waited_ms, cmd=command)
+                except Exception:
+                    pass
                 raise TimeoutError(f"Request {request_id} timed out after {timeout} seconds")
         
         except Exception as e:
@@ -224,11 +244,25 @@ class WebSocketTools(Tools):
                     finally:
                         new_loop.close()
                 
+                t0 = time.time()
                 thread = threading.Thread(target=run_in_new_loop, daemon=True)
+                try:
+                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait spawning thread and joining up to {secs}s", secs=self.timeout + 5)
+                except Exception:
+                    pass
                 thread.start()
                 thread.join(timeout=self.timeout + 5)  # 给一些额外时间
+                join_ms = int((time.time() - t0) * 1000)
+                try:
+                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait join elapsed {ms}ms", ms=join_ms)
+                except Exception:
+                    pass
                 
                 if thread.is_alive():
+                    try:
+                        LoggingUtils.log_error("WebSocketTools", "_sync_wait thread still alive after join timeout ({secs}s)", secs=self.timeout + 5)
+                    except Exception:
+                        pass
                     raise TimeoutError(f"Operation timed out after {self.timeout + 5} seconds")
                 
                 if 'exception' in exception_container:
@@ -237,12 +271,125 @@ class WebSocketTools(Tools):
                     return result_container['result']
                 raise RuntimeError("No result or exception from async operation")
             else:
-                return loop.run_until_complete(coro)
+                t0 = time.time()
+                try:
+                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait blocking run_until_complete on idle loop")
+                except Exception:
+                    pass
+                result = loop.run_until_complete(coro)
+                try:
+                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait run_until_complete elapsed {ms}ms", ms=int((time.time()-t0)*1000))
+                except Exception:
+                    pass
+                return result
         except RuntimeError:
             # 如果没有事件循环，创建一个新的
-            return asyncio.run(coro)
+            t0 = time.time()
+            try:
+                LoggingUtils.log_debug("WebSocketTools", "_sync_wait using asyncio.run path")
+            except Exception:
+                pass
+            result = asyncio.run(coro)
+            try:
+                LoggingUtils.log_debug("WebSocketTools", "_sync_wait asyncio.run elapsed {ms}ms", ms=int((time.time()-t0)*1000))
+            except Exception:
+                pass
+            return result
     
-    def get_state(self) -> Dict[str, Any]:
+    async def get_state_async(self, include_screenshot: bool = True) -> Dict[str, Any]:
+        """
+        异步获取设备状态（包含 a11y_tree 和 phone_state）。仅传引用，不回填大对象。
+        """
+        try:
+            LoggingUtils.log_debug("WebSocketTools", "[async] Getting state from device {device_id}", device_id=self.device_id)
+            response = await self._send_request_and_wait("get_state", {"include_screenshot": include_screenshot})
+
+            if response.get("status") == "error":
+                error_msg = response.get("error", "Unknown error")
+                LoggingUtils.log_error("WebSocketTools", "Error in get_state response: {error}", error=error_msg)
+                return {"error": "Error", "message": error_msg}
+
+            # 验证必需字段（允许仅返回引用）
+            if "a11y_tree" not in response and "a11y_ref" not in response:
+                LoggingUtils.log_error("WebSocketTools", "Response missing a11y_tree/a11y_ref field")
+                return {"error": "Missing Data", "message": "a11y_tree/a11y_ref not found in response"}
+            if "phone_state" not in response:
+                LoggingUtils.log_error("WebSocketTools", "Response missing phone_state field")
+                return {"error": "Missing Data", "message": "phone_state not found in response"}
+
+            # 内联 a11y_tree 时进行过滤，保持与 AdbTools 一致
+            elements = response.get("a11y_tree", [])
+            if isinstance(elements, list) and elements:
+                filtered_elements = []
+                for element in elements:
+                    filtered_element = {k: v for k, v in element.items() if k != "type"}
+                    if "children" in element:
+                        def filter_children_recursive(children):
+                            result = []
+                            for c in children:
+                                filtered = {k: v for k, v in c.items() if k != "type"}
+                                if "children" in c:
+                                    filtered["children"] = filter_children_recursive(c["children"])
+                                result.append(filtered)
+                            return result
+                        filtered_element["children"] = filter_children_recursive(element["children"])
+                    filtered_elements.append(filtered_element)
+                self.clickable_elements_cache = filtered_elements
+                result = {
+                    "a11y_tree": filtered_elements,
+                    "phone_state": response.get("phone_state", {}),
+                    "elements": filtered_elements
+                }
+            else:
+                # 仅引用返回 - 需要从 HTTP 服务器下载 a11y_tree 以更新 clickable_elements_cache
+                a11y_ref = response.get("a11y_ref")
+                if a11y_ref and isinstance(a11y_ref, dict):
+                    file_path = a11y_ref.get("path")
+                    if file_path:
+                        try:
+                            import json
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                a11y_data = json.load(f)
+                                # 上传的 JSON 文件直接是 a11y_tree 数组，不是包含 a11y_tree 键的对象
+                                if isinstance(a11y_data, list):
+                                    elements = a11y_data
+                                else:
+                                    elements = a11y_data.get("a11y_tree", [])
+                                if isinstance(elements, list) and elements:
+                                    filtered_elements = []
+                                    for element in elements:
+                                        filtered_element = {k: v for k, v in element.items() if k != "type"}
+                                        if "children" in element:
+                                            def filter_children_recursive(children):
+                                                result = []
+                                                for c in children:
+                                                    filtered = {k: v for k, v in c.items() if k != "type"}
+                                                    if "children" in c:
+                                                        filtered["children"] = filter_children_recursive(c["children"])
+                                                    result.append(filtered)
+                                                return result
+                                            filtered_element["children"] = filter_children_recursive(element["children"])
+                                        filtered_elements.append(filtered_element)
+                                    self.clickable_elements_cache = filtered_elements
+                                    LoggingUtils.log_debug("WebSocketTools", "[async] Updated clickable_elements_cache from a11y_ref, count={count}", count=len(filtered_elements))
+                        except Exception as e:
+                            LoggingUtils.log_warning("WebSocketTools", "Failed to load a11y_tree from {path}: {error}", path=file_path, error=e)
+                
+                result = {
+                    "a11y_ref": response.get("a11y_ref"),
+                    "screenshot_ref": response.get("screenshot_ref"),
+                    "phone_state": response.get("phone_state", {}),
+                }
+            LoggingUtils.log_debug("WebSocketTools", "[async] State retrieved ok")
+            return result
+        except TimeoutError as e:
+            LoggingUtils.log_error("WebSocketTools", "Timeout getting state: {error}", error=e)
+            return {"error": "Timeout", "message": str(e)}
+        except Exception as e:
+            LoggingUtils.log_error("WebSocketTools", "Error getting state: {error}", error=e)
+            return {"error": "Error", "message": str(e)}
+
+    def get_state(self, include_screenshot: bool = True) -> Dict[str, Any]:
         """
         获取设备状态（包含 a11y_tree 和 phone_state）
         
@@ -252,74 +399,9 @@ class WebSocketTools(Tools):
         try:
             LoggingUtils.log_debug("WebSocketTools", "Getting state from device {device_id}", device_id=self.device_id)
             
-            # 发送请求并等待响应
-            response = self._sync_wait(
-                self._send_request_and_wait("get_state", {})
-            )
-            
-            # 验证响应格式（response 可能是 data 部分或完整响应）
-            # 检查是否包含错误
-            if response.get("status") == "error":
-                error_msg = response.get("error", "Unknown error")
-                LoggingUtils.log_error("WebSocketTools", "Error in get_state response: {error}", error=error_msg)
-                return {
-                    "error": "Error",
-                    "message": error_msg
-                }
-            
-            # 验证必需字段
-            if "a11y_tree" not in response:
-                LoggingUtils.log_error("WebSocketTools", "Response missing a11y_tree field")
-                return {
-                    "error": "Missing Data",
-                    "message": "a11y_tree not found in response",
-                }
-            
-            if "phone_state" not in response:
-                LoggingUtils.log_error("WebSocketTools", "Response missing phone_state field")
-                return {
-                    "error": "Missing Data",
-                    "message": "phone_state not found in response",
-                }
-            
-            # 过滤掉 "type" 属性（与 AdbTools 保持一致）
-            elements = response.get("a11y_tree", [])
-            filtered_elements = []
-            for element in elements:
-                filtered_element = {k: v for k, v in element.items() if k != "type"}
-                # 递归处理子元素
-                if "children" in element:
-                    filtered_children = []
-                    for child in element["children"]:
-                        filtered_child = {k: v for k, v in child.items() if k != "type"}
-                        if "children" in child:
-                            # 递归处理更深层的子元素
-                            def filter_children_recursive(children):
-                                result = []
-                                for c in children:
-                                    filtered = {k: v for k, v in c.items() if k != "type"}
-                                    if "children" in c:
-                                        filtered["children"] = filter_children_recursive(c["children"])
-                                    result.append(filtered)
-                                return result
-                            filtered_child["children"] = filter_children_recursive(child["children"])
-                        filtered_children.append(filtered_child)
-                    filtered_element["children"] = filtered_children
-                filtered_elements.append(filtered_element)
-            
-            # 更新缓存
-            self.clickable_elements_cache = filtered_elements
-            
-            # 返回格式与 AdbTools 保持一致
-            result = {
-                "a11y_tree": filtered_elements,
-                "phone_state": response.get("phone_state", {}),
-                "elements": filtered_elements  # 兼容字段
-            }
-            
-            LoggingUtils.log_debug("WebSocketTools", "State retrieved successfully, {count} elements", 
-                                 count=len(filtered_elements))
-            return result
+            # 复用异步实现，避免重复逻辑与阻塞
+            response = self._sync_wait(self.get_state_async(include_screenshot=include_screenshot))
+            return response
             
         except TimeoutError as e:
             LoggingUtils.log_error("WebSocketTools", "Timeout getting state: {error}", error=e)
@@ -333,6 +415,132 @@ class WebSocketTools(Tools):
                 "error": "Error",
                 "message": str(e)
             }
+
+    async def take_screenshot_async(self, hide_overlay: bool = True) -> Tuple[str, bytes]:
+        """异步截屏，返回 (format, bytes)"""
+        try:
+            LoggingUtils.log_debug("WebSocketTools", "[async] Taking screenshot")
+            response = await self._send_request_and_wait("take_screenshot", {"hide_overlay": hide_overlay})
+            if response.get("status") == "success":
+                image_data_base64 = response.get("image_data", "")
+                if not image_data_base64:
+                    raise ValueError("No image data in response")
+                image_bytes = base64.b64decode(image_data_base64)
+                img_format = response.get("format", "PNG")
+                self.screenshots.append({
+                    "timestamp": time.time(),
+                    "image_data": image_bytes,
+                    "format": img_format,
+                })
+                self.last_screenshot = image_bytes
+                return (img_format, image_bytes)
+            else:
+                error_msg = response.get("error", "Unknown error")
+                raise ValueError(f"Failed to take screenshot: {error_msg}")
+        except TimeoutError as e:
+            LoggingUtils.log_error("WebSocketTools", "Timeout taking screenshot: {error}", error=e)
+            raise ValueError(f"Timeout taking screenshot: {str(e)}")
+        except Exception:
+            raise
+
+    async def tap_by_index_async(self, index: int) -> str:
+        """异步通过索引点击元素"""
+        try:
+            LoggingUtils.log_debug("WebSocketTools", "[async] Tapping element at index {index}", index=index)
+            if not self.clickable_elements_cache:
+                return "Error: No UI elements cached. Call get_state first."
+            response = await self._send_request_and_wait("tap_by_index", {"index": index})
+            status = response.get("status") or "success"
+            if status == "success":
+                message = response.get("message", f"Tapped element at index {index}")
+                return message
+            else:
+                error_msg = response.get("error", "Unknown error")
+                return f"Error: {error_msg}"
+        except TimeoutError as e:
+            return f"Error: Timeout - {str(e)}"
+        except Exception as e:
+            LoggingUtils.log_error("WebSocketTools", "Error tapping element: {error}", error=e)
+            return f"Error: {str(e)}"
+
+    async def input_text_async(self, text: str) -> str:
+        """异步输入文本"""
+        try:
+            LoggingUtils.log_debug("WebSocketTools", "[async] Inputting text: {text}", text=text[:50])
+            encoded_text = base64.b64encode(text.encode()).decode()
+            response = await self._send_request_and_wait("input_text", {
+                "text": text,
+                "base64_text": encoded_text
+            })
+            if response.get("status") == "success":
+                message = response.get("message", f"Text input completed: {text[:50]}")
+                return message
+            else:
+                error_msg = response.get("error", "Unknown error")
+                return f"Error: {error_msg}"
+        except TimeoutError as e:
+            return f"Error: Timeout - {str(e)}"
+        except Exception as e:
+            LoggingUtils.log_error("WebSocketTools", "Error inputting text: {error}", error=e)
+            return f"Error: {str(e)}"
+
+    async def swipe_async(self, start_x: int, start_y: int, end_x: int, end_y: int, duration_ms: int = 300) -> bool:
+        """异步滑动操作"""
+        try:
+            LoggingUtils.log_debug("WebSocketTools", "[async] Swiping from ({start_x}, {start_y}) to ({end_x}, {end_y})", 
+                                 start_x=start_x, start_y=start_y, end_x=end_x, end_y=end_y)
+            response = await self._send_request_and_wait("swipe", {
+                "start_x": start_x,
+                "start_y": start_y,
+                "end_x": end_x,
+                "end_y": end_y,
+                "duration_ms": duration_ms
+            })
+            return response.get("status") == "success"
+        except TimeoutError:
+            LoggingUtils.log_error("WebSocketTools", "Timeout during swipe")
+            return False
+        except Exception as e:
+            LoggingUtils.log_error("WebSocketTools", "Error during swipe: {error}", error=e)
+            return False
+
+    async def press_key_async(self, keycode: int) -> str:
+        """异步按键操作"""
+        try:
+            LoggingUtils.log_debug("WebSocketTools", "[async] Pressing key: {keycode}", keycode=keycode)
+            response = await self._send_request_and_wait("press_key", {"keycode": keycode})
+            if response.get("status") == "success":
+                message = response.get("message", f"Key {keycode} pressed")
+                return message
+            else:
+                error_msg = response.get("error", "Unknown error")
+                return f"Error: {error_msg}"
+        except TimeoutError as e:
+            return f"Error: Timeout - {str(e)}"
+        except Exception as e:
+            LoggingUtils.log_error("WebSocketTools", "Error pressing key: {error}", error=e)
+            return f"Error: {str(e)}"
+
+    async def start_app_async(self, package: str, activity: str = "") -> str:
+        """异步启动应用"""
+        try:
+            LoggingUtils.log_debug("WebSocketTools", "[async] Starting app: {package} with activity: {activity}", 
+                                 package=package, activity=activity)
+            response = await self._send_request_and_wait("start_app", {
+                "package": package,
+                "activity": activity
+            })
+            if response.get("status") == "success":
+                message = response.get("message", f"App started: {package}")
+                return message
+            else:
+                error_msg = response.get("error", "Unknown error")
+                return f"Error: {error_msg}"
+        except TimeoutError as e:
+            return f"Error: Timeout - {str(e)}"
+        except Exception as e:
+            LoggingUtils.log_error("WebSocketTools", "Error starting app: {error}", error=e)
+            return f"Error: {str(e)}"
     
     @Tools.ui_action
     def tap_by_index(self, index: int) -> str:

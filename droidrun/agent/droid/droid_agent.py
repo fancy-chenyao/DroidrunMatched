@@ -852,7 +852,7 @@ class DroidAgent(Workflow):
             # 初始化UI
             LoggingUtils.log_debug("DroidAgent", "Initializing UI state cache...")
             try:
-                ui_state = tools.get_state()
+                ui_state = await tools.get_state_async(include_screenshot=True)
                 LoggingUtils.log_debug("DroidAgent", "UI state initialized with {count} elements", 
                                      count=len(ui_state.get('elements', [])))
                 
@@ -861,19 +861,8 @@ class DroidAgent(Workflow):
                     ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
                     self.trajectory.ui_states.append(ui_state_event.ui_state)
                     LoggingUtils.log_info("DroidAgent", "Initial UI state recorded")
-                
-                try:
-                    screenshot = tools.take_screenshot()
-                    if screenshot:
-                        # take_screenshot返回(format, bytes)，我们需要bytes部分
-                        screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
-                        screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
-                        self.trajectory.screenshots.append(screenshot_event.screenshot)
-                        LoggingUtils.log_info("DroidAgent", "Initial screenshot captured and recorded")
-                except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
-                    ExceptionHandler.handle_file_operation_error(e, "[HOT] Initial screenshot capture")
             except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
-                ExceptionHandler.handle_file_operation_error(e, "[HOT] UI state initialization")
+                LoggingUtils.log_warning("DroidAgent", "Failed to initialize UI state: {error}", error=e)
                 return False, f"Failed to initialize UI state: {e}"
             executed_actions = []
             # 基于 changed_indices 的微冷启动触发记录，避免重复触发同一索引
@@ -886,6 +875,7 @@ class DroidAgent(Workflow):
                                      current=idx_action+1, total=len(actions), name=name, params=params)
                 try:
                     if name in ("tap_by_index", "tap", "tap_index"):
+                        LoggingUtils.log_debug("DroidAgent", "[DEBUG] Processing tap_by_index action {idx_action}/{total}", idx_action=idx_action, total=len(actions))
                         idx_val = params.get("index", params.get("idx"))
                         try:
                             default_idx = self.config_manager.get("tools.default_index", -1)
@@ -893,15 +883,21 @@ class DroidAgent(Workflow):
                         except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                             ExceptionHandler.handle_data_parsing_error(e, "[HOT] Index parsing")
                             idx = self.config_manager.get("tools.default_index", -1)
+                        LoggingUtils.log_debug("DroidAgent", "[DEBUG] Parsed index: {idx}", idx=idx)
                         if idx >= 0:
                             # 变化参数且为点击 → 基于 changed_indices 直接触发微冷启动（无窗口 gating）
-                            if self._is_changed_param_click_step(idx_action, act) and not triggered_changed_steps.get(idx_action):
+                            is_changed = self._is_changed_param_click_step(idx_action, act)
+                            LoggingUtils.log_debug("DroidAgent", "[DEBUG] Is changed param click: {is_changed}, changed_indices={changed}", 
+                                                 is_changed=is_changed, changed=(self.pending_hot_context or {}).get("changed_indices", []))
+                            if is_changed and not triggered_changed_steps.get(idx_action):
+                                LoggingUtils.log_info("DroidAgent", "[DEBUG] Triggering micro-coldstart for step {step}", step=idx_action)
                                 ok = await self._micro_coldstart_handle_click_step(idx_action, act)
                                 triggered_changed_steps[idx_action] = True
                                 if ok:
+                                    LoggingUtils.log_info("DroidAgent", "[DEBUG] Micro-coldstart succeeded, skipping direct tap")
                                     step_count += 1
                                     # 使用通用方法捕获UI状态和截图
-                                    self._capture_ui_state_and_screenshot("micro-coldstart")
+                                    await self._capture_ui_state_and_screenshot("micro-coldstart")
                                     if idx_action < len(actions) - 1:
                                         wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                                         time.sleep(wait_time)
@@ -910,11 +906,12 @@ class DroidAgent(Workflow):
                                 else:
                                     LoggingUtils.log_warning("DroidAgent", "Micro-coldstart failed for step {step}, fallback to direct tap", 
                                                            step=idx_action)
-                            tools.tap_by_index(idx)
+                            LoggingUtils.log_info("DroidAgent", "[DEBUG] Executing direct tap_by_index_async for index {idx}", idx=idx)
+                            await tools.tap_by_index_async(idx)
                             screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                             time.sleep(screenshot_wait)
                             # 使用通用方法捕获UI状态和截图
-                            self._capture_ui_state_and_screenshot("tap")
+                            await self._capture_ui_state_and_screenshot("tap")
                             
                             # 创建TapActionEvent并添加到macro
                             default_x = self.config_manager.get("tools.default_x_coordinate", 0)
@@ -940,11 +937,11 @@ class DroidAgent(Workflow):
                         text = str(text) if text is not None else ""
                         # 不再在直执中做就地文本适配，保持经验参数或上层已适配结果
                         if text:
-                            tools.input_text(text)
+                            await tools.input_text_async(text)
                             wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                             time.sleep(wait_time)
                             # 使用通用方法捕获UI状态和截图
-                            self._capture_ui_state_and_screenshot("input")
+                            await self._capture_ui_state_and_screenshot("input")
                             
                             # 创建InputTextActionEvent并添加到macro
                             
@@ -973,11 +970,11 @@ class DroidAgent(Workflow):
                         ex = int(params.get("end_x", end[0] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("x", default_x)))
                         ey = int(params.get("end_y", end[1] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("y", default_y)))
                         dur = int(params.get("duration_ms", params.get("duration", default_duration)))
-                        tools.swipe(sx, sy, ex, ey, dur)
+                        await tools.swipe_async(sx, sy, ex, ey, dur)
                         screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                         time.sleep(screenshot_wait)
                         # 使用通用方法捕获UI状态和截图
-                        self._capture_ui_state_and_screenshot("swipe")
+                        await self._capture_ui_state_and_screenshot("swipe")
                         
                         # 创建SwipeActionEvent并添加到macro
                         
@@ -996,23 +993,16 @@ class DroidAgent(Workflow):
                     elif name == "start_app":
                         pkg = params.get("package", params.get("pkg", ""))
                         pkg = str(pkg) if pkg is not None else ""
-                        if pkg and hasattr(tools, "start_app"):
-                            tools.start_app(pkg)
+                        if pkg and hasattr(tools, "start_app_async"):
+                            await tools.start_app_async(pkg)
                             long_wait = self.config_manager.get("tools.long_wait_time", 2.0)
                             time.sleep(long_wait)
                             try:
-                                # 在启动应用后捕获UI状态和截图
-                                ui_state = tools.get_state()
+                                # 在启动应用后捕获UI状态
+                                ui_state = await tools.get_state_async(include_screenshot=True)
                                 if ui_state and 'a11y_tree' in ui_state:
                                     ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
                                     self.trajectory.ui_states.append(ui_state_event.ui_state)
-                                
-                                screenshot = tools.take_screenshot()
-                                if screenshot:
-                                    # take_screenshot返回(format, bytes)，我们需要bytes部分
-                                    screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
-                                    screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
-                                    self.trajectory.screenshots.append(screenshot_event.screenshot)
                             except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
                                 LoggingUtils.log_warning("DroidAgent", "Failed to capture state after start_app: {error}", error=e)
                             
@@ -1034,11 +1024,11 @@ class DroidAgent(Workflow):
                             ExceptionHandler.handle_data_parsing_error(e, "[HOT] Keycode parsing")
                             keycode = 0
                         if keycode:
-                            tools.press_key(keycode)
+                            await tools.press_key_async(keycode)
                             wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                             time.sleep(wait_time)
                             # 使用通用方法捕获UI状态和截图
-                            self._capture_ui_state_and_screenshot("press_key")
+                            await self._capture_ui_state_and_screenshot("press_key")
                             
                             # 创建KeyPressActionEvent并添加到macro
                             
@@ -1066,7 +1056,7 @@ class DroidAgent(Workflow):
                 except ExceptionConstants.RUNTIME_EXCEPTIONS as action_error:
                     ExceptionHandler.handle_runtime_error(action_error, f"[HOT] Action {idx_action+1}", reraise=False)
                     try:
-                        tools.get_state()
+                        await tools.get_state_async(include_screenshot=False)
                     except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
                         ExceptionHandler.handle_file_operation_error(e, "[HOT] State capture after action failure")
                     continue
@@ -1102,9 +1092,9 @@ class DroidAgent(Workflow):
             ExceptionHandler.handle_runtime_error(e, "[HOT] Direct execution", reraise=False)
             return False, f"Direct execution failed: {e}"
 
-    def _capture_ui_state_and_screenshot(self, context: str) -> bool:
+    async def _capture_ui_state_and_screenshot(self, context: str) -> bool:
         """
-        捕获UI状态和截图的通用方法
+        捕获UI状态和截图的通用方法（异步）
         
         Args:
             context: 捕获上下文描述，用于日志记录
@@ -1115,19 +1105,11 @@ class DroidAgent(Workflow):
         try:
             tools = self.tools_instance
             
-            # 捕获UI状态
-            ui_state = tools.get_state()
+            # 捕获UI状态（异步）
+            ui_state = await tools.get_state_async(include_screenshot=True)
             if ui_state and 'a11y_tree' in ui_state:
                 ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
                 self.trajectory.ui_states.append(ui_state_event.ui_state)
-            
-            # 捕获截图
-            screenshot = tools.take_screenshot()
-            if screenshot:
-                # take_screenshot返回(format, bytes)，我们需要bytes部分
-                screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
-                screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
-                self.trajectory.screenshots.append(screenshot_event.screenshot)
             
             return True
             
@@ -1610,38 +1592,7 @@ class DroidAgent(Workflow):
         
         return actions
 
-    def _capture_ui_state_and_screenshot(self, context: str) -> bool:
-        """
-        捕获UI状态和截图的通用方法
-        
-        Args:
-            context: 捕获上下文描述，用于日志记录
-            
-        Returns:
-            bool: 是否成功捕获
-        """
-        try:
-            tools = self.tools_instance
-            
-            # 捕获UI状态
-            ui_state = tools.get_state()
-            if ui_state and 'a11y_tree' in ui_state:
-                ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
-                self.trajectory.ui_states.append(ui_state_event.ui_state)
-            
-            # 捕获截图
-            screenshot = tools.take_screenshot()
-            if screenshot:
-                # take_screenshot返回(format, bytes)，我们需要bytes部分
-                screenshot_bytes = screenshot[1] if isinstance(screenshot, tuple) else screenshot
-                screenshot_event = ScreenshotEvent(screenshot=screenshot_bytes)
-                self.trajectory.screenshots.append(screenshot_event.screenshot)
-            
-            return True
-            
-        except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
-            ExceptionHandler.handle_file_operation_error(e, f"[HOT] State capture after {context}")
-            return False
+    # 旧版本 _capture_ui_state_and_screenshot 已移除，统一使用上方的异步版本
 
     async def _save_experience_async(self, ev: FinalizeEvent) -> None:
         """
