@@ -1,6 +1,7 @@
 package Agent
 
 import android.app.Activity
+import android.content.Context
 import android.graphics.Bitmap
 import android.util.Base64
 import android.util.Log
@@ -9,6 +10,10 @@ import controller.UIUtils
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * 数据格式转换工具
@@ -17,121 +22,123 @@ import java.io.ByteArrayOutputStream
 object StateConverter {
     
     private const val TAG = "StateConverter"
-    private const val MAX_A11Y_NODES = 2000
-    private const val MAX_A11Y_DEPTH = 6
-    private const val MAX_TEXT_LEN = 256
+    
+    // 调试开关：是否保存原始元素树和XML文件
+    private const val SAVE_DEBUG_FILES = false
     
     /**
-     * 将GenericElement树转换为a11y_tree格式（JSON数组）
+     * 保存原始元素树到本地文件（调试用）
      */
-    fun convertElementTreeToA11yTree(element: GenericElement): JSONArray {
-        val result = JSONArray()
-        convertElementRecursive(element, result)
-        return result
-    }
-    
-    /**
-     * 递归转换元素
-     */
-    private fun convertElementRecursive(element: GenericElement, parentArray: JSONArray) {
-        val elementObj = JSONObject()
+    private fun saveOriginalElementTree(element: GenericElement, context: Context?) {
+        if (!SAVE_DEBUG_FILES) return  // 开关控制
         
-        // 基本属性
-        elementObj.put("index", element.index)
-        elementObj.put("resourceId", element.resourceId)
-        elementObj.put("className", element.className)
-        elementObj.put("text", truncateText(element.text))
-        elementObj.put("contentDesc", truncateText(element.contentDesc))
-        
-        // 布尔属性
-        elementObj.put("clickable", element.clickable)
-        elementObj.put("enabled", element.enabled)
-        elementObj.put("checked", element.checked)
-        elementObj.put("checkable", element.checkable)
-        elementObj.put("scrollable", element.scrollable)
-        elementObj.put("longClickable", element.longClickable)
-        elementObj.put("selected", element.selected)
-        elementObj.put("important", element.important)
-        elementObj.put("naf", element.naf)
-        
-        // bounds对象
-        val boundsObj = JSONObject()
-        boundsObj.put("left", element.bounds.left)
-        boundsObj.put("top", element.bounds.top)
-        boundsObj.put("right", element.bounds.right)
-        boundsObj.put("bottom", element.bounds.bottom)
-        elementObj.put("bounds", boundsObj)
-        
-        // 附加属性
-        if (element.additionalProps.isNotEmpty()) {
-            val additionalPropsObj = JSONObject()
-            element.additionalProps.forEach { (key, value) ->
-                additionalPropsObj.put(key, value)
+        try {
+            if (context == null) return
+            
+            // 使用指定的外部存储路径
+            val outputDir = File("/storage/0000-0000/Android/data/com.example.emplab/files/xml")
+            if (!outputDir.exists()) {
+                outputDir.mkdirs()
             }
-            elementObj.put("additionalProps", additionalPropsObj)
+            
+            // 生成文件名
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val originalFile = File(outputDir, "original_element_tree_${timestamp}.txt")
+            
+            // 保存原始元素树的可读格式
+            val originalContent = element.toFormattedString()
+            originalFile.writeText(originalContent, Charsets.UTF_8)
+            
+            Log.d(TAG, "原始元素树已保存: ${originalFile.absolutePath}")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "保存原始元素树失败", e)
         }
-        
-        // 递归处理子元素
-        if (element.children.isNotEmpty()) {
-            val childrenArray = JSONArray()
-            element.children.forEach { child ->
-                convertElementRecursive(child, childrenArray)
-            }
-            elementObj.put("children", childrenArray)
-        }
-        
-        parentArray.put(elementObj)
-    }
-    
-    private fun truncateText(s: String?): String {
-        if (s == null) return ""
-        return if (s.length > MAX_TEXT_LEN) s.substring(0, MAX_TEXT_LEN) else s
     }
     
     /**
-     * 受限版本：限制深度、节点数与字符串长度
+     * 将GenericElement转换为XML字符串并保存到本地文件（调试用）
      */
-    fun convertElementTreeToA11yTreePruned(element: GenericElement): JSONArray {
+    private fun saveElementTreeAsXml(element: GenericElement, context: Context?) {
+        if (!SAVE_DEBUG_FILES) return  // 开关控制
+        
+        try {
+            if (context == null) return
+            
+            // 使用指定的外部存储路径
+            val outputDir = File("/storage/0000-0000/Android/data/com.example.emplab/files/xml")
+            if (!outputDir.exists()) {
+                outputDir.mkdirs()
+            }
+            
+            // 生成文件名
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val xmlFile = File(outputDir, "element_tree_${timestamp}.xml")
+            
+            // 转换为XML格式
+            val xmlContent = convertGenericElementToXmlString(element)
+            xmlFile.writeText(xmlContent, Charsets.UTF_8)
+            
+            Log.d(TAG, "XML元素树已保存: ${xmlFile.absolutePath}")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "保存XML元素树失败", e)
+        }
+    }
+    
+    /**
+     * 将GenericElement转换为XML字符串
+     */
+    private fun convertGenericElementToXmlString(element: GenericElement): String {
+        return """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<hierarchy>
+${element.children.joinToString("") { it.toXmlString(1) }}
+</hierarchy>"""
+    }
+    
+    /**
+     * 将GenericElement树转换为a11y_tree格式（无限制版本）
+     */
+    fun convertElementTreeToA11yTreePruned(element: GenericElement, context: Context? = null): JSONArray {
+        // 保存原始元素树和XML到本地文件
+        saveOriginalElementTree(element, context)
+        saveElementTreeAsXml(element, context)
+        
         val result = JSONArray()
-        var count = 0
-        fun recurse(e: GenericElement, parent: JSONArray, depth: Int) {
-            if (depth > MAX_A11Y_DEPTH) return
-            if (count >= MAX_A11Y_NODES) return
+        
+        fun recurse(e: GenericElement, parent: JSONArray) {
             val obj = JSONObject()
             obj.put("index", e.index)
             obj.put("resourceId", e.resourceId)
             obj.put("className", e.className)
-            obj.put("text", truncateText(e.text))
-            obj.put("contentDesc", truncateText(e.contentDesc))
-            obj.put("clickable", e.clickable)
-            obj.put("enabled", e.enabled)
-            obj.put("checked", e.checked)
-            obj.put("checkable", e.checkable)
-            obj.put("scrollable", e.scrollable)
-            obj.put("longClickable", e.longClickable)
-            obj.put("selected", e.selected)
-            obj.put("important", e.important)
-            obj.put("naf", e.naf)
-            val boundsObj = JSONObject()
-            boundsObj.put("left", e.bounds.left)
-            boundsObj.put("top", e.bounds.top)
-            boundsObj.put("right", e.bounds.right)
-            boundsObj.put("bottom", e.bounds.bottom)
-            obj.put("bounds", boundsObj)
-            if (e.children.isNotEmpty() && depth < MAX_A11Y_DEPTH) {
+            
+            // text字段：优先使用contentDesc，如果为空则使用text，如果都为空则使用className
+            val displayText = when {
+                e.contentDesc.isNotEmpty() -> e.contentDesc
+                e.text.isNotEmpty() -> e.text
+                else -> e.className
+            }
+            obj.put("text", displayText)
+            
+            // bounds格式：转为字符串 "left, top, right, bottom"
+            obj.put("bounds", "${e.bounds.left}, ${e.bounds.top}, ${e.bounds.right}, ${e.bounds.bottom}")
+            
+            // 递归处理所有子节点，无深度和数量限制
+            if (e.children.isNotEmpty()) {
                 val arr = JSONArray()
                 for (child in e.children) {
-                    if (count >= MAX_A11Y_NODES) break
-                    recurse(child, arr, depth + 1)
+                    recurse(child, arr)
                 }
-                if (arr.length() > 0) {
-                    obj.put("children", arr)
-                }
+                obj.put("children", arr)
+            } else {
+                // 叶子节点也添加空的children数组
+                obj.put("children", JSONArray())
             }
+            
             parent.put(obj)
-            count++
         }
-        recurse(element, result, 1)
+        
+        recurse(element, result)
         return result
     }
     
@@ -191,21 +198,21 @@ object StateConverter {
         val response = JSONObject()
         
         try {
-            // 转换元素树
-            val a11yTree = convertElementTreeToA11yTree(elementTree)
-            response.put("a11y_tree", a11yTree)
+            // 转换元素树（使用无限制版本）
+            val a11yTree = convertElementTreeToA11yTreePruned(elementTree, activity)
+            response.put("a11y_tree", a11yTree as Any)
             
             // 获取设备状态
             val phoneState = getPhoneState(activity)
-            response.put("phone_state", phoneState)
+            response.put("phone_state", phoneState as Any)
             
             // 不在此处执行网络上传，避免主线程网络。截图引用由调用方负责上传并注入。
             
         } catch (e: Exception) {
             Log.e(TAG, "构建状态响应时发生异常", e)
             // 返回空的数据结构
-            response.put("a11y_tree", JSONArray())
-            response.put("phone_state", getPhoneState(null))
+            response.put("a11y_tree", JSONArray() as Any)
+            response.put("phone_state", getPhoneState(null) as Any)
         }
         
         return response

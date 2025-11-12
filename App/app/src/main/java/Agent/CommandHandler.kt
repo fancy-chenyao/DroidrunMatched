@@ -240,7 +240,7 @@ object CommandHandler {
                         var screenshotRef: JSONObject? = null
                         try {
                             // 生成裁剪后的a11y_tree
-                            val pruned = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
+                            val pruned = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
                             val jsonStr = pruned.toString()
                             val a11yUpload = HttpUploader.uploadJson(activity, jsonStr, "a11y_${System.currentTimeMillis()}", "a11y.json")
                             if (a11yUpload != null && a11yUpload.optString("status") == "success") {
@@ -259,7 +259,7 @@ object CommandHandler {
                             Log.w(TAG, "a11y上传异常", e)
                             try {
                                 // 异常也尝试内联
-                                a11yInline = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
+                                a11yInline = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
                             } catch (_: Exception) { }
                         }
                         try {
