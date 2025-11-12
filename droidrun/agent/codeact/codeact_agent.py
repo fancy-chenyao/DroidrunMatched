@@ -174,27 +174,33 @@ class CodeActAgent(Workflow):
         try:
             a11y_tree = state.get("a11y_tree")
             phone_state = state.get("phone_state")
+            
+            # 调试日志：确认 a11y_tree 是否存在
             if a11y_tree:
+                element_count = len(a11y_tree) if isinstance(a11y_tree, list) else 0
+                logger.info(f"✅ a11y_tree 已获取，包含 {element_count} 个顶层元素")
                 await ctx.store.set("ui_state", a11y_tree)
                 ctx.write_event_to_stream(RecordUIStateEvent(ui_state=a11y_tree))
                 chat_history = await chat_utils.add_ui_text_block(a11y_tree, chat_history)
+            else:
+                logger.warning("⚠️ a11y_tree 为空或不存在！大模型将无法看到 UI 元素")
+                
             if phone_state:
                 chat_history = await chat_utils.add_phone_state_block(phone_state, chat_history)
-        except Exception:
-            logger.warning("⚠️ Error processing ui_state/phone_state from get_state_async response")
+        except Exception as e:
+            logger.warning(f"⚠️ Error processing ui_state/phone_state from get_state_async response: {e}")
 
-        # 如需截图并且 vision 开启，则通过引用下载字节
+        # 如需截图并且 vision 开启，则从 base64 解码
         if any(c == "screenshot" for c in self.required_context):
             screenshot_bytes: Optional[bytes] = None
             try:
-                ref = (state or {}).get("screenshot_ref") or {}
-                url = ref.get("url")
-                if url:
-                    async with httpx.AsyncClient(timeout=20.0) as client:
-                        resp = await client.get(url)
-                        resp.raise_for_status()
-                        screenshot_bytes = resp.content
+                screenshot_base64 = (state or {}).get("screenshot_base64")
+                if screenshot_base64:
+                    import base64
+                    screenshot_bytes = base64.b64decode(screenshot_base64)
+                    logger.debug(f"Decoded screenshot from base64, size: {len(screenshot_bytes)} bytes")
             except Exception as e:
+                logger.warning(f"Failed to decode screenshot_base64: {e}")
                 screenshot_bytes = None
             if screenshot_bytes:
                 ctx.write_event_to_stream(ScreenshotEvent(screenshot=screenshot_bytes))

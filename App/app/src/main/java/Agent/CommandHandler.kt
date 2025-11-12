@@ -206,131 +206,50 @@ object CommandHandler {
                 // 缓存无效或不存在，重新获取
                 // 1. 获取元素树
                 ElementController.getCurrentElementTree(activity) { elementTree ->
-                    // 2. 异步获取截图（可选，不阻塞主线程），增加2秒降级超时
-                    val handler = Handler(Looper.getMainLooper())
-                    val completed = AtomicBoolean(false)
-                    
-                    val finishWith: (Bitmap?, org.json.JSONObject?, org.json.JSONObject?) -> Unit = { screenshot, a11yRef, screenshotRef ->
-                        if (!completed.getAndSet(true)) {
-                            // 构建仅包含phone_state的基础响应
-                            val stateResponse = JSONObject()
-                            try {
-                                val phoneState = StateConverter.getPhoneState(activity)
-                                stateResponse.put("phone_state", phoneState)
-                                // 附加引用（若有）
-                                if (a11yRef != null) stateResponse.put("a11y_ref", a11yRef)
-                                if (screenshotRef != null) stateResponse.put("screenshot_ref", screenshotRef)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "构建get_state基础响应异常", e)
-                            }
-                            updateCache(elementTree, stateResponse, currentScreenHash)
-                            callback(stateResponse)
-                        }
-                    }
-                    
-                    // 降级超时：2秒后若上传仍未完成，返回仅有phone_state（无引用）
-                    val fallback = Runnable {
-                        Log.w(TAG, "状态构建超时，降级为无引用返回（2s）")
-                        finishWith(null, null, null)
-                    }
-                    handler.postDelayed(fallback, 2000)
-                    
-                    // 并行任务：生成裁剪的a11y JSON并上传 + 截图并上传
+                    // 2. 在后台线程生成 a11y_tree
                     Thread {
-                        var a11yRef: JSONObject? = null
-                        var a11yInline: org.json.JSONArray? = null
-                        var screenshotRef: JSONObject? = null
                         try {
-                            // 生成裁剪后的a11y_tree
-                            val pruned = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
-                            Log.d(TAG, "裁剪后的a11y_tree: $pruned")
-                            val xml=elementTree.toXmlString()
-                            Log.d(TAG, "对应的xml: $xml")
-                            val jsonStr = pruned.toString()
-                            val a11yUpload = HttpUploader.uploadJson(activity, jsonStr, "a11y_${System.currentTimeMillis()}", "a11y.json")
-                            if (a11yUpload != null && a11yUpload.optString("status") == "success") {
-                                a11yRef = JSONObject().apply {
-                                    put("file_id", a11yUpload.optString("file_id"))
-                                    put("path", a11yUpload.optString("path"))
-                                    put("url", a11yUpload.optString("url"))
-                                    put("mime", a11yUpload.optString("mime"))
-                                    put("size", a11yUpload.optInt("size"))
-                                }
-                            } else {
-                                // 上传失败：降级为内联（受限大小）
-                                a11yInline = pruned
-                            }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "a11y上传异常", e)
-                            try {
-                                // 异常也尝试内联
-                                a11yInline = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
-                            } catch (_: Exception) { }
-                        }
-                        try {
-                            takeScreenshotAsync(activity) { screenshot ->
-                                if (screenshot != null && !screenshot.isRecycled) {
-                                    Thread {
-                                        val up = HttpUploader.uploadBitmap(activity, screenshot, "state_${System.currentTimeMillis()}")
-                                        if (up != null && up.optString("status") == "success") {
-                                            screenshotRef = JSONObject().apply {
-                                                put("file_id", up.optString("file_id"))
-                                                put("path", up.optString("path"))
-                                                put("url", up.optString("url"))
-                                                put("mime", up.optString("mime"))
-                                                put("size", up.optInt("size"))
-                                            }
+                            // 生成 a11y_tree（JSON 数组）
+                            val a11yTree = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
+                            Log.d(TAG, "a11y_tree 生成完成，节点数: ${a11yTree.length()}")
+
+                            // 获取截图并转为 Base64（如果需要）
+                            var screenshotBase64: String? = null
+                            if (params.optBoolean("include_screenshot", false)) {
+                                val screenshotLatch = java.util.concurrent.CountDownLatch(1)
+                                Handler(Looper.getMainLooper()).post {
+                                    takeScreenshotAsync(activity) { screenshot ->
+                                        if (screenshot != null && !screenshot.isRecycled) {
+                                            screenshotBase64 = StateConverter.bitmapToBase64(screenshot, 80)
+                                            Log.d(TAG, "截图转换完成，Base64 长度: ${screenshotBase64?.length ?: 0}")
+                                            screenshot.recycle()
                                         }
-                                        Handler(Looper.getMainLooper()).post {
-                                            handler.removeCallbacks(fallback)
-                                            // 如果引用不可用，尝试将a11y内联到最终响应
-                                            if (a11yRef == null && a11yInline != null) {
-                                                try {
-                                                    val stateResponse = JSONObject()
-                                                    stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
-                                                    stateResponse.put("a11y_tree", a11yInline)
-                                                    if (screenshotRef != null) stateResponse.put("screenshot_ref", screenshotRef)
-                                                    updateCache(elementTree, stateResponse, currentScreenHash)
-                                                    callback(stateResponse)
-                                                    return@post
-                                                } catch (e: Exception) {
-                                                    Log.w(TAG, "内联a11y构建失败，继续走finish", e)
-                                                }
-                                            }
-                                            finishWith(null, a11yRef, screenshotRef)
-                                        }
-                                    }.start()
-                                } else {
-                                    Handler(Looper.getMainLooper()).post {
-                                        handler.removeCallbacks(fallback)
-                                        if (a11yRef == null && a11yInline != null) {
-                                            try {
-                                                val stateResponse = JSONObject()
-                                                stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
-                                                stateResponse.put("a11y_tree", a11yInline)
-                                                updateCache(elementTree, stateResponse, currentScreenHash)
-                                                callback(stateResponse)
-                                                return@post
-                                            } catch (_: Exception) { }
-                                        }
-                                        finishWith(null, a11yRef, null)
+                                        screenshotLatch.countDown()
                                     }
                                 }
+                                // 等待截图完成（最多 2 秒）
+                                screenshotLatch.await(2, java.util.concurrent.TimeUnit.SECONDS)
                             }
-                        } catch (e: Exception) {
+
+                            // 构建响应（包含内联数据）
+                            val stateResponse = JSONObject()
+                            stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
+                            stateResponse.put("a11y_tree", a11yTree)
+                            if (screenshotBase64 != null) {
+                                stateResponse.put("screenshot_base64", screenshotBase64)
+                            }
+
+                            // 更新缓存并返回响应
                             Handler(Looper.getMainLooper()).post {
-                                handler.removeCallbacks(fallback)
-                                if (a11yRef == null && a11yInline != null) {
-                                    try {
-                                        val stateResponse = JSONObject()
-                                        stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
-                                        stateResponse.put("a11y_tree", a11yInline)
-                                        updateCache(elementTree, stateResponse, currentScreenHash)
-                                        callback(stateResponse)
-                                        return@post
-                                    } catch (_: Exception) { }
-                                }
-                                finishWith(null, a11yRef, null)
+                                updateCache(elementTree, stateResponse, currentScreenHash)
+                                callback(stateResponse)
+                                Log.d(TAG, "✓ 响应已发送（内联 a11y_tree + screenshot_base64）")
+                            }
+
+                        } catch (e: Exception) {
+                            Log.e(TAG, "生成状态响应异常", e)
+                            Handler(Looper.getMainLooper()).post {
+                                callback(createErrorResponse("Failed to generate state: ${e.message}"))
                             }
                         }
                     }.start()

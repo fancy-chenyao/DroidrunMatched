@@ -317,69 +317,43 @@ class WebSocketTools(Tools):
                 LoggingUtils.log_error("WebSocketTools", "Response missing phone_state field")
                 return {"error": "Missing Data", "message": "phone_state not found in response"}
 
-            # 内联 a11y_tree 时进行过滤，保持与 AdbTools 一致
+            # 定义过滤函数（去除 type 字段）
+            def filter_children_recursive(children):
+                result = []
+                for c in children:
+                    filtered = {k: v for k, v in c.items() if k != "type"}
+                    if "children" in c:
+                        filtered["children"] = filter_children_recursive(c["children"])
+                    result.append(filtered)
+                return result
+            
+            # 处理内联 a11y_tree（统一使用 WebSocket 传输）
             elements = response.get("a11y_tree", [])
+            filtered_elements = []
+            
             if isinstance(elements, list) and elements:
-                filtered_elements = []
+                # 过滤并处理 a11y_tree
                 for element in elements:
                     filtered_element = {k: v for k, v in element.items() if k != "type"}
                     if "children" in element:
-                        def filter_children_recursive(children):
-                            result = []
-                            for c in children:
-                                filtered = {k: v for k, v in c.items() if k != "type"}
-                                if "children" in c:
-                                    filtered["children"] = filter_children_recursive(c["children"])
-                                result.append(filtered)
-                            return result
                         filtered_element["children"] = filter_children_recursive(element["children"])
                     filtered_elements.append(filtered_element)
                 self.clickable_elements_cache = filtered_elements
-                result = {
-                    "a11y_tree": filtered_elements,
-                    "phone_state": response.get("phone_state", {}),
-                    "elements": filtered_elements
-                }
+                LoggingUtils.log_debug("WebSocketTools", "[async] Updated clickable_elements_cache from inline a11y_tree, count={count}", count=len(filtered_elements))
             else:
-                # 仅引用返回 - 需要从 HTTP 服务器下载 a11y_tree 以更新 clickable_elements_cache
-                a11y_ref = response.get("a11y_ref")
-                if a11y_ref and isinstance(a11y_ref, dict):
-                    file_path = a11y_ref.get("path")
-                    if file_path:
-                        try:
-                            import json
-                            with open(file_path, 'r', encoding='utf-8') as f:
-                                a11y_data = json.load(f)
-                                # 上传的 JSON 文件直接是 a11y_tree 数组，不是包含 a11y_tree 键的对象
-                                if isinstance(a11y_data, list):
-                                    elements = a11y_data
-                                else:
-                                    elements = a11y_data.get("a11y_tree", [])
-                                if isinstance(elements, list) and elements:
-                                    filtered_elements = []
-                                    for element in elements:
-                                        filtered_element = {k: v for k, v in element.items() if k != "type"}
-                                        if "children" in element:
-                                            def filter_children_recursive(children):
-                                                result = []
-                                                for c in children:
-                                                    filtered = {k: v for k, v in c.items() if k != "type"}
-                                                    if "children" in c:
-                                                        filtered["children"] = filter_children_recursive(c["children"])
-                                                    result.append(filtered)
-                                                return result
-                                            filtered_element["children"] = filter_children_recursive(element["children"])
-                                        filtered_elements.append(filtered_element)
-                                    self.clickable_elements_cache = filtered_elements
-                                    LoggingUtils.log_debug("WebSocketTools", "[async] Updated clickable_elements_cache from a11y_ref, count={count}", count=len(filtered_elements))
-                        except Exception as e:
-                            LoggingUtils.log_warning("WebSocketTools", "Failed to load a11y_tree from {path}: {error}", path=file_path, error=e)
-                
-                result = {
-                    "a11y_ref": response.get("a11y_ref"),
-                    "screenshot_ref": response.get("screenshot_ref"),
-                    "phone_state": response.get("phone_state", {}),
-                }
+                LoggingUtils.log_warning("WebSocketTools", "No a11y_tree data in response")
+            
+            # 构建返回结果
+            result = {
+                "a11y_tree": filtered_elements,
+                "phone_state": response.get("phone_state", {}),
+            }
+            
+            # 处理截图（如果有 screenshot_base64）
+            if "screenshot_base64" in response:
+                result["screenshot_base64"] = response.get("screenshot_base64")
+                screenshot_len = len(response.get("screenshot_base64", ""))
+                LoggingUtils.log_debug("WebSocketTools", "[async] Received screenshot_base64, length={length}", length=screenshot_len)
             LoggingUtils.log_debug("WebSocketTools", "[async] State retrieved ok")
             return result
         except TimeoutError as e:
