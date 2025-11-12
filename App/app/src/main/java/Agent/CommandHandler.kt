@@ -208,13 +208,19 @@ object CommandHandler {
                     val handler = Handler(Looper.getMainLooper())
                     val completed = AtomicBoolean(false)
                     
-                    val finishWith: (Bitmap?, org.json.JSONObject?, org.json.JSONObject?) -> Unit = { screenshot, a11yRef, screenshotRef ->
+                    val finishWith: (org.json.JSONObject?, org.json.JSONObject?, org.json.JSONObject?) -> Unit = { a11yInlineOrRef, a11yRef, screenshotRef ->
                         if (!completed.getAndSet(true)) {
-                            // 构建仅包含phone_state的基础响应
                             val stateResponse = JSONObject()
                             try {
-                                val phoneState = StateConverter.getPhoneState(activity)
-                                stateResponse.put("phone_state", phoneState)
+                                if (a11yInlineOrRef != null) {
+                                    // 使用内联的完整状态对象（已包含a11y_tree和phone_state）
+                                    stateResponse.put("a11y_tree", a11yInlineOrRef.opt("a11y_tree") as Any)
+                                    stateResponse.put("phone_state", a11yInlineOrRef.opt("phone_state") as Any)
+                                } else {
+                                    // 只有phone_state
+                                    val phoneState = StateConverter.getPhoneState(activity)
+                                    stateResponse.put("phone_state", phoneState as Any)
+                                }
                                 // 附加引用（若有）
                                 if (a11yRef != null) stateResponse.put("a11y_ref", a11yRef)
                                 if (screenshotRef != null) stateResponse.put("screenshot_ref", screenshotRef)
@@ -236,12 +242,18 @@ object CommandHandler {
                     // 并行任务：生成裁剪的a11y JSON并上传 + 截图并上传
                     Thread {
                         var a11yRef: JSONObject? = null
-                        var a11yInline: org.json.JSONArray? = null
+                        var a11yInline: org.json.JSONObject? = null
                         var screenshotRef: JSONObject? = null
                         try {
-                            // 生成裁剪后的a11y_tree
-                            val pruned = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
-                            val jsonStr = pruned.toString()
+                            // 生成完整的状态对象（包含a11y_tree和phone_state）
+                            val a11yTree = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
+                            val phoneState = StateConverter.getPhoneState(activity)
+                            
+                            val stateObj = org.json.JSONObject()
+                            stateObj.put("a11y_tree", a11yTree as Any)
+                            stateObj.put("phone_state", phoneState as Any)
+                            
+                            val jsonStr = stateObj.toString()
                             val a11yUpload = HttpUploader.uploadJson(activity, jsonStr, "a11y_${System.currentTimeMillis()}", "a11y.json")
                             if (a11yUpload != null && a11yUpload.optString("status") == "success") {
                                 a11yRef = JSONObject().apply {
@@ -253,13 +265,18 @@ object CommandHandler {
                                 }
                             } else {
                                 // 上传失败：降级为内联（受限大小）
-                                a11yInline = pruned
+                                a11yInline = stateObj
                             }
                         } catch (e: Exception) {
                             Log.w(TAG, "a11y上传异常", e)
                             try {
                                 // 异常也尝试内联
-                                a11yInline = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
+                                val a11yTree = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
+                                val phoneState = StateConverter.getPhoneState(activity)
+                                a11yInline = org.json.JSONObject().apply {
+                                    put("a11y_tree", a11yTree as Any)
+                                    put("phone_state", phoneState as Any)
+                                }
                             } catch (_: Exception) { }
                         }
                         try {
@@ -278,54 +295,20 @@ object CommandHandler {
                                         }
                                         Handler(Looper.getMainLooper()).post {
                                             handler.removeCallbacks(fallback)
-                                            // 如果引用不可用，尝试将a11y内联到最终响应
-                                            if (a11yRef == null && a11yInline != null) {
-                                                try {
-                                                    val stateResponse = JSONObject()
-                                                    stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
-                                                    stateResponse.put("a11y_tree", a11yInline)
-                                                    if (screenshotRef != null) stateResponse.put("screenshot_ref", screenshotRef)
-                                                    updateCache(elementTree, stateResponse, currentScreenHash)
-                                                    callback(stateResponse)
-                                                    return@post
-                                                } catch (e: Exception) {
-                                                    Log.w(TAG, "内联a11y构建失败，继续走finish", e)
-                                                }
-                                            }
-                                            finishWith(null, a11yRef, screenshotRef)
+                                            finishWith(a11yInline, a11yRef, screenshotRef)
                                         }
                                     }.start()
                                 } else {
                                     Handler(Looper.getMainLooper()).post {
                                         handler.removeCallbacks(fallback)
-                                        if (a11yRef == null && a11yInline != null) {
-                                            try {
-                                                val stateResponse = JSONObject()
-                                                stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
-                                                stateResponse.put("a11y_tree", a11yInline)
-                                                updateCache(elementTree, stateResponse, currentScreenHash)
-                                                callback(stateResponse)
-                                                return@post
-                                            } catch (_: Exception) { }
-                                        }
-                                        finishWith(null, a11yRef, null)
+                                        finishWith(a11yInline, a11yRef, null)
                                     }
                                 }
                             }
                         } catch (e: Exception) {
                             Handler(Looper.getMainLooper()).post {
                                 handler.removeCallbacks(fallback)
-                                if (a11yRef == null && a11yInline != null) {
-                                    try {
-                                        val stateResponse = JSONObject()
-                                        stateResponse.put("phone_state", StateConverter.getPhoneState(activity))
-                                        stateResponse.put("a11y_tree", a11yInline)
-                                        updateCache(elementTree, stateResponse, currentScreenHash)
-                                        callback(stateResponse)
-                                        return@post
-                                    } catch (_: Exception) { }
-                                }
-                                finishWith(null, a11yRef, null)
+                                finishWith(a11yInline, a11yRef, null)
                             }
                         }
                     }.start()
