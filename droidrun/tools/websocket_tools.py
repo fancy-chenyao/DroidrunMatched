@@ -34,7 +34,7 @@ class WebSocketTools(Tools):
         device_id: str,
         session_manager: SessionManager,
         config_manager=None,
-        timeout: int = 30,
+        timeout: int = 5,
     ) -> None:
         """
         初始化 WebSocketTools 实例
@@ -103,7 +103,11 @@ class WebSocketTools(Tools):
             pass
         
         # 创建 Future 用于等待响应
-        future = asyncio.Future()
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()  # 确保在当前事件循环中创建
+        LoggingUtils.log_info("WebSocketTools", "🔄 [_send_request_and_wait] 创建 Future | request_id={rid} | loop={loop_id}", 
+                             rid=request_id, loop_id=id(loop))
+        
         async with self._request_lock:
             self.pending_requests[request_id] = future
         
@@ -116,30 +120,89 @@ class WebSocketTools(Tools):
         )
         
         try:
+            # 记录发送时间戳
+            send_timestamp = time.strftime("%H:%M:%S", time.localtime())
+            
+            # 详细日志：记录命令发送
+            if command == "tap_by_index":
+                index = params.get("index", "unknown")
+                LoggingUtils.log_info("WebSocketTools", "📤 [{time}] 发送 tap_by_index 命令到移动端 | index={idx} | request_id={rid}", 
+                                    time=send_timestamp, idx=index, rid=request_id)
+            elif command == "get_state":
+                include_screenshot = params.get("include_screenshot", False)
+                # 记录 get_state 发送开始时间（用于计算总耗时）
+                self._get_state_send_times = getattr(self, '_get_state_send_times', {})
+                self._get_state_send_times[request_id] = time.time()
+                LoggingUtils.log_info("WebSocketTools", "📤 [{time}] 发送 get_state 命令到移动端 | include_screenshot={ss} | request_id={rid}", 
+                                    time=send_timestamp, ss=include_screenshot, rid=request_id)
+            elif command == "input_text":
+                text = params.get("text", "")[:20]  # 只显示前20个字符
+                LoggingUtils.log_info("WebSocketTools", "📤 [{time}] 发送 input_text 命令到移动端 | text='{txt}...' | request_id={rid}", 
+                                    time=send_timestamp, txt=text, rid=request_id)
+            else:
+                LoggingUtils.log_info("WebSocketTools", "📤 [{time}] 发送 {cmd} 命令到移动端 | params={prm} | request_id={rid}", 
+                                    time=send_timestamp, cmd=command, prm=params, rid=request_id)
+            
             # 发送请求
             success = await self.session_manager.send_to_device(self.device_id, request_message)
             if not success:
                 async with self._request_lock:
                     self.pending_requests.pop(request_id, None)
+                LoggingUtils.log_error("WebSocketTools", "❌ [{time}] 发送失败 | command={cmd} | request_id={rid}", 
+                                     time=send_timestamp, cmd=command, rid=request_id)
                 raise ValueError(f"Failed to send request to device {self.device_id}")
             
-            LoggingUtils.log_debug("WebSocketTools", "Sent request {request_id} for command {command}", 
-                                 request_id=request_id, command=command)
+            LoggingUtils.log_debug("WebSocketTools", "✓ 命令已发送到 WebSocket | command={command} | request_id={request_id}", 
+                                 command=command, request_id=request_id)
+            # 微让步：高优命令发送后立即让出事件循环，尽快调度 sender_loop 出队发送
+            try:
+                if command in {"tap_by_index", "tap", "scroll", "input_text", "swipe", "press_key", "start_app", "drag"}:
+                    await asyncio.sleep(0)
+                    LoggingUtils.log_debug("WebSocketTools", "Yielded after enqueue | cmd={cmd} | rid={rid}", 
+                                         cmd=command, rid=request_id)
+            except Exception:
+                pass
             
             # 等待响应（带超时）
             try:
+                LoggingUtils.log_info("WebSocketTools", "🔄 [_send_request_and_wait] 开始等待响应 | request_id={rid} | timeout={to}s", rid=request_id, to=timeout)
+                wait_start = time.time()
+                
                 response = await asyncio.wait_for(future, timeout=timeout)
+                
+                wait_end = time.time()
+                wait_duration = int((wait_end - wait_start) * 1000)
+                LoggingUtils.log_info("WebSocketTools", "🔄 [_send_request_and_wait] 收到响应 | request_id={rid} | 等待耗时={dur}ms", rid=request_id, dur=wait_duration)
+                
                 # response 是完整响应，提取 data 部分（如果存在）
                 if isinstance(response, dict) and "data" in response:
                     try:
                         waited_ms = int((time.time() - t_create) * 1000)
-                        LoggingUtils.log_debug("WebSocketTools", "Request {rid} completed in {ms}ms (cmd={cmd})", rid=request_id, ms=waited_ms, cmd=command)
+                        recv_timestamp = time.strftime("%H:%M:%S", time.localtime())
+                        
+                        # 如果是 get_state，计算从发送到接收的总耗时
+                        if command == "get_state":
+                            send_times = getattr(self, '_get_state_send_times', {})
+                            send_time = send_times.pop(request_id, None)
+                            if send_time:
+                                total_ms = int((time.time() - send_time) * 1000)
+                                data_size = len(str(response.get("data", {})))
+                                LoggingUtils.log_info("WebSocketTools", "📥 [{time}] 收到 get_state 响应 | 总耗时={total}ms | 数据大小={size}B | request_id={rid}", 
+                                                    time=recv_timestamp, total=total_ms, size=data_size, rid=request_id)
+                            else:
+                                LoggingUtils.log_info("WebSocketTools", "📥 [{time}] 收到响应 | command={cmd} | 耗时={ms}ms | request_id={rid}", 
+                                                    time=recv_timestamp, cmd=command, ms=waited_ms, rid=request_id)
+                        else:
+                            LoggingUtils.log_info("WebSocketTools", "📥 [{time}] 收到响应 | command={cmd} | 耗时={ms}ms | request_id={rid}", 
+                                                time=recv_timestamp, cmd=command, ms=waited_ms, rid=request_id)
                     except Exception:
                         pass
                     return response["data"]
                 try:
                     waited_ms = int((time.time() - t_create) * 1000)
-                    LoggingUtils.log_debug("WebSocketTools", "Request {rid} completed in {ms}ms (cmd={cmd})", rid=request_id, ms=waited_ms, cmd=command)
+                    recv_timestamp = time.strftime("%H:%M:%S", time.localtime())
+                    LoggingUtils.log_info("WebSocketTools", "📥 [{time}] 收到响应 | command={cmd} | 耗时={ms}ms | request_id={rid}", 
+                                        time=recv_timestamp, cmd=command, ms=waited_ms, rid=request_id)
                 except Exception:
                     pass
                 return response
@@ -148,7 +211,9 @@ class WebSocketTools(Tools):
                     self.pending_requests.pop(request_id, None)
                 try:
                     waited_ms = int((time.time() - t_create) * 1000)
-                    LoggingUtils.log_error("WebSocketTools", "Request {rid} timeout after {to}s (waited {ms}ms, cmd={cmd})", rid=request_id, to=timeout, ms=waited_ms, cmd=command)
+                    timeout_timestamp = time.strftime("%H:%M:%S", time.localtime())
+                    LoggingUtils.log_error("WebSocketTools", "⏱️ [{time}] 命令超时 | command={cmd} | 等待={ms}ms | 超时阈值={to}s | request_id={rid}", 
+                                         time=timeout_timestamp, cmd=command, ms=waited_ms, to=timeout, rid=request_id)
                 except Exception:
                     pass
                 raise TimeoutError(f"Request {request_id} timed out after {timeout} seconds")
@@ -162,8 +227,6 @@ class WebSocketTools(Tools):
         """
         处理来自 APP 的响应消息（由 WebSocketServer 从异步上下文调用）
         
-        注意：这个方法会被 WebSocketServer 从异步上下文调用，需要正确处理异步
-        
         Args:
             response_data: 响应数据字典，应包含 request_id 字段
         """
@@ -172,49 +235,62 @@ class WebSocketTools(Tools):
             LoggingUtils.log_warning("WebSocketTools", "Response missing request_id, ignoring")
             return
         
-        # 使用异步方式处理响应
-        async def _handle_async():
-            async with self._request_lock:
-                future = self.pending_requests.get(request_id)
-                if future and not future.done():
-                    # 检查是否有错误
-                    if response_data.get("status") == "error":
-                        error_msg = response_data.get("error", "Unknown error")
-                        future.set_exception(ValueError(error_msg))
-                    else:
-                        # 设置响应数据（包含完整响应）
-                        future.set_result(response_data)
-                    LoggingUtils.log_debug("WebSocketTools", "Response received for request {request_id}", 
-                                         request_id=request_id)
-                else:
-                    LoggingUtils.log_warning("WebSocketTools", "No pending request found for request_id {request_id}", 
-                                           request_id=request_id)
+        LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 开始处理响应 | request_id={rid}", rid=request_id)
         
-        # 尝试在现有事件循环中调度
+        # 检查当前事件循环
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # 如果循环正在运行，创建任务（这是最常见的情况）
-                asyncio.create_task(_handle_async())
-            else:
-                # 如果循环不在运行，直接运行（理论上不应该发生，因为从异步上下文调用）
-                loop.run_until_complete(_handle_async())
+            current_loop = asyncio.get_running_loop()
+            LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 当前事件循环 | request_id={rid} | loop={loop_id}", 
+                                 rid=request_id, loop_id=id(current_loop))
         except RuntimeError:
-            # 如果没有事件循环，在新线程中创建一个
-            import threading
-            def _run_in_thread():
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    loop.run_until_complete(_handle_async())
-                finally:
-                    loop.close()
-            thread = threading.Thread(target=_run_in_thread, daemon=True)
-            thread.start()
+            LoggingUtils.log_error("WebSocketTools", "🔄 [_handle_response] 没有运行中的事件循环 | request_id={rid}", rid=request_id)
+        
+        # 直接同步处理，避免异步调度问题
+        try:
+            future = self.pending_requests.get(request_id)
+            if future and not future.done():
+                LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 找到对应的 future，设置结果 | request_id={rid}", rid=request_id)
+                
+                # 获取 future 关联的事件循环
+                future_loop = getattr(future, '_loop', None)
+                if future_loop:
+                    LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] Future 事件循环 | request_id={rid} | future_loop={loop_id}", 
+                                         rid=request_id, loop_id=id(future_loop))
+                
+                # 检查是否有错误
+                if response_data.get("status") == "error":
+                    error_msg = response_data.get("error", "Unknown error")
+                    # 使用线程安全的方式设置异常
+                    if future_loop and future_loop.is_running():
+                        future_loop.call_soon_threadsafe(future.set_exception, ValueError(error_msg))
+                    else:
+                        future.set_exception(ValueError(error_msg))
+                    LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 设置异常 | request_id={rid} | error={err}", rid=request_id, err=error_msg)
+                else:
+                    # 使用线程安全的方式设置结果
+                    if future_loop and future_loop.is_running():
+                        future_loop.call_soon_threadsafe(future.set_result, response_data)
+                    else:
+                        future.set_result(response_data)
+                    LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 设置结果成功 | request_id={rid}", rid=request_id)
+                LoggingUtils.log_debug("WebSocketTools", "Response received for request {request_id}", 
+                                     request_id=request_id)
+                # 从待处理请求中移除
+                self.pending_requests.pop(request_id, None)
+                LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 从待处理请求中移除 | request_id={rid}", rid=request_id)
+            else:
+                if not future:
+                    LoggingUtils.log_warning("WebSocketTools", "🔄 [_handle_response] 未找到对应的 future | request_id={rid}", rid=request_id)
+                else:
+                    LoggingUtils.log_warning("WebSocketTools", "🔄 [_handle_response] future 已完成 | request_id={rid} | done={done}", rid=request_id, done=future.done())
+        except Exception as e:
+            LoggingUtils.log_error("WebSocketTools", "🔄 [_handle_response] 处理响应时出错 | request_id={rid} | error={err}", 
+                                 request_id=request_id, err=e)
     
     def _sync_wait(self, coro):
         """
         同步等待异步操作（用于同步方法调用异步实现）
+        使用 run_coroutine_threadsafe 避免阻塞主事件循环
         
         Args:
             coro: 协程对象
@@ -225,65 +301,29 @@ class WebSocketTools(Tools):
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # 如果事件循环正在运行，使用线程池在新线程中运行
+                # 使用 run_coroutine_threadsafe 在主事件循环中执行协程
+                # 这样不会阻塞事件循环，其他协程可以继续执行
                 import concurrent.futures
-                import threading
-                
-                result_container = {}
-                exception_container = {}
-                
-                def run_in_new_loop():
-                    """在新的事件循环中运行协程"""
-                    new_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(new_loop)
-                    try:
-                        result = new_loop.run_until_complete(coro)
-                        result_container['result'] = result
-                    except Exception as e:
-                        exception_container['exception'] = e
-                    finally:
-                        new_loop.close()
-                
-                t0 = time.time()
-                thread = threading.Thread(target=run_in_new_loop, daemon=True)
                 try:
-                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait spawning thread and joining up to {secs}s", secs=self.timeout + 5)
-                except Exception:
-                    pass
-                thread.start()
-                thread.join(timeout=self.timeout + 5)  # 给一些额外时间
-                join_ms = int((time.time() - t0) * 1000)
-                try:
-                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait join elapsed {ms}ms", ms=join_ms)
+                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait using run_coroutine_threadsafe (timeout={secs}s)", secs=self.timeout)
                 except Exception:
                     pass
                 
-                if thread.is_alive():
+                future = asyncio.run_coroutine_threadsafe(coro, loop)
+                try:
+                    return future.result(timeout=self.timeout)
+                except concurrent.futures.TimeoutError:
                     try:
-                        LoggingUtils.log_error("WebSocketTools", "_sync_wait thread still alive after join timeout ({secs}s)", secs=self.timeout + 5)
+                        LoggingUtils.log_error("WebSocketTools", "_sync_wait timeout after {secs}s", secs=self.timeout)
                     except Exception:
                         pass
-                    raise TimeoutError(f"Operation timed out after {self.timeout + 5} seconds")
-                
-                if 'exception' in exception_container:
-                    raise exception_container['exception']
-                if 'result' in result_container:
-                    return result_container['result']
-                raise RuntimeError("No result or exception from async operation")
+                    raise TimeoutError(f"Operation timed out after {self.timeout} seconds")
+                    
             else:
-                t0 = time.time()
-                try:
-                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait blocking run_until_complete on idle loop")
-                except Exception:
-                    pass
-                result = loop.run_until_complete(coro)
-                try:
-                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait run_until_complete elapsed {ms}ms", ms=int((time.time()-t0)*1000))
-                except Exception:
-                    pass
-                return result
+                # 如果循环不在运行，直接运行（理论上不应该发生）
+                return loop.run_until_complete(coro)
         except RuntimeError:
-            # 如果没有事件循环，创建一个新的
+            # 如果没有事件循环，使用 asyncio.run（回退方案）
             t0 = time.time()
             try:
                 LoggingUtils.log_debug("WebSocketTools", "_sync_wait using asyncio.run path")
@@ -363,7 +403,7 @@ class WebSocketTools(Tools):
             LoggingUtils.log_error("WebSocketTools", "Error getting state: {error}", error=e)
             return {"error": "Error", "message": str(e)}
 
-    def get_state(self, include_screenshot: bool = True) -> Dict[str, Any]:
+    async def get_state(self, include_screenshot: bool = True) -> Dict[str, Any]:
         """
         获取设备状态（包含 a11y_tree 和 phone_state）
         
@@ -371,10 +411,10 @@ class WebSocketTools(Tools):
             包含 'a11y_tree' 和 'phone_state' 的字典
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "Getting state from device {device_id}", device_id=self.device_id)
+            LoggingUtils.log_debug("WebSocketTools", "[async] Getting state from device {device_id}", device_id=self.device_id)
             
-            # 复用异步实现，避免重复逻辑与阻塞
-            response = self._sync_wait(self.get_state_async(include_screenshot=include_screenshot))
+            # 直接调用异步实现
+            response = await self.get_state_async(include_screenshot=include_screenshot)
             return response
             
         except TimeoutError as e:
@@ -437,27 +477,6 @@ class WebSocketTools(Tools):
             LoggingUtils.log_error("WebSocketTools", "Error tapping element: {error}", error=e)
             return f"Error: {str(e)}"
 
-    async def input_text_async(self, text: str) -> str:
-        """异步输入文本"""
-        try:
-            LoggingUtils.log_debug("WebSocketTools", "[async] Inputting text: {text}", text=text[:50])
-            encoded_text = base64.b64encode(text.encode()).decode()
-            response = await self._send_request_and_wait("input_text", {
-                "text": text,
-                "base64_text": encoded_text
-            })
-            if response.get("status") == "success":
-                message = response.get("message", f"Text input completed: {text[:50]}")
-                return message
-            else:
-                error_msg = response.get("error", "Unknown error")
-                return f"Error: {error_msg}"
-        except TimeoutError as e:
-            return f"Error: Timeout - {str(e)}"
-        except Exception as e:
-            LoggingUtils.log_error("WebSocketTools", "Error inputting text: {error}", error=e)
-            return f"Error: {str(e)}"
-
     async def swipe_async(self, start_x: int, start_y: int, end_x: int, end_y: int, duration_ms: int = 300) -> bool:
         """异步滑动操作"""
         try:
@@ -517,7 +536,7 @@ class WebSocketTools(Tools):
             return f"Error: {str(e)}"
     
     @Tools.ui_action
-    def tap_by_index(self, index: int) -> str:
+    async def tap_by_index(self, index: int) -> str:
         """
         通过索引点击元素
         
@@ -528,24 +547,11 @@ class WebSocketTools(Tools):
             操作结果消息
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "Tapping element at index {index}", index=index)
-            
-            # 检查缓存
+            LoggingUtils.log_debug("WebSocketTools", "[async] Tapping element at index {index}", index=index)
             if not self.clickable_elements_cache:
                 return "Error: No UI elements cached. Call get_state first."
-            
-            # 发送请求
-            response = self._sync_wait(
-                self._send_request_and_wait("tap_by_index", {"index": index})
-            )
-            
-            # 处理响应（response 是从 _send_request_and_wait 返回的 data 部分）
-            # 如果 response 直接包含 status，说明是完整响应
-            status = response.get("status")
-            if status is None:
-                # 如果没有 status，假设成功
-                status = "success"
-            
+            response = await self._send_request_and_wait("tap_by_index", {"index": index})
+            status = response.get("status") or "success"
             if status == "success":
                 message = response.get("message", f"Tapped element at index {index}")
                 
@@ -568,12 +574,12 @@ class WebSocketTools(Tools):
             else:
                 error_msg = response.get("error", "Unknown error")
                 return f"Error: {error_msg}"
-                
         except TimeoutError as e:
-            return f"Error: Timeout - {str(e)}"
+            LoggingUtils.log_error("WebSocketTools", "Timeout tapping element at index {index}: {error}", index=index, error=e)
+            return f"Error: Timeout tapping element at index {index}: {str(e)}"
         except Exception as e:
-            LoggingUtils.log_error("WebSocketTools", "Error tapping element: {error}", error=e)
-            return f"Error: {str(e)}"
+            LoggingUtils.log_error("WebSocketTools", "Error tapping element at index {index}: {error}", index=index, error=e)
+            return f"Error: Failed to tap element at index {index}: {str(e)}"
     
     def _find_element_by_index(self, index: int) -> Optional[Dict[str, Any]]:
         """递归查找指定索引的元素"""
@@ -589,7 +595,7 @@ class WebSocketTools(Tools):
         return find_recursive(self.clickable_elements_cache)
     
     @Tools.ui_action
-    def swipe(
+    async def swipe(
         self, start_x: int, start_y: int, end_x: int, end_y: int, duration_ms: int = 300
     ) -> bool:
         """
@@ -606,18 +612,16 @@ class WebSocketTools(Tools):
             操作是否成功
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "Swiping from ({start_x}, {start_y}) to ({end_x}, {end_y})", 
+            LoggingUtils.log_debug("WebSocketTools", "[async] Swiping from ({start_x}, {start_y}) to ({end_x}, {end_y})", 
                                  start_x=start_x, start_y=start_y, end_x=end_x, end_y=end_y)
             
-            response = self._sync_wait(
-                self._send_request_and_wait("swipe", {
-                    "start_x": start_x,
-                    "start_y": start_y,
-                    "end_x": end_x,
-                    "end_y": end_y,
-                    "duration_ms": duration_ms
-                })
-            )
+            response = await self._send_request_and_wait("swipe", {
+                "start_x": start_x,
+                "start_y": start_y,
+                "end_x": end_x,
+                "end_y": end_y,
+                "duration_ms": duration_ms
+            })
             
             if response.get("status") == "success":
                 if self._ctx:
@@ -699,7 +703,7 @@ class WebSocketTools(Tools):
             return False
     
     @Tools.ui_action
-    def input_text(self, text: str) -> str:
+    async def input_text(self, text: str) -> str:
         """
         输入文本
         
@@ -710,17 +714,15 @@ class WebSocketTools(Tools):
             操作结果消息
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "Inputting text: {text}", text=text[:50])
+            LoggingUtils.log_debug("WebSocketTools", "[async] Inputting text: {text}", text=text[:50])
             
             # 编码文本（Base64）
             encoded_text = base64.b64encode(text.encode()).decode()
             
-            response = self._sync_wait(
-                self._send_request_and_wait("input_text", {
-                    "text": text,
-                    "base64_text": encoded_text
-                })
-            )
+            response = await self._send_request_and_wait("input_text", {
+                "text": text,
+                "base64_text": encoded_text
+            })
             
             if response.get("status") == "success":
                 message = response.get("message", f"Text input completed: {text[:50]}")
@@ -745,7 +747,7 @@ class WebSocketTools(Tools):
             return f"Error: {str(e)}"
     
     @Tools.ui_action
-    def back(self) -> str:
+    async def back(self) -> str:
         """
         按返回键
         
@@ -753,11 +755,9 @@ class WebSocketTools(Tools):
             操作结果消息
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "Pressing back button")
+            LoggingUtils.log_debug("WebSocketTools", "[async] Pressing back button")
             
-            response = self._sync_wait(
-                self._send_request_and_wait("back", {})
-            )
+            response = await self._send_request_and_wait("back", {})
             
             if response.get("status") == "success":
                 message = response.get("message", "Back button pressed")
@@ -782,22 +782,20 @@ class WebSocketTools(Tools):
             return f"Error: {str(e)}"
     
     @Tools.ui_action
-    def press_key(self, keycode: int) -> str:
+    async def press_key(self, keycode: int) -> str:
         """
         按键操作
         
         Args:
-            keycode: 按键码
+            keycode: 按键代码
             
         Returns:
             操作结果消息
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "Pressing key: {keycode}", keycode=keycode)
+            LoggingUtils.log_debug("WebSocketTools", "[async] Pressing key: {keycode}", keycode=keycode)
             
-            response = self._sync_wait(
-                self._send_request_and_wait("press_key", {"keycode": keycode})
-            )
+            response = await self._send_request_and_wait("press_key", {"keycode": keycode})
             
             if response.get("status") == "success":
                 message = response.get("message", f"Key {keycode} pressed")
@@ -822,7 +820,7 @@ class WebSocketTools(Tools):
             return f"Error: {str(e)}"
     
     @Tools.ui_action
-    def start_app(self, package: str, activity: str = "") -> str:
+    async def start_app(self, package: str, activity: str = "") -> str:
         """
         启动应用
         
@@ -834,15 +832,13 @@ class WebSocketTools(Tools):
             操作结果消息
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "Starting app: {package} with activity: {activity}", 
-                                 package=package, activity=activity)
+            LoggingUtils.log_debug("WebSocketTools", "[async] Starting app: {package}", package=package)
             
-            response = self._sync_wait(
-                self._send_request_and_wait("start_app", {
-                    "package": package,
-                    "activity": activity
-                })
-            )
+            params = {"package": package}
+            if activity:
+                params["activity"] = activity
+                
+            response = await self._send_request_and_wait("start_app", params)
             
             if response.get("status") == "success":
                 message = response.get("message", f"App started: {package}")
@@ -867,24 +863,20 @@ class WebSocketTools(Tools):
             LoggingUtils.log_error("WebSocketTools", "Error starting app: {error}", error=e)
             return f"Error: {str(e)}"
     
-    def take_screenshot(self, hide_overlay: bool = True) -> Tuple[str, bytes]:
+    async def take_screenshot(self, hide_overlay: bool = True) -> Tuple[str, bytes]:
         """
         截屏
         
         Args:
-            hide_overlay: 是否隐藏覆盖层（默认True）
+            hide_overlay: 是否隐藏覆盖层
             
         Returns:
-            元组 (format, bytes)
+            (image_format, image_data) 元组
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "Taking screenshot")
+            LoggingUtils.log_debug("WebSocketTools", "[async] Taking screenshot")
             
-            response = self._sync_wait(
-                self._send_request_and_wait("take_screenshot", {
-                    "hide_overlay": hide_overlay
-                })
-            )
+            response = await self._send_request_and_wait("take_screenshot", {"hide_overlay": hide_overlay})
             
             if response.get("status") == "success":
                 # 获取截图数据（Base64编码）
@@ -918,7 +910,7 @@ class WebSocketTools(Tools):
             LoggingUtils.log_error("WebSocketTools", "Error taking screenshot: {error}", error=e)
             raise
     
-    def list_packages(self, include_system_apps: bool = False) -> List[str]:
+    async def list_packages(self, include_system_apps: bool = False) -> List[str]:
         """
         列出应用包名
         
@@ -926,17 +918,12 @@ class WebSocketTools(Tools):
             include_system_apps: 是否包含系统应用
             
         Returns:
-            包名列表
+            应用包名列表
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "Listing packages (include_system: {include_system})", 
-                                 include_system=include_system_apps)
+            LoggingUtils.log_debug("WebSocketTools", "[async] Listing packages")
             
-            response = self._sync_wait(
-                self._send_request_and_wait("list_packages", {
-                    "include_system_apps": include_system_apps
-                })
-            )
+            response = await self._send_request_and_wait("list_packages", {"include_system_apps": include_system_apps})
             
             if response.get("status") == "success":
                 packages = response.get("packages", [])
@@ -954,7 +941,7 @@ class WebSocketTools(Tools):
             LoggingUtils.log_error("WebSocketTools", "Error listing packages: {error}", error=e)
             return []
     
-    def remember(self, information: str) -> str:
+    async def remember(self, information: str) -> str:
         """
         记住信息
         
@@ -962,22 +949,22 @@ class WebSocketTools(Tools):
             information: 要记住的信息
             
         Returns:
-            确认消息
+            操作结果消息
         """
         self.memory.append(information)
         LoggingUtils.log_debug("WebSocketTools", "Remembered information: {info}", info=information[:50])
         return f"Remembered: {information[:50]}"
     
-    def get_memory(self) -> List[str]:
+    async def get_memory(self) -> List[str]:
         """
         获取记忆
         
         Returns:
-            记忆列表
+            记忆信息列表
         """
         return self.memory.copy()
     
-    def complete(self, success: bool, reason: str = "") -> None:
+    async def complete(self, success: bool, reason: str = "") -> None:
         """
         完成任务
         

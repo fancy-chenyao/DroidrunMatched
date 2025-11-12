@@ -83,9 +83,9 @@ class WebSocketClient {
                 try {
                     val ext = response.header("Sec-WebSocket-Extensions")
                     if (!ext.isNullOrEmpty()) {
-                        Log.d(TAG, "协商的WS扩展: $ext")
+                        Log.d(TAG, "⚠️ 协商的WS扩展: $ext (压缩可能影响性能)")
                     } else {
-                        Log.d(TAG, "未协商到WS扩展 (permessage-deflate可能未启用)")
+                        Log.d(TAG, "✅ 未启用压缩扩展 (permessage-deflate禁用，传输更快)")
                     }
                 } catch (_: Exception) { }
                 this@WebSocketClient.webSocket = webSocket

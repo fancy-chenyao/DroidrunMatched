@@ -185,6 +185,10 @@ object CommandHandler {
         activity: Activity?,
         callback: (JSONObject) -> Unit
     ) {
+        // 记录开始处理时间
+        val startTime = System.currentTimeMillis()
+        Log.d(TAG, "⏱️ [get_state] 开始处理 | request_id=$requestId")
+        
         if (activity == null) {
             callback(createErrorResponse("No active activity"))
             return
@@ -220,7 +224,7 @@ object CommandHandler {
                                 Handler(Looper.getMainLooper()).post {
                                     takeScreenshotAsync(activity) { screenshot ->
                                         if (screenshot != null && !screenshot.isRecycled) {
-                                            screenshotBase64 = StateConverter.bitmapToBase64(screenshot, 80)
+                                            screenshotBase64 = StateConverter.bitmapToBase64(screenshot, 30)
                                             Log.d(TAG, "截图转换完成，Base64 长度: ${screenshotBase64?.length ?: 0}")
                                             screenshot.recycle()
                                         }
@@ -243,6 +247,12 @@ object CommandHandler {
                             Handler(Looper.getMainLooper()).post {
                                 updateCache(elementTree, stateResponse, currentScreenHash)
                                 callback(stateResponse)
+                                
+                                // 计算总耗时和数据大小
+                                val totalTime = System.currentTimeMillis() - startTime
+                                val responseSize = stateResponse.toString().length
+                                val screenshotSize = screenshotBase64?.length ?: 0
+                                Log.d(TAG, "⏱️ [get_state] 完成 | 总耗时=${totalTime}ms | 响应大小=${responseSize}B | 截图大小=${screenshotSize}B | request_id=$requestId")
                                 Log.d(TAG, "✓ 响应已发送（内联 a11y_tree + screenshot_base64）")
                             }
 

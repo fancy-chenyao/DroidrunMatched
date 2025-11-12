@@ -37,8 +37,7 @@ class TaskExecutor:
         self,
         goal: str,
         request_id: str,
-        options: Optional[Dict[str, Any]] = None,
-        status_callback: Optional[callable] = None
+        options: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         执行任务
@@ -47,7 +46,6 @@ class TaskExecutor:
             goal: 任务目标（自然语言描述）
             request_id: 请求ID
             options: 任务选项（可选）
-            status_callback: 状态回调函数，用于发送状态更新
             
         Returns:
             任务执行结果
@@ -55,10 +53,6 @@ class TaskExecutor:
         try:
             LoggingUtils.log_info("TaskExecutor", "Starting task execution for device {device_id}, goal: {goal}", 
                                 device_id=self.device_id, goal=goal[:100])
-            
-            # 发送状态更新：开始执行
-            if status_callback:
-                await status_callback("running", 0.0, "初始化中...")
             
             # 1. 获取服务器实例和工具（延迟导入以避免循环导入）
             from droidrun.server import get_global_server
@@ -86,11 +80,6 @@ class TaskExecutor:
             
             # 3. 加载 LLM（使用与 main.py 相同的方式）
             LoggingUtils.log_info("TaskExecutor", "Starting LLM loading...")
-            if status_callback:
-                try:
-                    await status_callback("running", 0.1, "加载 LLM...")
-                except Exception as e:
-                    LoggingUtils.log_error("TaskExecutor", "Failed to send status callback: {error}", error=e)
             
             api_config = self.config_manager.get_api_config()
             LoggingUtils.log_info("TaskExecutor", "API config retrieved: model={model}, base_url={base_url}", 
@@ -132,12 +121,6 @@ class TaskExecutor:
             LoggingUtils.log_info("TaskExecutor", "Creating DroidAgent with options: max_steps={max_steps}, vision={vision}, reasoning={reasoning}, reflection={reflection}", 
                                 max_steps=max_steps, vision=vision, reasoning=reasoning, reflection=reflection)
             
-            if status_callback:
-                try:
-                    await status_callback("running", 0.2, "创建 Agent...")
-                except Exception as e:
-                    LoggingUtils.log_error("TaskExecutor", "Failed to send status callback: {error}", error=e)
-            
             try:
                 agent = DroidAgent(
                     goal=goal,
@@ -163,17 +146,22 @@ class TaskExecutor:
             
             LoggingUtils.log_info("TaskExecutor", "DroidAgent created, starting execution...")
             
-            # 6. 执行任务（在后台任务中执行，以便可以发送状态更新）
-            if status_callback:
-                try:
-                    await status_callback("running", 0.3, "执行任务中...")
-                except Exception as e:
-                    LoggingUtils.log_error("TaskExecutor", "Failed to send status callback: {error}", error=e)
-            
-            # 执行任务
+            # 6. 执行任务
             LoggingUtils.log_info("TaskExecutor", "Calling agent.run()...")
             try:
+                # 启动任务级事件循环看门狗（仅日志用途）
+                watchdog_task = None
+                try:
+                    watchdog_task = asyncio.create_task(self._task_watchdog(tag="agent.run"))
+                except Exception:
+                    watchdog_task = None
                 result = await agent.run()
+                # 结束看门狗
+                if watchdog_task:
+                    try:
+                        watchdog_task.cancel()
+                    except Exception:
+                        pass
                 LoggingUtils.log_info("TaskExecutor", "agent.run() completed, result keys: {keys}", keys=list(result.keys()) if result else "None")
             except Exception as e:
                 LoggingUtils.log_error("TaskExecutor", "Error during agent.run(): {error}", error=e)
@@ -221,6 +209,23 @@ class TaskExecutor:
                 pass
             
             raise
+
+    async def _task_watchdog(self, tag: str = "task"):
+        """任务级事件循环看门狗：周期性检测 drift，并带上阶段标签，帮助定位阻塞发生时的业务阶段（仅日志用途）。"""
+        try:
+            interval = 0.2
+            loop = asyncio.get_running_loop()
+            last = loop.time()
+            while True:
+                await asyncio.sleep(interval)
+                now = loop.time()
+                drift = (now - last) - interval
+                last = now
+                drift_ms = int(drift * 1000)
+                if drift_ms > 1000:
+                    LoggingUtils.log_info("TaskExecutor", "EventLoop stall (task) | tag={tag} | drift_ms={d}", tag=tag, d=drift_ms)
+        except asyncio.CancelledError:
+            return
     
     def cancel_task(self):
         """取消当前任务"""

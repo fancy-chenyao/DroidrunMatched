@@ -77,7 +77,7 @@ class ServerConfig:
     server_host: str = "0.0.0.0"
     websocket_path: str = "/ws"
     device_id_header: str = "X-Device-ID"
-    timeout: int = 30
+    timeout: int = 5
     heartbeat_interval: int = 30
     max_connections: int = 100
 

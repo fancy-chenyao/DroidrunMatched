@@ -381,6 +381,16 @@ class DroidAgent(Workflow):
 
             async for nested_ev in handler.stream_events():
                 self.handle_stream_event(nested_ev, ctx)
+                # 微让步：planner 事件流处理中适当让步，防止事件循环饥饿
+                try:
+                    await asyncio.sleep(0)
+                except Exception:
+                    pass
+                # 微让步：每处理一个事件后让出一次事件循环，避免长时间占用
+                try:
+                    await asyncio.sleep(0)
+                except Exception:
+                    pass
 
             result = await handler
 

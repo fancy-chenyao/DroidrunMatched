@@ -265,6 +265,15 @@ class WebSocketServer:
             
             # 消息循环
             async for message in websocket:
+                # 立即记录接收时间戳
+                import time
+                raw_receive_timestamp = time.time()
+                raw_receive_time_str = time.strftime('%H:%M:%S', time.localtime(raw_receive_timestamp))
+                raw_receive_ms = int((raw_receive_timestamp * 1000) % 1000)
+                
+                LoggingUtils.log_info("WebSocketServer", "🔄 [RAW] WebSocket收到原始消息 | device_id={did} | timestamp={ts}.{ms:03d}", 
+                                     did=device_id, ts=raw_receive_time_str, ms=raw_receive_ms)
+                
                 try:
                     # 记录接收到的消息（用于调试）
                     if isinstance(message, bytes):
@@ -429,6 +438,14 @@ class WebSocketServer:
             device_id: 设备ID
             message: 消息内容（字符串或字节）
         """
+        import time
+        receive_timestamp = time.time()
+        receive_time_str = time.strftime('%H:%M:%S', time.localtime(receive_timestamp))
+        receive_ms = int((receive_timestamp * 1000) % 1000)
+        
+        LoggingUtils.log_info("WebSocketServer", "🔄 [_handle_message] 收到消息 | device_id={did} | timestamp={ts}.{ms:03d}", 
+                             did=device_id, ts=receive_time_str, ms=receive_ms)
+        
         try:
             # 获取设备会话协议
             session = await self.session_manager.get_session(device_id)
@@ -574,21 +591,6 @@ class WebSocketServer:
             
             executor = self._device_task_executors[device_id]
             
-            # 定义状态回调函数
-            async def status_callback(status: str, progress: float, message_text: str):
-                """发送任务状态更新"""
-                try:
-                    status_msg = MessageProtocol.create_task_status(
-                        request_id=request_id,
-                        status=status,
-                        progress=progress,
-                        message=message_text,
-                        device_id=device_id
-                    )
-                    await self.session_manager.send_to_device(device_id, status_msg)
-                except Exception as e:
-                    LoggingUtils.log_error("WebSocketServer", "Failed to send task status update: {error}", error=e)
-            
             # 在后台任务中执行（避免阻塞消息处理）
             async def execute_in_background():
                 """在后台执行任务"""
@@ -596,20 +598,13 @@ class WebSocketServer:
                     LoggingUtils.log_info("WebSocketServer", "Background task started for device {device_id}, request_id={request_id}", 
                                         device_id=device_id, request_id=request_id)
                     
-                    # 发送开始状态
-                    try:
-                        await status_callback("running", 0.0, "任务开始执行...")
-                    except Exception as e:
-                        LoggingUtils.log_error("WebSocketServer", "Failed to send initial status: {error}", error=e)
-                    
                     LoggingUtils.log_info("WebSocketServer", "Calling executor.execute_task()...")
                     
                     # 执行任务
                     result = await executor.execute_task(
                         goal=goal,
                         request_id=request_id,
-                        options=options,
-                        status_callback=status_callback
+                        options=options
                     )
                     
                     LoggingUtils.log_info("WebSocketServer", "Task execution completed, result: {result}", result=result)
@@ -691,14 +686,22 @@ class WebSocketServer:
             device_id: 设备ID
             message: 命令响应消息
         """
+        request_id = message.get("request_id", "unknown")
+        status = message.get("status", "unknown")
+        LoggingUtils.log_info("WebSocketServer", "🔄 [_handle_command_response_async] 开始处理 | device_id={did} | request_id={rid} | status={status}", 
+                             did=device_id, rid=request_id, status=status)
+        
         # 在转发前，若 data 中包含 screenshot_ref/a11y_ref，默认不回填，仅传引用
         try:
             # 忽略中间态回包（accepted），仅在最终 success/error 时完成请求
-            status = message.get("status")
             if status == "accepted":
-                LoggingUtils.log_debug("WebSocketServer", "Received interim 'accepted' for device {device_id}, request_id={rid}", 
-                                       device_id=device_id, rid=message.get("request_id"))
+                LoggingUtils.log_info("WebSocketServer", "🔄 [_handle_command_response_async] 忽略 accepted 状态 | device_id={did} | request_id={rid}", 
+                                     did=device_id, rid=request_id)
                 return
+            
+            LoggingUtils.log_info("WebSocketServer", "🔄 [_handle_command_response_async] 处理最终状态 | device_id={did} | request_id={rid} | status={status}", 
+                                 did=device_id, rid=request_id, status=status)
+            
             data = message.get("data") or {}
             # 守护开关：默认不进行任何回填
             resolve_inline_refs = False
@@ -745,15 +748,27 @@ class WebSocketServer:
             LoggingUtils.log_error("WebSocketServer", "Error resolving screenshot_ref: {error}", error=e)
         
         # 转发响应到对应的 WebSocketTools 实例
+        LoggingUtils.log_info("WebSocketServer", "🔄 [_handle_command_response_async] 准备转发到 WebSocketTools | device_id={did} | request_id={rid}", 
+                             did=device_id, rid=request_id)
+        
         if device_id in self._device_tools_map:
             tools_instance = self._device_tools_map[device_id]
+            LoggingUtils.log_info("WebSocketServer", "🔄 [_handle_command_response_async] 找到 WebSocketTools 实例 | device_id={did} | request_id={rid}", 
+                                 did=device_id, rid=request_id)
+            
             if hasattr(tools_instance, '_handle_response'):
+                LoggingUtils.log_info("WebSocketServer", "🔄 [_handle_command_response_async] 调用 _handle_response | device_id={did} | request_id={rid}", 
+                                     did=device_id, rid=request_id)
                 # 调用 _handle_response（它会处理异步调度）
                 tools_instance._handle_response(message)
+                LoggingUtils.log_info("WebSocketServer", "🔄 [_handle_command_response_async] _handle_response 调用完成 | device_id={did} | request_id={rid}", 
+                                     did=device_id, rid=request_id)
             else:
                 LoggingUtils.log_warning("WebSocketServer", "WebSocketTools instance for device {device_id} has no _handle_response method", 
                                        device_id=device_id)
         else:
+            LoggingUtils.log_warning("WebSocketServer", "🔄 [_handle_command_response_async] 未找到 WebSocketTools 实例 | device_id={did} | request_id={rid}", 
+                                   did=device_id, rid=request_id)
             LoggingUtils.log_debug("WebSocketServer", "No WebSocketTools instance registered for device {device_id}", 
                                  device_id=device_id)
     
@@ -856,6 +871,7 @@ class WebSocketServer:
             
             LoggingUtils.log_info("WebSocketServer", "Starting WebSocket server on {host}:{port}{path}", 
                                 host=self.host, port=self.port, path=self.websocket_path)
+            LoggingUtils.log_info("WebSocketServer", "🚀 WebSocket compression disabled for faster transmission")
             
             # 创建WebSocket服务器
             # 注意：新版本websockets的回调函数只接收websocket参数，path需要从websocket对象获取
@@ -864,7 +880,11 @@ class WebSocketServer:
                 self.host,
                 self.port,
                 max_size=int(self.config_manager.get("server.websocket_max_message_bytes", 20 * 1024 * 1024)),
-                compression="deflate"
+                compression=None,  # 禁用压缩，大幅提升传输速度
+                ping_interval=None,  # 禁用自动ping，减少网络开销
+                ping_timeout=None,   # 禁用ping超时
+                close_timeout=1,     # 快速关闭连接
+                max_queue=1,         # 最小队列大小，立即处理消息
             )
             
             self.is_running = True
