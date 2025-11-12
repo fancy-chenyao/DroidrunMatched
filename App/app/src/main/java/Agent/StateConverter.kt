@@ -40,7 +40,7 @@ object StateConverter {
         elementObj.put("index", element.index)
         elementObj.put("resourceId", element.resourceId)
         elementObj.put("className", element.className)
-        elementObj.put("text", truncateText(element.text))
+        elementObj.put("text", element.text)
         elementObj.put("contentDesc", truncateText(element.contentDesc))
         
         // 布尔属性

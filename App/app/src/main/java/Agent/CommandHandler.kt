@@ -14,11 +14,13 @@ import android.view.PixelCopy
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import Agent.ActivityTracker
 import controller.ElementController
 import controller.GenericElement
 import controller.NativeController
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
+import utlis.PageChangeVerifier
 
 /**
  * 命令处理器
@@ -241,6 +243,9 @@ object CommandHandler {
                         try {
                             // 生成裁剪后的a11y_tree
                             val pruned = StateConverter.convertElementTreeToA11yTreePruned(elementTree)
+                            Log.d(TAG, "裁剪后的a11y_tree: $pruned")
+                            val xml=elementTree.toXmlString()
+                            Log.d(TAG, "对应的xml: $xml")
                             val jsonStr = pruned.toString()
                             val a11yUpload = HttpUploader.uploadJson(activity, jsonStr, "a11y_${System.currentTimeMillis()}", "a11y.json")
                             if (a11yUpload != null && a11yUpload.optString("status") == "success") {
@@ -467,13 +472,29 @@ object CommandHandler {
         // 在主线程执行点击
         Handler(Looper.getMainLooper()).post {
             try {
+                // 动作前状态用于页面变化验证
+                val preActivity = activity
+                val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
                 // 使用NativeController执行坐标点击（dp单位）
                 NativeController.clickByCoordinateDp(activity, x.toFloat(), y.toFloat()) { success ->
                     if (success) {
-                        // UI操作后清理缓存，因为页面可能已变化
-                        clearCache()
-                        Log.d(TAG, "tap命令执行成功: ($x, $y)")
-                        callback(createSuccessResponse())
+                        // 成功后进行页面变化验证
+                        PageChangeVerifier.verifyActionWithPageChange(
+                            handler = Handler(Looper.getMainLooper()),
+                            getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                            preActivity = preActivity,
+                            preViewTreeHash = preHash
+                        ) { changed, changeType ->
+                            if (changed) {
+                                clearCache()
+                                Log.d(TAG, "tap命令执行成功且检测到页面变化: ($x, $y), 类型=$changeType")
+                                val data = JSONObject().apply { put("page_change_type", changeType) }
+                                callback(createSuccessResponse(data))
+                            } else {
+                                Log.w(TAG, "tap命令执行后未检测到页面变化")
+                                callback(createErrorResponse("Tap succeeded but page unchanged"))
+                            }
+                        }
                     } else {
                         Log.w(TAG, "tap命令执行失败: NativeController返回false")
                         callback(createErrorResponse("Tap action failed"))
@@ -527,13 +548,29 @@ object CommandHandler {
         // 在主线程执行点击
         Handler(Looper.getMainLooper()).post {
             try {
+                // 动作前状态用于页面变化验证
+                val preActivity = activity
+                val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
                 // 使用NativeController执行坐标点击（dp单位）
                 NativeController.clickByCoordinateDp(activity, centerX, centerY) { success ->
                     if (success) {
-                        // UI操作后清理缓存，因为页面可能已变化
-                        clearCache()
-                        Log.d(TAG, "tap_by_index命令执行成功: index=$index")
-                        callback(createSuccessResponse())
+                        // 成功后进行页面变化验证
+                        PageChangeVerifier.verifyActionWithPageChange(
+                            handler = Handler(Looper.getMainLooper()),
+                            getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                            preActivity = preActivity,
+                            preViewTreeHash = preHash
+                        ) { changed, changeType ->
+                            if (changed) {
+                                clearCache()
+                                Log.d(TAG, "tap_by_index命令执行成功且检测到页面变化: index=$index, 类型=$changeType")
+                                val data = JSONObject().apply { put("page_change_type", changeType) }
+                                callback(createSuccessResponse(data))
+                            } else {
+                                Log.w(TAG, "tap_by_index命令执行后未检测到页面变化")
+                                callback(createErrorResponse("Tap by index succeeded but page unchanged"))
+                            }
+                        }
                     } else {
                         Log.w(TAG, "tap_by_index命令执行失败: NativeController返回false")
                         callback(createErrorResponse("Tap by index action failed"))
@@ -604,6 +641,9 @@ object CommandHandler {
         
         Handler(Looper.getMainLooper()).post {
             try {
+                // 动作前状态用于页面变化验证
+                val preActivity = activity
+                val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
                 // 使用NativeController的scrollByTouchDp方法实现滑动
                 NativeController.scrollByTouchDp(
                     activity = activity,
@@ -614,10 +654,23 @@ object CommandHandler {
                     duration = duration.toLong()
                 ) { success ->
                     if (success) {
-                        // UI操作后清理缓存，因为页面可能已变化
-                        clearCache()
-                        Log.d(TAG, "swipe命令执行成功")
-                        callback(createSuccessResponse())
+                        // 成功后进行页面变化验证
+                        PageChangeVerifier.verifyActionWithPageChange(
+                            handler = Handler(Looper.getMainLooper()),
+                            getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                            preActivity = preActivity,
+                            preViewTreeHash = preHash
+                        ) { changed, changeType ->
+                            if (changed) {
+                                clearCache()
+                                Log.d(TAG, "swipe命令执行成功且检测到页面变化: 类型=$changeType")
+                                val data = JSONObject().apply { put("page_change_type", changeType) }
+                                callback(createSuccessResponse(data))
+                            } else {
+                                Log.w(TAG, "swipe命令执行后未检测到页面变化")
+                                callback(createErrorResponse("Swipe succeeded but page unchanged"))
+                            }
+                        }
                     } else {
                         Log.w(TAG, "swipe命令执行失败: NativeController返回false")
                         callback(createErrorResponse("Swipe action failed"))
@@ -657,6 +710,9 @@ object CommandHandler {
         
         Handler(Looper.getMainLooper()).post {
             try {
+                // 动作前状态用于页面变化验证
+                val preActivity = activity
+                val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
                 // 检查是否提供了坐标参数
                 if (params.has("x") && params.has("y")) {
                     // 使用坐标输入（点击坐标后输入文本）
@@ -672,10 +728,23 @@ object CommandHandler {
                         clearBeforeInput = true
                     ) { success ->
                         if (success) {
-                            // UI操作后清理缓存，因为页面可能已变化
-                            clearCache()
-                            Log.d(TAG, "input_text命令执行成功")
-                            callback(createSuccessResponse())
+                            // 成功后进行页面变化验证
+                            PageChangeVerifier.verifyActionWithPageChange(
+                                handler = Handler(Looper.getMainLooper()),
+                                getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                                preActivity = preActivity,
+                                preViewTreeHash = preHash
+                            ) { changed, changeType ->
+                                if (changed) {
+                                    clearCache()
+                                    Log.d(TAG, "input_text命令执行成功且检测到页面变化: 类型=$changeType")
+                                    val data = JSONObject().apply { put("page_change_type", changeType) }
+                                    callback(createSuccessResponse(data))
+                                } else {
+                                    Log.w(TAG, "input_text命令执行后未检测到页面变化")
+                                    callback(createErrorResponse("Input text succeeded but page unchanged"))
+                                }
+                            }
                         } else {
                             Log.w(TAG, "input_text命令执行失败: NativeController返回false")
                             callback(createErrorResponse("Input text action failed"))
@@ -692,8 +761,22 @@ object CommandHandler {
                         focusedView.setText(text)
                         // 移动光标到末尾
                         focusedView.setSelection(text.length)
-                        clearCache()
-                        callback(createSuccessResponse())
+                        // 成功后进行页面变化验证
+                        PageChangeVerifier.verifyActionWithPageChange(
+                            handler = Handler(Looper.getMainLooper()),
+                            getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                            preActivity = preActivity,
+                            preViewTreeHash = preHash
+                        ) { changed, changeType ->
+                            if (changed) {
+                                clearCache()
+                                val data = JSONObject().apply { put("page_change_type", changeType) }
+                                Log.d(TAG, "输入文本导致页面变化，类型: $changeType")
+                                callback(createSuccessResponse(data))
+                            } else {
+                                callback(createErrorResponse("输入文本操作成功但页面未变化"))
+                            }
+                        }
                     } else {
                         // 尝试找到第一个EditText并输入
                         val editText = findFirstEditText(rootView)
@@ -709,8 +792,21 @@ object CommandHandler {
                             Handler(Looper.getMainLooper()).postDelayed({
                                 editText.setText(text)
                                 editText.setSelection(text.length)
-                                clearCache()
-                                callback(createSuccessResponse())
+                                // 成功后进行页面变化验证
+                                PageChangeVerifier.verifyActionWithPageChange(
+                                    handler = Handler(Looper.getMainLooper()),
+                                    getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                                    preActivity = preActivity,
+                                    preViewTreeHash = preHash
+                                ) { changed, changeType ->
+                                    if (changed) {
+                                        clearCache()
+                                        val data = JSONObject().apply { put("page_change_type", changeType) }
+                                        callback(createSuccessResponse(data))
+                                    } else {
+                                        callback(createErrorResponse("Input text succeeded but page unchanged"))
+                                    }
+                                }
                             }, 300)
                         } else {
                             Log.w(TAG, "input_text命令执行失败: 未找到输入框")
@@ -763,12 +859,28 @@ object CommandHandler {
         
         Handler(Looper.getMainLooper()).post {
             try {
+                // 动作前状态用于页面变化验证
+                val preActivity = activity
+                val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
                 NativeController.goBack(activity) { success ->
                     if (success) {
-                        // UI操作后清理缓存，因为页面可能已变化
-                        clearCache()
-                        Log.d(TAG, "back命令执行成功")
-                        callback(createSuccessResponse())
+                        // 成功后进行页面变化验证
+                        PageChangeVerifier.verifyActionWithPageChange(
+                            handler = Handler(Looper.getMainLooper()),
+                            getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                            preActivity = preActivity,
+                            preViewTreeHash = preHash
+                        ) { changed, changeType ->
+                            if (changed) {
+                                clearCache()
+                                Log.d(TAG, "back命令执行成功且检测到页面变化: 类型=$changeType")
+                                val data = JSONObject().apply { put("page_change_type", changeType) }
+                                callback(createSuccessResponse(data))
+                            } else {
+                                Log.w(TAG, "back命令执行后未检测到页面变化")
+                                callback(createErrorResponse("Back succeeded but page unchanged"))
+                            }
+                        }
                     } else {
                         Log.w(TAG, "back命令执行失败: NativeController返回false")
                         callback(createErrorResponse("Back action failed"))
@@ -820,10 +932,26 @@ object CommandHandler {
                 val upResult = rootView.dispatchKeyEvent(upEvent)
                 
                 if (downResult && upResult) {
-                    // UI操作后清理缓存，因为页面可能已变化
-                    clearCache()
-                    Log.d(TAG, "press_key命令执行成功: keycode=$keycode")
-                    callback(createSuccessResponse())
+                    // 动作前状态用于页面变化验证（按键前已计算）
+                    val preActivity = activity
+                    val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
+                    // 成功后进行页面变化验证
+                    PageChangeVerifier.verifyActionWithPageChange(
+                        handler = Handler(Looper.getMainLooper()),
+                        getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                        preActivity = preActivity,
+                        preViewTreeHash = preHash
+                    ) { changed, changeType ->
+                        if (changed) {
+                            clearCache()
+                            Log.d(TAG, "press_key命令执行成功且检测到页面变化: keycode=$keycode, 类型=$changeType")
+                            val data = JSONObject().apply { put("page_change_type", changeType) }
+                            callback(createSuccessResponse(data))
+                        } else {
+                            Log.w(TAG, "press_key命令执行后未检测到页面变化")
+                            callback(createErrorResponse("Press key succeeded but page unchanged"))
+                        }
+                    }
                 } else {
                     Log.w(TAG, "press_key命令执行失败: downResult=$downResult, upResult=$upResult")
                     callback(createErrorResponse("Press key action failed"))
