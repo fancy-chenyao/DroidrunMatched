@@ -360,6 +360,26 @@ object CommandHandler {
     }
     
     /**
+     * 智能缓存清理 - 针对input_text操作的特殊处理
+     * 只有在真正需要时才清理稳定索引映射
+     */
+    private fun smartClearCache(operationType: String) {
+        when (operationType) {
+            "input_text" -> {
+                // input_text操作通常只改变文本内容，不改变元素结构
+                // 保留稳定索引映射，只清理截图缓存
+                lastScreenHash = null
+                recycleOldScreenshot()
+                Log.d(TAG, "input_text操作：保留元素树缓存，仅清理截图缓存")
+            }
+            else -> {
+                // 其他操作使用完整的缓存清理
+                clearCache()
+            }
+        }
+    }
+    
+    /**
      * 安全地回收旧的截图，防止内存泄漏
      */
     private fun recycleOldScreenshot() {
@@ -687,7 +707,7 @@ object CommandHandler {
                                 preViewTreeHash = preHash
                             ) { changed, changeType ->
                                 if (changed) {
-                                    clearCache()
+                                    smartClearCache("input_text")
                                     Log.d(TAG, "input_text命令执行成功且检测到页面变化: 类型=$changeType")
                                     val data = JSONObject().apply { put("page_change_type", changeType) }
                                     callback(createSuccessResponse(data))
@@ -720,7 +740,7 @@ object CommandHandler {
                             preViewTreeHash = preHash
                         ) { changed, changeType ->
                             if (changed) {
-                                clearCache()
+                                smartClearCache("input_text")
                                 val data = JSONObject().apply { put("page_change_type", changeType) }
                                 Log.d(TAG, "输入文本导致页面变化，类型: $changeType")
                                 callback(createSuccessResponse(data))
@@ -751,7 +771,7 @@ object CommandHandler {
                                     preViewTreeHash = preHash
                                 ) { changed, changeType ->
                                     if (changed) {
-                                        clearCache()
+                                        smartClearCache("input_text")
                                         val data = JSONObject().apply { put("page_change_type", changeType) }
                                         callback(createSuccessResponse(data))
                                     } else {
