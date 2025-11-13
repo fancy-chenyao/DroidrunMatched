@@ -87,6 +87,36 @@ object StateConverter {
     }
     
     /**
+     * 保存JSON数组到本地文件（调试用）
+     */
+    private fun saveJsonArray(jsonArray: JSONArray, context: Context?) {
+        if (!SAVE_DEBUG_FILES) return  // 开关控制
+        
+        try {
+            if (context == null) return
+            
+            // 使用指定的外部存储路径
+            val outputDir = File("/storage/0000-0000/Android/data/com.example.emplab/files/xml")
+            if (!outputDir.exists()) {
+                outputDir.mkdirs()
+            }
+            
+            // 生成文件名
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val jsonFile = File(outputDir, "a11y_tree_${timestamp}.json")
+            
+            // 保存JSON格式
+            val jsonContent = jsonArray.toString(2) // 缩进2个空格，便于阅读
+            jsonFile.writeText(jsonContent, Charsets.UTF_8)
+            
+            Log.d(TAG, "JSON数组已保存: ${jsonFile.absolutePath}")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "保存JSON数组失败", e)
+        }
+    }
+    
+    /**
      * 将GenericElement转换为XML字符串
      */
     private fun convertGenericElementToXmlString(element: GenericElement): String {
@@ -97,18 +127,76 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
     }
     
     /**
-     * 将GenericElement树转换为a11y_tree格式（无限制版本）
+     * 计算元素的稳定哈希值，用于生成稳定索引
+     */
+    private fun calculateStableHash(element: GenericElement): String {
+        // 使用稳定属性组合生成哈希
+        val stableProps = listOf(
+            element.resourceId,
+            element.className,
+            element.text,
+            element.contentDesc,
+            "${element.bounds.left},${element.bounds.top},${element.bounds.right},${element.bounds.bottom}"
+        ).joinToString("|")
+        
+        return stableProps.hashCode().toString()
+    }
+    
+    /**
+     * 收集所有元素并生成稳定索引映射
+     */
+    private fun collectElementsWithStableIndex(element: GenericElement): List<Pair<GenericElement, Int>> {
+        val allElements = mutableListOf<GenericElement>()
+        
+        // 递归收集所有元素
+        fun collectElements(e: GenericElement) {
+            allElements.add(e)
+            e.children.forEach { child ->
+                collectElements(child)
+            }
+        }
+        
+        collectElements(element)
+        
+        // 按稳定哈希值排序，确保索引稳定
+        val sortedElements = allElements.sortedBy { calculateStableHash(it) }
+        
+        // 生成稳定索引映射
+        return sortedElements.mapIndexed { index, elem -> elem to (index + 1) }
+    }
+    
+    /**
+     * 获取稳定索引映射（公共方法）
+     */
+    fun getStableIndexMap(element: GenericElement): Map<GenericElement, Int> {
+        return collectElementsWithStableIndex(element).toMap()
+    }
+    
+    /**
+     * 将GenericElement树转换为a11y_tree格式（使用稳定索引）
      */
     fun convertElementTreeToA11yTreePruned(element: GenericElement, context: Context? = null): JSONArray {
         // 保存原始元素树和XML到本地文件
         saveOriginalElementTree(element, context)
         saveElementTreeAsXml(element, context)
         
+        // 生成稳定索引映射
+        val stableIndexMap = collectElementsWithStableIndex(element).toMap()
+        
+        // 调试日志：输出索引映射信息
+        Log.d(TAG, "生成稳定索引映射，共${stableIndexMap.size}个元素")
+        if (SAVE_DEBUG_FILES) {
+            stableIndexMap.entries.take(5).forEach { (elem, stableIndex) ->
+                Log.d(TAG, "元素[${elem.className}:${elem.text}] 原索引=${elem.index} 稳定索引=$stableIndex")
+            }
+        }
+        
         val result = JSONArray()
         
         fun recurse(e: GenericElement, parent: JSONArray) {
             val obj = JSONObject()
-            obj.put("index", e.index)
+            // 使用稳定索引替代原始index
+            obj.put("index", stableIndexMap[e] ?: e.index)
             obj.put("resourceId", e.resourceId)
             obj.put("className", e.className)
             
@@ -139,6 +227,10 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
         }
         
         recurse(element, result)
+        
+        // 保存JSON数组到本地文件
+        saveJsonArray(result, context)
+        
         return result
     }
     

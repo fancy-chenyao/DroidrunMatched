@@ -245,7 +245,10 @@ object CommandHandler {
 
                             // 更新缓存并返回响应
                             Handler(Looper.getMainLooper()).post {
-                                updateCache(elementTree, stateResponse, currentScreenHash)
+                                // 为缓存的元素树应用稳定索引
+                                val stableIndexMap = StateConverter.getStableIndexMap(elementTree)
+                                val elementTreeWithStableIndex = applyStableIndexToElementTree(elementTree, stableIndexMap)
+                                updateCache(elementTreeWithStableIndex, stateResponse, currentScreenHash)
                                 callback(stateResponse)
                                 
                                 // 计算总耗时和数据大小
@@ -469,6 +472,8 @@ object CommandHandler {
             return
         }
         
+        Log.d(TAG, "找到目标元素: className=${targetElement.className}, text=${targetElement.text}, bounds=${targetElement.bounds}")
+        
         // 计算元素中心坐标（dp单位）
         val centerX = (targetElement.bounds.left + targetElement.bounds.right) / 2f
         val centerY = (targetElement.bounds.top + targetElement.bounds.bottom) / 2f
@@ -534,6 +539,23 @@ object CommandHandler {
         }
         
         return searchElement(root)
+    }
+    
+    /**
+     * 为元素树应用稳定索引
+     */
+    private fun applyStableIndexToElementTree(root: GenericElement, stableIndexMap: Map<GenericElement, Int>): GenericElement {
+        fun applyStableIndex(element: GenericElement): GenericElement {
+            val stableIndex = stableIndexMap[element] ?: element.index
+            val updatedChildren = element.children.map { applyStableIndex(it) }
+            
+            return element.copy(
+                index = stableIndex,
+                children = updatedChildren
+            )
+        }
+        
+        return applyStableIndex(root)
     }
     
     /**
