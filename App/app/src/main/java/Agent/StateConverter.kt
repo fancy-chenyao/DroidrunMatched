@@ -130,13 +130,14 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
      * 计算元素的稳定哈希值，用于生成稳定索引
      */
     private fun calculateStableHash(element: GenericElement): String {
-        // 使用稳定属性组合生成哈希
+        // 使用稳定属性组合生成哈希，排除动态生成的resource-id
         val stableProps = listOf(
-            element.resourceId,
             element.className,
             element.text,
             element.contentDesc,
-            "${element.bounds.left},${element.bounds.top},${element.bounds.right},${element.bounds.bottom}"
+            "${element.bounds.left},${element.bounds.top},${element.bounds.right},${element.bounds.bottom}",
+            element.clickable.toString(),
+            element.enabled.toString()
         ).joinToString("|")
         
         return stableProps.hashCode().toString()
@@ -148,21 +149,42 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
     private fun collectElementsWithStableIndex(element: GenericElement): List<Pair<GenericElement, Int>> {
         val allElements = mutableListOf<GenericElement>()
         
-        // 递归收集所有元素
-        fun collectElements(e: GenericElement) {
+        // 递归收集所有元素，同时记录层级路径
+        fun collectElements(e: GenericElement, path: String = "") {
             allElements.add(e)
-            e.children.forEach { child ->
-                collectElements(child)
+            e.children.forEachIndexed { childIndex, child ->
+                collectElements(child, "$path/$childIndex")
             }
         }
         
         collectElements(element)
         
-        // 按稳定哈希值排序，确保索引稳定
-        val sortedElements = allElements.sortedBy { calculateStableHash(it) }
+        // 按稳定哈希值排序，如果哈希相同则按层级路径排序
+        val sortedElements = allElements.sortedWith(compareBy<GenericElement> { calculateStableHash(it) }
+            .thenBy { elem ->
+                // 计算元素在树中的层级路径作为次要排序条件
+                calculateElementPath(element, elem)
+            })
         
         // 生成稳定索引映射
         return sortedElements.mapIndexed { index, elem -> elem to (index + 1) }
+    }
+    
+    /**
+     * 计算元素在树中的路径，用于处理哈希冲突
+     */
+    private fun calculateElementPath(root: GenericElement, target: GenericElement): String {
+        fun findPath(current: GenericElement, path: String): String? {
+            if (current === target) return path
+            
+            current.children.forEachIndexed { index, child ->
+                val childPath = findPath(child, "$path/$index")
+                if (childPath != null) return childPath
+            }
+            return null
+        }
+        
+        return findPath(root, "") ?: ""
     }
     
     /**
@@ -187,7 +209,16 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
         Log.d(TAG, "生成稳定索引映射，共${stableIndexMap.size}个元素")
         if (SAVE_DEBUG_FILES) {
             stableIndexMap.entries.take(5).forEach { (elem, stableIndex) ->
-                Log.d(TAG, "元素[${elem.className}:${elem.text}] 原索引=${elem.index} 稳定索引=$stableIndex")
+                val hash = calculateStableHash(elem)
+                Log.d(TAG, "元素[${elem.className}:${elem.text}:${elem.contentDesc}] 原索引=${elem.index} 稳定索引=$stableIndex 哈希=$hash")
+            }
+            
+            // 特别关注"请休假"相关元素
+            stableIndexMap.entries.filter { 
+                it.key.text.contains("请休假") || it.key.contentDesc.contains("请休假") 
+            }.forEach { (elem, stableIndex) ->
+                val hash = calculateStableHash(elem)
+                Log.d(TAG, "🎯请休假元素: [${elem.className}:${elem.text}:${elem.contentDesc}] 稳定索引=$stableIndex 哈希=$hash bounds=${elem.bounds}")
             }
         }
         
