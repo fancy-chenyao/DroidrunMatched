@@ -4,7 +4,7 @@ import time
 import asyncio
 import json
 import os
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Dict, Any, Callable
 import httpx
 from llama_index.core.base.llms.types import ChatMessage, ChatResponse
 from llama_index.core.prompts import PromptTemplate
@@ -28,11 +28,9 @@ from droidrun.agent.codeact.prompts import (
     DEFAULT_CODE_ACT_USER_PROMPT,
     DEFAULT_NO_THOUGHTS_PROMPT,
 )
-
 from droidrun.agent.context.episodic_memory import EpisodicMemory, EpisodicMemoryStep
 from droidrun.tools import Tools
 from droidrun.tools.adb import AdbTools
-from typing import Optional, Dict, Tuple, List, Any, Callable
 from droidrun.agent.context.agent_persona import AgentPersona
 
 logger = logging.getLogger("droidrun")
@@ -97,8 +95,14 @@ class CodeActAgent(Workflow):
 
         self.required_context = persona.required_context
 
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
         self.executor = SimpleCodeExecutor(
-            loop=asyncio.get_event_loop(),
+            loop=loop,
             locals={},
             tools=self.tool_list,
             tools_instance=tools_instance,
@@ -257,7 +261,7 @@ class CodeActAgent(Workflow):
         else:
             message = ChatMessage(
                 role="user",
-                content="No code was provided. If you want to mark task as complete (whether it failed or succeeded), use complete(success:bool, reason:str) function within a code block ```pythn\n```.",
+                content="No code was provided. If you want to mark task as complete (whether it failed or succeeded), use complete(success:bool, reason:str) function within a code block ```python\n```.",
             )
             await self.chat_memory.aput(message)
             return TaskInputEvent(input=self.chat_memory.get_all())
@@ -377,7 +381,6 @@ class CodeActAgent(Workflow):
         messages_to_send = [self.system_prompt] + limited_history
         messages_to_send = [chat_utils.message_copy(msg) for msg in messages_to_send]
         try:
-            logger.info(f"Messages to send: {messages_to_send}")
             response = await self.llm.achat(messages=messages_to_send)
             logger.debug("🔍 Received LLM response.")
 
@@ -421,15 +424,19 @@ class CodeActAgent(Workflow):
                 self.llm.class_name() == "Gemini_LLM"
                 and "You exceeded your current quota" in str(e)
             ):
-                s = str(e._details[2])
-                match = re.search(r"seconds:\s*(\d+)", s)
-                if match:
-                    seconds = int(match.group(1)) + 1
-                    logger.error(f"Rate limit error. Retrying in {seconds} seconds...")
-                    time.sleep(seconds)
-                else:
+                try:
+                    s = str(e._details[2]) if hasattr(e, '_details') and len(e._details) > 2 else str(e)
+                    match = re.search(r"seconds:\s*(\d+)", s)
+                    if match:
+                        seconds = int(match.group(1)) + 1
+                        logger.error(f"Rate limit error. Retrying in {seconds} seconds...")
+                        await asyncio.sleep(seconds)
+                    else:
+                        logger.error(f"Rate limit error. Retrying in 5 seconds...")
+                        await asyncio.sleep(5)
+                except Exception:
                     logger.error(f"Rate limit error. Retrying in 5 seconds...")
-                    time.sleep(40)
+                    await asyncio.sleep(5)
                 logger.debug("🔍 Retrying call to LLM...")
                 response = await self.llm.achat(messages=messages_to_send)
             elif (
@@ -442,7 +449,7 @@ class CodeActAgent(Workflow):
                 self._anthropic_retry_count += 1
                 seconds = min(2 ** self._anthropic_retry_count, 60)  # Cap at 60 seconds
                 logger.error(f"Anthropic overload error. Retrying in {seconds} seconds... (attempt {self._anthropic_retry_count})")
-                time.sleep(seconds)
+                await asyncio.sleep(seconds)
                 logger.debug("🔍 Retrying call to LLM...")
                 response = await self.llm.achat(messages=messages_to_send)
                 self._anthropic_retry_count = 0  # Reset on success
@@ -477,7 +484,6 @@ class CodeActAgent(Workflow):
         try:
             # Get current screenshot and UI state
             screenshot = None
-            ui_state = None
             
             try:
                 state = await self.tools.get_state_async(include_screenshot=True)

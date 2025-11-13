@@ -177,16 +177,7 @@ class SessionManager:
                     pass
                 
                 # 根据消息类型确定优先级
-                mtype = message.get("type") if isinstance(message, dict) else None
-                priority = 2  # 默认低优先级
-                if mtype == "command":
-                    priority = 0  # 最高优先级
-                elif mtype == "command_response":
-                    priority = 0  # 响应也是高优先级
-                elif mtype == "task_response":
-                    priority = 1  # 任务结果（中等优先级）
-                elif mtype == "heartbeat_ack":
-                    priority = 2  # 低优先级
+                priority = self._get_message_priority(message)
                 
                 # 使用计数器保证相同优先级的消息按顺序发送
                 counter = getattr(session, "_msg_counter", 0)
@@ -216,16 +207,7 @@ class SessionManager:
                     _ = q.get_nowait()
                     
                     # 重新入队当前消息
-                    mtype = message.get("type") if isinstance(message, dict) else None
-                    priority = 2
-                    if mtype == "command":
-                        priority = 0
-                    elif mtype == "command_response":
-                        priority = 0
-                    elif mtype == "task_response":
-                        priority = 1
-                    elif mtype == "heartbeat_ack":
-                        priority = 2
+                    priority = self._get_message_priority(message)
                     
                     counter = getattr(session, "_msg_counter", 0)
                     session._msg_counter = counter + 1
@@ -264,7 +246,7 @@ class SessionManager:
                 
                 # 使用超时等待，避免无限期阻塞
                 try:
-                    item = await asyncio.wait_for(q.get(), timeout=30)  # 100毫秒超时
+                    item = await asyncio.wait_for(q.get(), timeout=0.1)  # 100毫秒超时
                 except asyncio.TimeoutError:
                     # 队列为空时继续循环，不阻塞
                     continue
@@ -299,6 +281,11 @@ class SessionManager:
                             import json
                             message_str = json.dumps(message)
                             message_size = len(message_str)
+                            
+                            # 获取消息信息
+                            mtype = message.get("type") if isinstance(message, dict) else None
+                            rid = message.get("request_id") if isinstance(message, dict) else None
+                            
                             await session.websocket.send(message_str)
                             send_duration = int((time.time() - send_start) * 1000)
                             try:
@@ -412,6 +399,9 @@ class SessionManager:
             
             if timeout_devices:
                 LoggingUtils.log_info("SessionManager", "Cleaned up {count} timeout sessions", count=len(timeout_devices))
+            
+            # 同时清理过期的入队时间记录
+            self._cleanup_old_enqueue_timestamps()
     
     def get_active_devices(self) -> Set[str]:
         """
@@ -425,6 +415,34 @@ class SessionManager:
     def get_session_count(self) -> int:
         """获取当前会话数量"""
         return len([s for s in self.sessions.values() if s.is_active])
+    
+    def _get_message_priority(self, message: dict) -> int:
+        """获取消息优先级"""
+        mtype = message.get("type") if isinstance(message, dict) else None
+        if mtype in ["command", "command_response"]:
+            return 0  # 最高优先级
+        elif mtype == "task_response":
+            return 1  # 中等优先级
+        else:
+            return 2  # 低优先级（包括heartbeat_ack）
+    
+    def _cleanup_old_enqueue_timestamps(self):
+        """清理过期的入队时间记录，防止内存泄漏"""
+        try:
+            current_time = time.time()
+            # 清理超过5分钟的记录
+            expired_keys = [
+                rid for rid, timestamp in self._enqueue_ts.items()
+                if current_time - timestamp > 300
+            ]
+            for rid in expired_keys:
+                self._enqueue_ts.pop(rid, None)
+            
+            if expired_keys:
+                LoggingUtils.log_debug("SessionManager", "Cleaned up {count} expired enqueue timestamps", 
+                                     count=len(expired_keys))
+        except Exception as e:
+            LoggingUtils.log_error("SessionManager", "Error cleaning up enqueue timestamps: {error}", error=e)
 
 
 
