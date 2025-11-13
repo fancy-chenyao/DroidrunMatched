@@ -268,20 +268,6 @@ class SessionManager:
                 except asyncio.TimeoutError:
                     # 队列为空时继续循环，不阻塞
                     continue
-                # 出队心跳日志：观测两次出队之间的时间差，辅助判断是否出现事件循环阻塞
-                try:
-                    now_ts = time.time()
-                    delta_ms = int((now_ts - last_dequeue_ts) * 1000)
-                    last_dequeue_ts = now_ts
-                    qsize = getattr(q, "qsize", lambda: -1)()
-                    if delta_ms > 1000:
-                        LoggingUtils.log_info("SessionManager", "SenderLoop dequeue stall? | device={device_id} | delta_ms={d} | qsize={qsize}",
-                                              device_id=device_id, d=delta_ms, qsize=qsize)
-                    else:
-                        LoggingUtils.log_debug("SessionManager", "SenderLoop dequeue tick | device={device_id} | delta_ms={d} | qsize={qsize}",
-                                               device_id=device_id, d=delta_ms, qsize=qsize)
-                except Exception:
-                    pass
                 # 从优先级队列中提取消息
                 if isinstance(item, tuple) and len(item) == 3:
                     priority, counter, message = item
@@ -291,21 +277,6 @@ class SessionManager:
                     priority = 2
                 
                 try:
-                    # 发送前记录延迟
-                    try:
-                        rid = message.get("request_id") if isinstance(message, dict) else None
-                        mtype = message.get("type") if isinstance(message, dict) else None
-                        t_enq = self._enqueue_ts.pop(rid, None) if rid else None
-                        priority_name = {0: "HIGH", 1: "MED", 2: "LOW"}.get(priority, "UNK")
-                        if t_enq is not None:
-                            delay_ms = int((time.time() - t_enq) * 1000)
-                            LoggingUtils.log_info("SessionManager", "Dequeued for send type={mtype}, priority={prio}({pname}), request_id={rid}, enqueue_delay_ms={d}",
-                                                  mtype=mtype, prio=priority, pname=priority_name, rid=rid, d=delay_ms)
-                        else:
-                            LoggingUtils.log_info("SessionManager", "Dequeued for send type={mtype}, priority={prio}({pname}), request_id={rid}",
-                                                  mtype=mtype, prio=priority, pname=priority_name, rid=rid)
-                    except Exception:
-                        pass
                     # Decide encoding by session protocol (rollout guarded)
                     protocol = getattr(session, "protocol", "json")
                     send_bin_enabled = False  # 与上游保持一致，先关闭二进制下行

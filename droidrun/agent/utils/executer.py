@@ -135,9 +135,7 @@ class SimpleCodeExecutor:
         """
         import time
         
-        # 添加详细的时间戳日志
         start_time = time.time()
-        logger.info(f"🕐 [SimpleCodeExecutor] execute 开始 | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
         
         # Update UI elements before execution
         self.globals['ui_state'] = await ctx.store.get("ui_state", None)
@@ -158,32 +156,17 @@ class SimpleCodeExecutor:
             
             def execute_code():
                 try:
-                    exec_start = time.time()
-                    logger.info(f"🕐 [SimpleCodeExecutor] 线程中开始执行代码 | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
-                    
                     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                         exec(code, self.globals, self.locals)
                     
-                    exec_end = time.time()
-                    exec_duration = int((exec_end - exec_start) * 1000)
-                    logger.info(f"🕐 [SimpleCodeExecutor] 线程中代码执行完成 | 耗时={exec_duration}ms | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
-                    
                 except Exception as e:
                     import traceback
-                    logger.error(f"🕐 [SimpleCodeExecutor] 线程中代码执行异常 | error={e} | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
                     thread_exception.append((e, traceback.format_exc()))
 
             # Run in thread executor to avoid blocking the event loop
             loop = asyncio.get_event_loop()
             
-            thread_start = time.time()
-            logger.info(f"🕐 [SimpleCodeExecutor] 提交到线程池前 | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
-            
             await loop.run_in_executor(None, execute_code)
-            
-            thread_end = time.time()
-            thread_duration = int((thread_end - thread_start) * 1000)
-            logger.info(f"🕐 [SimpleCodeExecutor] 线程池执行完成 | 耗时={thread_duration}ms | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
 
             # Get output
             output = stdout.getvalue()
@@ -195,12 +178,10 @@ class SimpleCodeExecutor:
 
         except Exception as e:
             # Capture exception information
-            logger.error(f"🕐 [SimpleCodeExecutor] execute 方法异常 | error={e} | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
+            logger.error(f"SimpleCodeExecutor execute error: {e}")
             output = f"Error: {type(e).__name__}: {str(e)}\n"
             output += traceback.format_exc()
 
-        total_duration = int((time.time() - start_time) * 1000)
-        logger.info(f"🕐 [SimpleCodeExecutor] execute 完成 | 总耗时={total_duration}ms | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
 
         result = {
             'output': output,

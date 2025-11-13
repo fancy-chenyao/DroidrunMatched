@@ -271,25 +271,13 @@ class CodeActAgent(Workflow):
         code = ev.code
         assert code, "Code cannot be empty."
         
-        # 添加详细的时间戳日志
-        start_time = time.time()
         logger.info(f"⚡ Executing action...")
-        logger.info(f"🕐 [CodeActAgent] execute_code 开始 | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
         logger.info(f"Code to execute:\n```python\n{code}\n```")
 
         try:
             self.code_exec_counter += 1
             
-            # 记录调用 executor.execute 前的时间
-            executor_start = time.time()
-            logger.info(f"🕐 [CodeActAgent] 调用 executor.execute 前 | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
-            
             result = await self.executor.execute(ctx, code)
-            
-            # 记录 executor.execute 完成后的时间
-            executor_end = time.time()
-            executor_duration = int((executor_end - executor_start) * 1000)
-            logger.info(f"🕐 [CodeActAgent] executor.execute 完成 | 耗时={executor_duration}ms | timestamp={time.strftime('%H:%M:%S')}.{int(time.time() * 1000) % 1000:03d}")
             
             logger.info(f"💡 Code execution successful. Result: {result['output']}")
             screenshots = result['screenshots']
@@ -389,6 +377,7 @@ class CodeActAgent(Workflow):
         messages_to_send = [self.system_prompt] + limited_history
         messages_to_send = [chat_utils.message_copy(msg) for msg in messages_to_send]
         try:
+            logger.info(f"Messages to send: {messages_to_send}")
             response = await self.llm.achat(messages=messages_to_send)
             logger.debug("🔍 Received LLM response.")
 

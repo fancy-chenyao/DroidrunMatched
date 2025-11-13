@@ -105,8 +105,6 @@ class WebSocketTools(Tools):
         # 创建 Future 用于等待响应
         loop = asyncio.get_running_loop()
         future = loop.create_future()  # 确保在当前事件循环中创建
-        LoggingUtils.log_info("WebSocketTools", "🔄 [_send_request_and_wait] 创建 Future | request_id={rid} | loop={loop_id}", 
-                             rid=request_id, loop_id=id(loop))
         
         async with self._request_lock:
             self.pending_requests[request_id] = future
@@ -123,88 +121,28 @@ class WebSocketTools(Tools):
             # 记录发送时间戳
             send_timestamp = time.strftime("%H:%M:%S", time.localtime())
             
-            # 详细日志：记录命令发送
-            if command == "tap_by_index":
-                index = params.get("index", "unknown")
-                LoggingUtils.log_info("WebSocketTools", "📤 [{time}] 发送 tap_by_index 命令到移动端 | index={idx} | request_id={rid}", 
-                                    time=send_timestamp, idx=index, rid=request_id)
-            elif command == "get_state":
-                include_screenshot = params.get("include_screenshot", False)
-                # 记录 get_state 发送开始时间（用于计算总耗时）
-                self._get_state_send_times = getattr(self, '_get_state_send_times', {})
-                self._get_state_send_times[request_id] = time.time()
-                LoggingUtils.log_info("WebSocketTools", "📤 [{time}] 发送 get_state 命令到移动端 | include_screenshot={ss} | request_id={rid}", 
-                                    time=send_timestamp, ss=include_screenshot, rid=request_id)
-            elif command == "input_text":
-                text = params.get("text", "")[:20]  # 只显示前20个字符
-                LoggingUtils.log_info("WebSocketTools", "📤 [{time}] 发送 input_text 命令到移动端 | text='{txt}...' | request_id={rid}", 
-                                    time=send_timestamp, txt=text, rid=request_id)
-            else:
-                LoggingUtils.log_info("WebSocketTools", "📤 [{time}] 发送 {cmd} 命令到移动端 | params={prm} | request_id={rid}", 
-                                    time=send_timestamp, cmd=command, prm=params, rid=request_id)
             
             # 发送请求
             success = await self.session_manager.send_to_device(self.device_id, request_message)
             if not success:
                 async with self._request_lock:
                     self.pending_requests.pop(request_id, None)
-                LoggingUtils.log_error("WebSocketTools", "❌ [{time}] 发送失败 | command={cmd} | request_id={rid}", 
-                                     time=send_timestamp, cmd=command, rid=request_id)
                 raise ValueError(f"Failed to send request to device {self.device_id}")
             
-            LoggingUtils.log_debug("WebSocketTools", "✓ 命令已发送到 WebSocket | command={command} | request_id={request_id}", 
-                                 command=command, request_id=request_id)
             # 微让步：高优命令发送后立即让出事件循环，尽快调度 sender_loop 出队发送
             try:
                 if command in {"tap_by_index", "tap", "scroll", "input_text", "swipe", "press_key", "start_app", "drag"}:
                     await asyncio.sleep(0)
-                    LoggingUtils.log_debug("WebSocketTools", "Yielded after enqueue | cmd={cmd} | rid={rid}", 
-                                         cmd=command, rid=request_id)
             except Exception:
                 pass
             
             # 等待响应（带超时）
             try:
-                LoggingUtils.log_info("WebSocketTools", "🔄 [_send_request_and_wait] 开始等待响应 | request_id={rid} | timeout={to}s", rid=request_id, to=timeout)
-                wait_start = time.time()
-                
                 response = await asyncio.wait_for(future, timeout=timeout)
-                
-                wait_end = time.time()
-                wait_duration = int((wait_end - wait_start) * 1000)
-                LoggingUtils.log_info("WebSocketTools", "🔄 [_send_request_and_wait] 收到响应 | request_id={rid} | 等待耗时={dur}ms", rid=request_id, dur=wait_duration)
                 
                 # response 是完整响应，提取 data 部分（如果存在）
                 if isinstance(response, dict) and "data" in response:
-                    try:
-                        waited_ms = int((time.time() - t_create) * 1000)
-                        recv_timestamp = time.strftime("%H:%M:%S", time.localtime())
-                        
-                        # 如果是 get_state，计算从发送到接收的总耗时
-                        if command == "get_state":
-                            send_times = getattr(self, '_get_state_send_times', {})
-                            send_time = send_times.pop(request_id, None)
-                            if send_time:
-                                total_ms = int((time.time() - send_time) * 1000)
-                                data_size = len(str(response.get("data", {})))
-                                LoggingUtils.log_info("WebSocketTools", "📥 [{time}] 收到 get_state 响应 | 总耗时={total}ms | 数据大小={size}B | request_id={rid}", 
-                                                    time=recv_timestamp, total=total_ms, size=data_size, rid=request_id)
-                            else:
-                                LoggingUtils.log_info("WebSocketTools", "📥 [{time}] 收到响应 | command={cmd} | 耗时={ms}ms | request_id={rid}", 
-                                                    time=recv_timestamp, cmd=command, ms=waited_ms, rid=request_id)
-                        else:
-                            LoggingUtils.log_info("WebSocketTools", "📥 [{time}] 收到响应 | command={cmd} | 耗时={ms}ms | request_id={rid}", 
-                                                time=recv_timestamp, cmd=command, ms=waited_ms, rid=request_id)
-                    except Exception:
-                        pass
                     return response["data"]
-                try:
-                    waited_ms = int((time.time() - t_create) * 1000)
-                    recv_timestamp = time.strftime("%H:%M:%S", time.localtime())
-                    LoggingUtils.log_info("WebSocketTools", "📥 [{time}] 收到响应 | command={cmd} | 耗时={ms}ms | request_id={rid}", 
-                                        time=recv_timestamp, cmd=command, ms=waited_ms, rid=request_id)
-                except Exception:
-                    pass
                 return response
             except asyncio.TimeoutError:
                 async with self._request_lock:
@@ -235,27 +173,14 @@ class WebSocketTools(Tools):
             LoggingUtils.log_warning("WebSocketTools", "Response missing request_id, ignoring")
             return
         
-        LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 开始处理响应 | request_id={rid}", rid=request_id)
         
-        # 检查当前事件循环
-        try:
-            current_loop = asyncio.get_running_loop()
-            LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 当前事件循环 | request_id={rid} | loop={loop_id}", 
-                                 rid=request_id, loop_id=id(current_loop))
-        except RuntimeError:
-            LoggingUtils.log_error("WebSocketTools", "🔄 [_handle_response] 没有运行中的事件循环 | request_id={rid}", rid=request_id)
         
         # 直接同步处理，避免异步调度问题
         try:
             future = self.pending_requests.get(request_id)
             if future and not future.done():
-                LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 找到对应的 future，设置结果 | request_id={rid}", rid=request_id)
-                
                 # 获取 future 关联的事件循环
                 future_loop = getattr(future, '_loop', None)
-                if future_loop:
-                    LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] Future 事件循环 | request_id={rid} | future_loop={loop_id}", 
-                                         rid=request_id, loop_id=id(future_loop))
                 
                 # 检查是否有错误
                 if response_data.get("status") == "error":
@@ -265,27 +190,19 @@ class WebSocketTools(Tools):
                         future_loop.call_soon_threadsafe(future.set_exception, ValueError(error_msg))
                     else:
                         future.set_exception(ValueError(error_msg))
-                    LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 设置异常 | request_id={rid} | error={err}", rid=request_id, err=error_msg)
                 else:
                     # 使用线程安全的方式设置结果
                     if future_loop and future_loop.is_running():
                         future_loop.call_soon_threadsafe(future.set_result, response_data)
                     else:
                         future.set_result(response_data)
-                    LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 设置结果成功 | request_id={rid}", rid=request_id)
-                LoggingUtils.log_debug("WebSocketTools", "Response received for request {request_id}", 
-                                     request_id=request_id)
                 # 从待处理请求中移除
                 self.pending_requests.pop(request_id, None)
-                LoggingUtils.log_info("WebSocketTools", "🔄 [_handle_response] 从待处理请求中移除 | request_id={rid}", rid=request_id)
             else:
-                if not future:
-                    LoggingUtils.log_warning("WebSocketTools", "🔄 [_handle_response] 未找到对应的 future | request_id={rid}", rid=request_id)
-                else:
-                    LoggingUtils.log_warning("WebSocketTools", "🔄 [_handle_response] future 已完成 | request_id={rid} | done={done}", rid=request_id, done=future.done())
+                pass  # Future not found or already done
         except Exception as e:
-            LoggingUtils.log_error("WebSocketTools", "🔄 [_handle_response] 处理响应时出错 | request_id={rid} | error={err}", 
-                                 request_id=request_id, err=e)
+            LoggingUtils.log_error("WebSocketTools", "Error handling response for request {rid}: {err}", 
+                                 rid=request_id, err=e)
     
     def _sync_wait(self, coro):
         """
