@@ -210,7 +210,9 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
         if (SAVE_DEBUG_FILES) {
             stableIndexMap.entries.take(5).forEach { (elem, stableIndex) ->
                 val hash = calculateStableHash(elem)
-                Log.d(TAG, "元素[${elem.className}:${elem.text}:${elem.contentDesc}] 原索引=${elem.index} 稳定索引=$stableIndex 哈希=$hash")
+                val resourceName = elem.additionalProps["resourceName"]
+                val finalResourceId = if (!resourceName.isNullOrEmpty()) "com.example.emplab:id/$resourceName" else elem.resourceId
+                Log.d(TAG, "元素[${elem.className}:${elem.text}:${elem.contentDesc}] 原索引=${elem.index} 稳定索引=$stableIndex 哈希=$hash resourceId=$finalResourceId")
             }
             
             // 特别关注"请休假"相关元素
@@ -228,7 +230,16 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
             val obj = JSONObject()
             // 使用稳定索引替代原始index
             obj.put("index", stableIndexMap[e] ?: e.index)
-            obj.put("resourceId", e.resourceId)
+            
+            // 优先使用additionalProps中的resourceName，构造完整的resourceId
+            val resourceName = e.additionalProps["resourceName"]
+            val finalResourceId = if (!resourceName.isNullOrEmpty()) {
+                "com.example.emplab:id/$resourceName"
+            } else {
+                e.resourceId
+            }
+            obj.put("resourceId", finalResourceId)
+            
             obj.put("className", e.className)
             
             // text字段：优先使用contentDesc，如果为空则使用text，如果都为空则使用className
@@ -241,6 +252,15 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
             
             // bounds格式：转为字符串 "left, top, right, bottom"
             obj.put("bounds", "${e.bounds.left}, ${e.bounds.top}, ${e.bounds.right}, ${e.bounds.bottom}")
+            
+            // 添加无障碍属性，让JSON更贴合无障碍树
+            obj.put("clickable", e.clickable)
+            obj.put("enabled", e.enabled)
+            obj.put("checkable", e.checkable)
+            obj.put("checked", e.checked)
+            obj.put("scrollable", e.scrollable)
+            obj.put("longClickable", e.longClickable)
+            obj.put("selected", e.selected)
             
             // 递归处理所有子节点，无深度和数量限制
             if (e.children.isNotEmpty()) {
