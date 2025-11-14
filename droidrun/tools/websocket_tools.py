@@ -660,16 +660,23 @@ class WebSocketTools(Tools):
                 
             response = await self._send_request_and_wait("input_text", params)
             
-            if response.get("status") == "success":
+            # 检查响应状态，兼容不同的响应格式
+            status = response.get("status", "success")  # 默认为 success
+            if status == "success" or not response.get("error"):
                 message = response.get("message", f"Text input completed: {text[:50]}")
                 
+                # 创建 InputTextActionEvent
+                input_event = InputTextActionEvent(
+                    action_type="input_text",
+                    description=f"Input text: '{text[:50]}{'...' if len(text) > 50 else ''}'" + (f" at index {index}" if index is not None else ""),
+                    text=text,
+                    index=index
+                )
+                
                 if self._ctx:
-                    input_event = InputTextActionEvent(
-                        action_type="input_text",
-                        description=f"Input text: '{text[:50]}{'...' if len(text) > 50 else ''}'",
-                        text=text
-                    )
                     self._ctx.write_event_to_stream(input_event)
+                else:
+                    LoggingUtils.log_warning("WebSocketTools", "⚠️ Context is None, InputTextActionEvent not recorded")
                 
                 return message
             else:

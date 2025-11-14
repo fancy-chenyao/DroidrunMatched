@@ -862,6 +862,14 @@ class DroidAgent(Workflow):
             # 为工具设置上下文，确保 MacroEvent 能够正确创建
             if tools and hasattr(tools, '_set_context'):
                 tools._set_context(ctx)
+            
+            # 在热启动执行过程中也需要监听事件流
+            async def process_stream_events():
+                async for ev in ctx.stream_events():
+                    self.handle_stream_event(ev, ctx)
+            
+            # 启动事件流处理任务
+            stream_task = asyncio.create_task(process_stream_events())
             step_count = 0
             # 初始化UI
             LoggingUtils.log_debug("DroidAgent", "Initializing UI state cache...")
@@ -953,9 +961,9 @@ class DroidAgent(Workflow):
                         # 不再在直执中做就地文本适配，保持经验参数或上层已适配结果
                         if text:
                             if index is not None:
-                                await tools.input_text_async(text, index)
+                                await tools.input_text(text, index)
                             else:
-                                await tools.input_text_async(text)
+                                await tools.input_text(text)
                             wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                             time.sleep(wait_time)
                             # 使用通用方法捕获UI状态和截图
@@ -965,15 +973,16 @@ class DroidAgent(Workflow):
                             
                             input_event = InputTextActionEvent(
                                 action_type="input_text",
-                                description=f"Input text: '{text}'",
-                                text=text
+                                description=f"Input text: '{text}'" + (f" at index {index}" if index is not None else ""),
+                                text=text,
+                                index=index
                             )
                             self.trajectory.macro.append(input_event)
                             
                             step_count += 1
                             executed_actions.append({
                                 "action": "input_text",
-                                "params": {"text": text},
+                                "params": {"text": text, "index": index} if index is not None else {"text": text},
                                 "success": True,
                                 "timestamp": time.time()
                             })
@@ -1109,6 +1118,14 @@ class DroidAgent(Workflow):
         except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
             ExceptionHandler.handle_runtime_error(e, "[HOT] Direct execution", reraise=False)
             return False, f"Direct execution failed: {e}"
+        finally:
+            # 取消事件流处理任务
+            if 'stream_task' in locals():
+                stream_task.cancel()
+                try:
+                    await stream_task
+                except asyncio.CancelledError:
+                    pass
 
     async def _capture_ui_state_and_screenshot(self, context: str) -> bool:
         """
@@ -1541,6 +1558,8 @@ class DroidAgent(Workflow):
             params['index'] = action.get('element_index', -1)
         elif action_type == 'InputTextActionEvent':
             params['text'] = action.get('text', '')
+            if action.get('index') is not None:
+                params['index'] = action.get('index')
         elif action_type == 'SwipeActionEvent':
             params.update({
                 'start_x': action.get('start_x', 0),

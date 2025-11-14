@@ -36,6 +36,7 @@ class DragActionEvent(MacroEvent):
 class InputTextActionEvent(MacroEvent):
     """Event for text input actions"""
     text: str
+    index: int = None  # 添加 index 字段
 
 class KeyPressActionEvent(MacroEvent):
     """Event for key press actions"""

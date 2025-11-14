@@ -508,8 +508,9 @@ class AdbTools(Tools):
             if self._ctx:
                 input_event = InputTextActionEvent(
                     action_type="input_text",
-                    description=f"Input text: '{text[:50]}{'...' if len(text) > 50 else ''}'",
+                    description=f"Input text: '{text[:50]}{'...' if len(text) > 50 else ''}'" + (f" at index {index}" if index is not None else ""),
                     text=text,
+                    index=index
                 )
                 self._ctx.write_event_to_stream(input_event)
 

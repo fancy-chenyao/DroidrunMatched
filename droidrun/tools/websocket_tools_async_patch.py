@@ -3,6 +3,9 @@ WebSocketTools 异步方法补丁文件
 用于将所有同步方法改为异步实现
 """
 
+from droidrun.agent.common.events import InputTextActionEvent
+from droidrun.agent.utils.logging_utils import LoggingUtils
+
 # 以下是所有需要修改的同步方法，改为异步后直接调用对应的 _async 方法
 
 async def tap_by_index(self, index: int) -> str:
@@ -135,8 +138,25 @@ async def input_text(self, text: str, index: Optional[int] = None) -> str:
             params["index"] = index
             
         response = await self._send_request_and_wait("input_text", params)
-        if response.get("status") == "success":
+        
+        # 检查响应状态，兼容不同的响应格式
+        status = response.get("status", "success")  # 默认为 success
+        if status == "success" or not response.get("error"):
             message = response.get("message", f"Text input completed: {text[:50]}")
+            
+            # 创建 InputTextActionEvent
+            input_event = InputTextActionEvent(
+                action_type="input_text",
+                description=f"Input text: '{text[:50]}{'...' if len(text) > 50 else ''}'" + (f" at index {index}" if index is not None else ""),
+                text=text,
+                index=index
+            )
+            
+            if self._ctx:
+                self._ctx.write_event_to_stream(input_event)
+            else:
+                LoggingUtils.log_warning("WebSocketTools", "⚠️ Context is None, InputTextActionEvent not recorded")
+            
             return message
         else:
             error_msg = response.get("error", "Unknown error")
