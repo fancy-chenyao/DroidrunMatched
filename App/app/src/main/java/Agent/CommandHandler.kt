@@ -654,9 +654,145 @@ object CommandHandler {
         }
     }
     
-    /**
-     * 处理input_text命令 - 文本输入
-     */
+    // /**
+    //  * 处理input_text命令 - 文本输入
+    //  */
+    // private fun handleInputText(
+    //     requestId: String,
+    //     params: JSONObject,
+    //     activity: Activity?,
+    //     callback: (JSONObject) -> Unit
+    // ) {
+    //     // 参数验证
+    //     if (!params.has("text")) {
+    //         Log.w(TAG, "input_text命令缺少参数: text")
+    //         callback(createErrorResponse("Missing text parameter"))
+    //         return
+    //     }
+        
+    //     val text = params.getString("text")
+    //     Log.d(TAG, "执行input_text命令: text=\"$text\"")
+        
+    //     if (activity == null) {
+    //         Log.w(TAG, "input_text命令执行失败: Activity为空")
+    //         callback(createErrorResponse("No active activity"))
+    //         return
+    //     }
+        
+    //     Handler(Looper.getMainLooper()).post {
+    //         try {
+    //             // 动作前状态用于页面变化验证
+    //             val preActivity = activity
+    //             val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
+    //             // 检查是否提供了坐标参数
+    //             if (params.has("x") && params.has("y")) {
+    //                 // 使用坐标输入（点击坐标后输入文本）
+    //                 val x = params.getInt("x")
+    //                 val y = params.getInt("y")
+    //                 Log.d(TAG, "使用坐标输入: ($x, $y)")
+                    
+    //                 NativeController.inputTextByCoordinateDp(
+    //                     activity = activity,
+    //                     inputXDp = x.toFloat(),
+    //                     inputYDp = y.toFloat(),
+    //                     inputContent = text,
+    //                     clearBeforeInput = true
+    //                 ) { success ->
+    //                     if (success) {
+    //                         // 成功后进行页面变化验证
+    //                         PageChangeVerifier.verifyActionWithPageChange(
+    //                             handler = Handler(Looper.getMainLooper()),
+    //                             getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+    //                             preActivity = preActivity,
+    //                             preViewTreeHash = preHash
+    //                         ) { changed, changeType ->
+    //                             if (changed) {
+    //                                 smartClearCache("input_text")
+    //                                 Log.d(TAG, "input_text命令执行成功且检测到页面变化: 类型=$changeType")
+    //                                 val data = JSONObject().apply { put("page_change_type", changeType) }
+    //                                 callback(createSuccessResponse(data))
+    //                             } else {
+    //                                 Log.w(TAG, "input_text命令执行后未检测到页面变化")
+    //                                 callback(createErrorResponse("Input text succeeded but page unchanged"))
+    //                             }
+    //                         }
+    //                     } else {
+    //                         Log.w(TAG, "input_text命令执行失败: NativeController返回false")
+    //                         callback(createErrorResponse("Input text action failed"))
+    //                     }
+    //                 }
+    //             } else {
+    //                 // 没有坐标，尝试使用当前焦点视图或第一个EditText
+    //                 val rootView = activity.findViewById<View>(android.R.id.content)
+    //                 val focusedView = rootView.findFocus()
+                    
+    //                 if (focusedView is EditText) {
+    //                     // 如果已有焦点EditText，直接输入
+    //                     Log.d(TAG, "使用焦点EditText输入")
+    //                     focusedView.setText(text)
+    //                     // 移动光标到末尾
+    //                     focusedView.setSelection(text.length)
+    //                     // 成功后进行页面变化验证
+    //                     PageChangeVerifier.verifyActionWithPageChange(
+    //                         handler = Handler(Looper.getMainLooper()),
+    //                         getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+    //                         preActivity = preActivity,
+    //                         preViewTreeHash = preHash
+    //                     ) { changed, changeType ->
+    //                         if (changed) {
+    //                             smartClearCache("input_text")
+    //                             val data = JSONObject().apply { put("page_change_type", changeType) }
+    //                             Log.d(TAG, "输入文本导致页面变化，类型: $changeType")
+    //                             callback(createSuccessResponse(data))
+    //                         } else {
+    //                             callback(createErrorResponse("输入文本操作成功但页面未变化"))
+    //                         }
+    //                     }
+    //                 } else {
+    //                     // 尝试找到第一个EditText并输入
+    //                     val editText = findFirstEditText(rootView)
+    //                     if (editText != null) {
+    //                         Log.d(TAG, "找到EditText，准备输入")
+    //                         // 点击EditText获取焦点
+    //                         editText.requestFocus()
+    //                         // 显示软键盘
+    //                         val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+    //                         imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
+                            
+    //                         // 等待软键盘弹出后输入
+    //                         Handler(Looper.getMainLooper()).postDelayed({
+    //                             editText.setText(text)
+    //                             editText.setSelection(text.length)
+    //                             // 成功后进行页面变化验证
+    //                             PageChangeVerifier.verifyActionWithPageChange(
+    //                                 handler = Handler(Looper.getMainLooper()),
+    //                                 getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+    //                                 preActivity = preActivity,
+    //                                 preViewTreeHash = preHash
+    //                             ) { changed, changeType ->
+    //                                 if (changed) {
+    //                                     smartClearCache("input_text")
+    //                                     val data = JSONObject().apply { put("page_change_type", changeType) }
+    //                                     callback(createSuccessResponse(data))
+    //                                 } else {
+    //                                     callback(createErrorResponse("Input text succeeded but page unchanged"))
+    //                                 }
+    //                             }
+    //                         }, 300)
+    //                     } else {
+    //                         Log.w(TAG, "input_text命令执行失败: 未找到输入框")
+    //                         callback(createErrorResponse("No input field found. Please provide coordinates (x, y) for input_text command."))
+    //                     }
+    //                 }
+    //             }
+    //         } catch (e: Exception) {
+    //             Log.e(TAG, "input_text命令执行异常: ${e.message}", e)
+    //             callback(createErrorResponse("Exception: ${e.message}"))
+    //         }
+    //     }
+    // }
+
+
     private fun handleInputText(
         requestId: String,
         params: JSONObject,
@@ -671,7 +807,9 @@ object CommandHandler {
         }
         
         val text = params.getString("text")
-        Log.d(TAG, "执行input_text命令: text=\"$text\"")
+        val index = params.optInt("index", 0)  // 默认为0，如果未提供index
+        
+        Log.d(TAG, "执行input_text命令: text=\"$text\", index=$index")
         
         if (activity == null) {
             Log.w(TAG, "input_text命令执行失败: Activity为空")
@@ -684,54 +822,30 @@ object CommandHandler {
                 // 动作前状态用于页面变化验证
                 val preActivity = activity
                 val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
-                // 检查是否提供了坐标参数
-                if (params.has("x") && params.has("y")) {
-                    // 使用坐标输入（点击坐标后输入文本）
-                    val x = params.getInt("x")
-                    val y = params.getInt("y")
-                    Log.d(TAG, "使用坐标输入: ($x, $y)")
-                    
-                    NativeController.inputTextByCoordinateDp(
-                        activity = activity,
-                        inputXDp = x.toFloat(),
-                        inputYDp = y.toFloat(),
-                        inputContent = text,
-                        clearBeforeInput = true
-                    ) { success ->
-                        if (success) {
-                            // 成功后进行页面变化验证
-                            PageChangeVerifier.verifyActionWithPageChange(
-                                handler = Handler(Looper.getMainLooper()),
-                                getCurrentActivity = { ActivityTracker.getCurrentActivity() },
-                                preActivity = preActivity,
-                                preViewTreeHash = preHash
-                            ) { changed, changeType ->
-                                if (changed) {
-                                    smartClearCache("input_text")
-                                    Log.d(TAG, "input_text命令执行成功且检测到页面变化: 类型=$changeType")
-                                    val data = JSONObject().apply { put("page_change_type", changeType) }
-                                    callback(createSuccessResponse(data))
-                                } else {
-                                    Log.w(TAG, "input_text命令执行后未检测到页面变化")
-                                    callback(createErrorResponse("Input text succeeded but page unchanged"))
-                                }
-                            }
-                        } else {
-                            Log.w(TAG, "input_text命令执行失败: NativeController返回false")
-                            callback(createErrorResponse("Input text action failed"))
-                        }
-                    }
-                } else {
-                    // 没有坐标，尝试使用当前焦点视图或第一个EditText
-                    val rootView = activity.findViewById<View>(android.R.id.content)
-                    val focusedView = rootView.findFocus()
-                    
-                    if (focusedView is EditText) {
-                        // 如果已有焦点EditText，直接输入
-                        Log.d(TAG, "使用焦点EditText输入")
-                        focusedView.setText(text)
-                        // 移动光标到末尾
-                        focusedView.setSelection(text.length)
+                
+                Log.d(TAG, "解析输入文本: text='$text', index=$index")
+                
+                // 从缓存中获取元素树
+                val elementTree = cachedElementTree
+                if (elementTree == null) {
+                    Log.w(TAG, "未找到缓存的元素树")
+                    callback(createErrorResponse("Element tree not available"))
+                    return@post
+                }
+                
+                // 根据索引查找元素
+                val targetElement = findElementByIndex(elementTree, index)
+                if (targetElement == null) {
+                    Log.w(TAG, "未找到索引为 $index 的元素")
+                    callback(createErrorResponse("Element with index $index not found"))
+                    return@post
+                }
+                
+                Log.d(TAG, "找到目标元素: resourceId=${targetElement.resourceId}, className=${targetElement.className}")
+                
+                // 使用ElementController设置输入值
+                ElementController.setInputValue(activity, targetElement.resourceId, text) { success ->
+                    if (success) {
                         // 成功后进行页面变化验证
                         PageChangeVerifier.verifyActionWithPageChange(
                             handler = Handler(Looper.getMainLooper()),
@@ -741,48 +855,20 @@ object CommandHandler {
                         ) { changed, changeType ->
                             if (changed) {
                                 smartClearCache("input_text")
-                                val data = JSONObject().apply { put("page_change_type", changeType) }
-                                Log.d(TAG, "输入文本导致页面变化，类型: $changeType")
+                                val data = JSONObject().apply { 
+                                    put("page_change_type", changeType)
+                                    put("element_index", index)
+                                }
+                                Log.d(TAG, "input_text命令执行成功且检测到页面变化: 类型=$changeType")
                                 callback(createSuccessResponse(data))
                             } else {
-                                callback(createErrorResponse("输入文本操作成功但页面未变化"))
+                                Log.w(TAG, "input_text命令执行后未检测到页面变化")
+                                callback(createErrorResponse("Input text succeeded but page unchanged"))
                             }
                         }
                     } else {
-                        // 尝试找到第一个EditText并输入
-                        val editText = findFirstEditText(rootView)
-                        if (editText != null) {
-                            Log.d(TAG, "找到EditText，准备输入")
-                            // 点击EditText获取焦点
-                            editText.requestFocus()
-                            // 显示软键盘
-                            val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                            imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
-                            
-                            // 等待软键盘弹出后输入
-                            Handler(Looper.getMainLooper()).postDelayed({
-                                editText.setText(text)
-                                editText.setSelection(text.length)
-                                // 成功后进行页面变化验证
-                                PageChangeVerifier.verifyActionWithPageChange(
-                                    handler = Handler(Looper.getMainLooper()),
-                                    getCurrentActivity = { ActivityTracker.getCurrentActivity() },
-                                    preActivity = preActivity,
-                                    preViewTreeHash = preHash
-                                ) { changed, changeType ->
-                                    if (changed) {
-                                        smartClearCache("input_text")
-                                        val data = JSONObject().apply { put("page_change_type", changeType) }
-                                        callback(createSuccessResponse(data))
-                                    } else {
-                                        callback(createErrorResponse("Input text succeeded but page unchanged"))
-                                    }
-                                }
-                            }, 300)
-                        } else {
-                            Log.w(TAG, "input_text命令执行失败: 未找到输入框")
-                            callback(createErrorResponse("No input field found. Please provide coordinates (x, y) for input_text command."))
-                        }
+                        Log.w(TAG, "input_text命令执行失败: 设置输入值失败")
+                        callback(createErrorResponse("Failed to set input value"))
                     }
                 }
             } catch (e: Exception) {
@@ -791,6 +877,7 @@ object CommandHandler {
             }
         }
     }
+
     
     /**
      * 查找第一个EditText视图
