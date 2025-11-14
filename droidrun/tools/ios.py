@@ -390,17 +390,29 @@ class IOSTools(Tools):
         logger.info(f"Drag action FAILED! Not implemented for iOS")
         return False
 
-    def input_text(self, text: str) -> str:
+    def input_text(self, text: str, index: Optional[int] = None) -> str:
         """
         Input text on the iOS device.
 
         Args:
             text: Text to input. Can contain spaces, newlines, and special characters including non-ASCII.
+            index: Optional element index to target specific input field.
+                  If provided, will first tap the element at this index before inputting text.
+                  Note: For iOS tools, this is handled on the server side.
 
         Returns:
             Result message
         """
         try:
+            # 如果提供了 index，先点击对应元素
+            if index is not None:
+                logger.debug(f"Tapping element at index {index} before input")
+                tap_result = self.tap_by_index(index)
+                if "Error" in tap_result:
+                    return f"Error: Failed to tap element at index {index}: {tap_result}"
+                # 等待一下让元素获得焦点
+                time.sleep(0.3)
+            
             # Use the last tapped element's rect if available, otherwise use a default
             rect = self.last_tapped_rect if self.last_tapped_rect else "0,0,100,100"
 

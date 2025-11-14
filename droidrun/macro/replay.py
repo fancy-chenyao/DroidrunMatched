@@ -131,9 +131,14 @@ class MacroPlayer:
 
             elif action_type == "input_text":
                 text = action.get("text", "")
+                index = action.get("index", None)
 
-                LoggingUtils.log_info("MacroReplay", "Inputting text: '{text}'", text=text)
-                result = tools.input_text(text)
+                if index is not None:
+                    LoggingUtils.log_info("MacroReplay", "Inputting text: '{text}' at index {index}", text=text, index=index)
+                    result = tools.input_text(text, index)
+                else:
+                    LoggingUtils.log_info("MacroReplay", "Inputting text: '{text}'", text=text)
+                    result = tools.input_text(text)
                 LoggingUtils.log_debug("MacroReplay", "Result: {result}", result=result)
                 return True
 

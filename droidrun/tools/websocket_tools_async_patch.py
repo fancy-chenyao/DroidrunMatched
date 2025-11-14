@@ -114,19 +114,27 @@ async def drag(self, start_x: int, start_y: int, end_x: int, end_y: int, duratio
         LoggingUtils.log_error("WebSocketTools", "Error dragging: {error}", error=e)
         return False
 
-async def input_text(self, text: str) -> str:
+async def input_text(self, text: str, index: Optional[int] = None) -> str:
     """
     输入文本
     
     Args:
         text: 要输入的文本
+        index: 可选的元素索引，如果提供则由移动端直接在该元素中输入文本
         
     Returns:
         操作结果消息
     """
     try:
-        LoggingUtils.log_debug("WebSocketTools", "[async] Inputting text: {text}", text=text[:50])
-        response = await self._send_request_and_wait("input_text", {"text": text})
+        LoggingUtils.log_debug("WebSocketTools", "[async] Inputting text: {text} {index_info}", 
+                             text=text[:50], index_info=f"at index {index}" if index is not None else "")
+        
+        params = {"text": text}
+        # 直接将 index 信息传递给移动端，由移动端处理元素定位和输入
+        if index is not None:
+            params["index"] = index
+            
+        response = await self._send_request_and_wait("input_text", params)
         if response.get("status") == "success":
             message = response.get("message", f"Text input completed: {text[:50]}")
             return message

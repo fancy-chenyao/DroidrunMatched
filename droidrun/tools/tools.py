@@ -118,9 +118,19 @@ class Tools(ABC):
         pass
 
     @abstractmethod
-    async def input_text(self, text: str) -> str:
+    async def input_text(self, text: str, index: Optional[int] = None) -> str:
         """
-        Input the given text into a focused input field.
+        Input the given text into an input field.
+        
+        Args:
+            text: Text to input
+            index: Optional element index to target specific input field.
+                  If provided, will directly input text into that element without needing to tap first.
+                  Recommended usage: input_text("your text", element_index) for better efficiency.
+        
+        Examples:
+            input_text("Hello")  # Input into currently focused field
+            input_text("Beijing", 5)  # Input "Beijing" directly into element at index 5
         """
         pass
 

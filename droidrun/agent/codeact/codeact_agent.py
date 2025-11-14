@@ -376,13 +376,21 @@ class CodeActAgent(Workflow):
     async def _get_llm_response(
         self, ctx: Context, chat_history: List[ChatMessage]
     ) -> ChatResponse | None:
-        logger.debug("🔍 Getting LLM response...")
+        # 记录 LLM 思考开始时间
+        llm_start_time = time.time()
+        start_timestamp = time.strftime("%H:%M:%S", time.localtime())
+        logger.info(f"🤔 LLM 开始思考 at {start_timestamp}")
+        
         limited_history = self._limit_history(chat_history)
         messages_to_send = [self.system_prompt] + limited_history
         messages_to_send = [chat_utils.message_copy(msg) for msg in messages_to_send]
         try:
             response = await self.llm.achat(messages=messages_to_send)
-            logger.debug("🔍 Received LLM response.")
+            
+            # 计算 LLM 思考耗时
+            thinking_time = time.time() - llm_start_time
+            end_timestamp = time.strftime("%H:%M:%S", time.localtime())
+            logger.info(f"💡 LLM 完成思考 at {end_timestamp}, 耗时: {thinking_time:.2f}s")
 
             filtered_chat_history = []
             for msg in limited_history:

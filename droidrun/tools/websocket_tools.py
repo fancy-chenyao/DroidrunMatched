@@ -122,9 +122,11 @@ class WebSocketTools(Tools):
         )
         
         try:
-            # 记录发送时间戳
+            # 记录发送时间戳和开始时间
+            send_start_time = time.time()
             send_timestamp = time.strftime("%H:%M:%S", time.localtime())
-            
+            LoggingUtils.log_info("WebSocketTools", "📤 发送操作到移动端: {cmd} at {time}", 
+                                cmd=command, time=send_timestamp)
             
             # 发送请求
             success = await self.session_manager.send_to_device(self.device_id, request_message)
@@ -143,6 +145,12 @@ class WebSocketTools(Tools):
             # 等待响应（带超时）
             try:
                 response = await asyncio.wait_for(future, timeout=timeout)
+                
+                # 计算操作执行耗时
+                execution_time = time.time() - send_start_time
+                receive_timestamp = time.strftime("%H:%M:%S", time.localtime())
+                LoggingUtils.log_info("WebSocketTools", "✅ 移动端完成操作: {cmd} at {time}, 耗时: {duration:.2f}s", 
+                                    cmd=command, time=receive_timestamp, duration=execution_time)
                 
                 # response 是完整响应，提取 data 部分（如果存在）
                 if isinstance(response, dict) and "data" in response:
@@ -624,26 +632,33 @@ class WebSocketTools(Tools):
             return False
     
     @Tools.ui_action
-    async def input_text(self, text: str) -> str:
+    async def input_text(self, text: str, index: Optional[int] = None) -> str:
         """
         输入文本
         
         Args:
             text: 要输入的文本
+            index: 可选的元素索引，如果提供则由移动端直接在该元素中输入文本
             
         Returns:
             操作结果消息
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "[async] Inputting text: {text}", text=text[:50])
+            LoggingUtils.log_debug("WebSocketTools", "[async] Inputting text: {text} {index_info}", 
+                                 text=text[:50], index_info=f"at index {index}" if index is not None else "")
             
             # 编码文本（Base64）
             encoded_text = base64.b64encode(text.encode()).decode()
             
-            response = await self._send_request_and_wait("input_text", {
+            params = {
                 "text": text,
                 "base64_text": encoded_text
-            })
+            }
+            # 直接将 index 信息传递给移动端，由移动端处理元素定位和输入
+            if index is not None:
+                params["index"] = index
+                
+            response = await self._send_request_and_wait("input_text", params)
             
             if response.get("status") == "success":
                 message = response.get("message", f"Text input completed: {text[:50]}")

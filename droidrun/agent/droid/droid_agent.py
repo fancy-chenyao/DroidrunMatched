@@ -949,9 +949,13 @@ class DroidAgent(Workflow):
                     elif name in ("input_text", "type", "input"):
                         text = params.get("text", params.get("value", ""))
                         text = str(text) if text is not None else ""
+                        index = params.get("index", None)
                         # 不再在直执中做就地文本适配，保持经验参数或上层已适配结果
                         if text:
-                            await tools.input_text_async(text)
+                            if index is not None:
+                                await tools.input_text_async(text, index)
+                            else:
+                                await tools.input_text_async(text)
                             wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                             time.sleep(wait_time)
                             # 使用通用方法捕获UI状态和截图
