@@ -586,10 +586,19 @@ class DroidAgent(Workflow):
         self.step_counter = 0
         self.retry_counter = 0
 
+        # 判断新任务的类型（必须在支持的清单内）
+        task_type = self.memory_manager.determine_task_type(self.goal)
+        if not task_type:
+            LoggingUtils.log_info("ExperienceMemory", f"The function type of the task does not exist in the list.")
+            return "暂不支持该功能"  # 这里需要对接一下，后续不执行，且返回前端
+        LoggingUtils.log_info("ExperienceMemory", f"Task determined as type: {task_type}")
+        self.current_task_type = task_type
+
         # 新增：热启动检查
         if self.memory_enabled and self.memory_config.hot_start_enabled:
             similar_experiences = self.memory_manager.batch_find_similar_experiences(
-                self.goal, 
+                self.goal,
+                self.current_task_type,
                 threshold=self.memory_config.similarity_threshold
             )
             
@@ -1308,6 +1317,7 @@ class DroidAgent(Workflow):
         experience = TaskExperience(
             id=self.experience_id,  # 使用共享的experience_id
             goal=self.goal,
+            type=self.current_task_type,
             success=ev.success,
             timestamp=time.time(),
             page_sequence=page_sequence,

@@ -18,6 +18,7 @@ class TaskExperience:
     """任务经验数据结构"""
     id: str
     goal: str
+    type: Optional[str]
     success: bool
     timestamp: float
     page_sequence: List[Dict[str, Any]]
@@ -153,18 +154,31 @@ class ExperienceMemory:
             LoggingUtils.log_warning("ExperienceMemory", "LLM similarity calculation failed: {error}", error=e)
             return self._simple_text_similarity(goal1, goal2)
 
-    def batch_find_similar_experiences(self, goal: str, threshold: float = 0.8) -> List[TaskExperience]:
+    def batch_find_similar_experiences(self, goal: str, task_type: str, threshold: float = 0.8) -> List[TaskExperience]:
         """查找相似经验 - 使用LLM进行语义匹配"""
         if not self.llm:
-            LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for similarity matching")
+            LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for batch similarity matching")
             return []
+
+        # 实时遍历所有经验，筛选出类型匹配的经验.
+        # 这里后续最好改成，经验按照功能存在不同文件夹，直接调用，比遍历效率高？
+        type_experiences = [
+            exp for exp in self.experiences
+            if hasattr(exp, 'type') and exp.type == task_type  # 检查经验是否有type属性，且与任务类型一致
+        ]
+        if not type_experiences:
+            LoggingUtils.log_info("ExperienceMemory", f"No experiences found for type: {task_type}")
+            return []  #返回空列表，后续直接冷启动
+
+        type_experiences_goals = [exp.goal for exp in type_experiences]
+        similarity_scores = self._batch_calculate_similarity(goal, type_experiences_goals)
 
         similar_experiences = []
 
-        all_experiences_goals = [exp.goal for exp in self.experiences]
-        similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
+        # all_experiences_goals = [exp.goal for exp in self.experiences]
+        # similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
 
-        for i, experience in enumerate(self.experiences):
+        for i, experience in enumerate(type_experiences):
             try:
                 similarity = similarity_scores[i]
                 # 记录相似度日志
@@ -341,3 +355,29 @@ class ExperienceMemory:
                     os.remove(os.path.join(self.storage_dir, filename))
         logger.info("🧹 All experiences cleared")
 
+    def determine_task_type(self, goal: str) -> Optional[str]:
+        """用大模型判断任务类型，必须属于支持的类型清单"""
+        supported_types = ["请休假", "员工差旅"] # 暂时，后续续调整
+        try:
+            # 构建类型判断提示词   # 这里需要对接一下
+            prompt = f"""
+请判断以下任务属于哪种功能类型（只能从给定的类型清单中选择，若都不符合则返回"未知"）。
+
+支持的类型清单：{supported_types}  
+
+任务：{goal}
+
+请只返回类型名称（如"请休假"），不要添加任何解释。若不属于任何类型，返回"未知"。
+"""
+            response = self.llm.complete(prompt)
+            task_type = response.text.strip()
+
+            # 校验返回的类型是否在支持的清单内
+            if task_type in supported_types:
+                return task_type
+            else:
+                LoggingUtils.log_info("ExperienceMemory", f"Task type '{task_type}' not in supported list")
+                return None
+        except Exception as e:
+            LoggingUtils.log_error("ExperienceMemory", f"Failed to determine task type: {e}")
+            return None
