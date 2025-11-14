@@ -73,6 +73,10 @@ class WebSocketTools(Tools):
         LoggingUtils.log_info("WebSocketTools", "WebSocketTools initialized for device {device_id}", 
                             device_id=device_id)
     
+    def _set_context(self, ctx: Context):
+        """设置上下文，用于事件流记录"""
+        self._ctx = ctx
+    
     def _generate_request_id(self) -> str:
         """生成请求ID"""
         self.request_counter += 1

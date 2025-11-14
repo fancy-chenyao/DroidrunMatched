@@ -353,7 +353,7 @@ class DroidAgent(Workflow):
                 LoggingUtils.log_progress("DroidAgent", "Directly executing {count} hot-start actions", count=len(self.pending_hot_actions))
                 # 设置热启动标志，用于后续判断（finalize阶段）
                 self.is_hot_start_execution = True
-                success, reason = await self._direct_execute_actions_async(self.pending_hot_actions)
+                success, reason = await self._direct_execute_actions_async(ctx, self.pending_hot_actions)
                 # 记录热启动执行结果
                 if hasattr(self, 'trajectory') and self.trajectory:
                     self.trajectory.events.append(TaskEndEvent(success=success, reason=reason, task=task))
@@ -852,12 +852,16 @@ class DroidAgent(Workflow):
             else:
                 self.trajectory.events.append(ev)
     
-    async def _direct_execute_actions_async(self, actions: List[Dict]) -> tuple[bool, str]:
+    async def _direct_execute_actions_async(self, ctx: Context, actions: List[Dict]) -> tuple[bool, str]:
         """
         直接执行热启动动作（异步），必要时触发微冷启动子流程。
         """
         try:
             tools = self.tools_instance
+            
+            # 为工具设置上下文，确保 MacroEvent 能够正确创建
+            if tools and hasattr(tools, '_set_context'):
+                tools._set_context(ctx)
             step_count = 0
             # 初始化UI
             LoggingUtils.log_debug("DroidAgent", "Initializing UI state cache...")

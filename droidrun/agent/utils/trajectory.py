@@ -183,8 +183,8 @@ class Trajectory:
 
 
         trajectory_json_path = os.path.join(trajectory_folder, "trajectory.json")
-        with open(trajectory_json_path, "w") as f:
-            json.dump(serializable_events, f, indent=2)
+        with open(trajectory_json_path, "w", encoding="utf-8") as f:
+            json.dump(serializable_events, f, indent=2, ensure_ascii=False)
 
         # Save macro sequence as a separate file for replay
         if self.macro:
@@ -201,7 +201,7 @@ class Trajectory:
                 macro_data.append(macro_dict)
 
             macro_json_path = os.path.join(trajectory_folder, "macro.json")
-            with open(macro_json_path, "w") as f:
+            with open(macro_json_path, "w", encoding="utf-8") as f:
                 json.dump(
                     {
                         "version": "1.0",
@@ -212,6 +212,7 @@ class Trajectory:
                     },
                     f,
                     indent=2,
+                    ensure_ascii=False,
                 )
 
             logger.info(

@@ -9,6 +9,7 @@ import asyncio
 from asyncio import AbstractEventLoop
 import threading
 from droidrun.tools.adb import AdbTools
+from droidrun.tools.websocket_tools import WebSocketTools
 
 logger = logging.getLogger("droidrun")
 
@@ -142,8 +143,10 @@ class SimpleCodeExecutor:
         self.globals['step_screenshots'] = []
         self.globals['step_ui_states'] = []
         
-        if self.tools_instance and isinstance(self.tools_instance, AdbTools):
-            self.tools_instance._set_context(ctx)
+        # 为工具实例设置上下文，用于事件流记录
+        if self.tools_instance:
+            if isinstance(self.tools_instance, (AdbTools, WebSocketTools)):
+                self.tools_instance._set_context(ctx)
 
         # Capture stdout and stderr
         stdout = io.StringIO()
