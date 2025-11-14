@@ -245,10 +245,10 @@ object CommandHandler {
 
                             // 更新缓存并返回响应
                             Handler(Looper.getMainLooper()).post {
-                                // 为缓存的元素树应用稳定索引
-                                val stableIndexMap = StateConverter.getStableIndexMap(elementTree)
-                                val elementTreeWithStableIndex = applyStableIndexToElementTree(elementTree, stableIndexMap)
-                                updateCache(elementTreeWithStableIndex, stateResponse, currentScreenHash)
+                                // 为缓存的元素树应用增量索引
+                                val incrementalIndexMap = StateConverter.getIncrementalIndexMap(elementTree)
+                                val elementTreeWithIncrementalIndex = applyIncrementalIndexToElementTree(elementTree, incrementalIndexMap)
+                                updateCache(elementTreeWithIncrementalIndex, stateResponse, currentScreenHash)
                                 callback(stateResponse)
                                 
                                 // 计算总耗时和数据大小
@@ -562,20 +562,20 @@ object CommandHandler {
     }
     
     /**
-     * 为元素树应用稳定索引
+     * 为元素树应用增量索引
      */
-    private fun applyStableIndexToElementTree(root: GenericElement, stableIndexMap: Map<GenericElement, Int>): GenericElement {
-        fun applyStableIndex(element: GenericElement): GenericElement {
-            val stableIndex = stableIndexMap[element] ?: element.index
-            val updatedChildren = element.children.map { applyStableIndex(it) }
+    private fun applyIncrementalIndexToElementTree(root: GenericElement, incrementalIndexMap: Map<GenericElement, Int>): GenericElement {
+        fun applyIncrementalIndex(element: GenericElement): GenericElement {
+            val incrementalIndex = incrementalIndexMap[element] ?: element.index
+            val updatedChildren = element.children.map { applyIncrementalIndex(it) }
             
             return element.copy(
-                index = stableIndex,
+                index = incrementalIndex,
                 children = updatedChildren
             )
         }
         
-        return applyStableIndex(root)
+        return applyIncrementalIndex(root)
     }
     
     /**
