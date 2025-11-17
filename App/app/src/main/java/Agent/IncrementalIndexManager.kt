@@ -11,6 +11,9 @@ import java.util.concurrent.ConcurrentHashMap
 object IncrementalIndexManager {
     private const val TAG = "IncrementalIndexManager"
     
+    // 控制是否打印调试信息
+    private var isDebugEnabled = false
+    
     // 元素唯一ID到索引的映射
     private val elementIdToIndex = ConcurrentHashMap<String, Int>()
     
@@ -24,6 +27,22 @@ object IncrementalIndexManager {
     private val reservedIndexes = mutableSetOf<Int>()
     
     /**
+     * 调试日志输出函数
+     */
+    private fun debugLog(message: String) {
+        if (isDebugEnabled) {
+            Log.d(TAG, message)
+        }
+    }
+    
+    /**
+     * 设置调试模式
+     */
+    fun setDebugEnabled(enabled: Boolean) {
+        isDebugEnabled = enabled
+    }
+    
+    /**
      * 为元素树分配增量索引
      * @param elements 当前页面的所有元素列表
      * @return 元素到索引的映射
@@ -32,7 +51,7 @@ object IncrementalIndexManager {
         val result = mutableMapOf<GenericElement, Int>()
         val currentElementIds = mutableSetOf<String>()
         
-        Log.d(TAG, "开始分配增量索引，当前元素数量: ${elements.size}")
+        debugLog("开始分配增量索引，当前元素数量: ${elements.size}")
         
         // 为每个元素分配索引
         elements.forEach { element ->
@@ -46,7 +65,7 @@ object IncrementalIndexManager {
         // 标记不再存在的元素为隐藏状态
         markHiddenElements(currentElementIds)
         
-        Log.d(TAG, "索引分配完成，活跃元素: ${elements.size}, 保留索引: ${reservedIndexes.size}, 下一个索引: $nextAvailableIndex")
+        debugLog("索引分配完成，活跃元素: ${elements.size}, 保留索引: ${reservedIndexes.size}, 下一个索引: $nextAvailableIndex")
         
         return result
     }
@@ -81,7 +100,7 @@ object IncrementalIndexManager {
         if (existingIndex != null) {
             // 元素重新出现，从保留索引中移除
             reservedIndexes.remove(existingIndex)
-            Log.d(TAG, "元素重新出现: $elementId -> 索引 $existingIndex")
+            debugLog("元素重新出现: $elementId -> 索引 $existingIndex")
             return existingIndex
         }
         
@@ -90,7 +109,7 @@ object IncrementalIndexManager {
         elementIdToIndex[elementId] = newIndex
         indexToElementId[newIndex] = elementId
         
-        Log.d(TAG, "新元素分配索引: [${element.className}:${element.text}:${element.contentDesc}] -> 索引 $newIndex")
+        debugLog("新元素分配索引: [${element.className}:${element.text}:${element.contentDesc}] -> 索引 $newIndex")
         return newIndex
     }
     
@@ -119,12 +138,12 @@ object IncrementalIndexManager {
             val index = elementIdToIndex[elementId]
             if (index != null) {
                 reservedIndexes.add(index)
-                Log.d(TAG, "元素隐藏，保留索引: $elementId -> 索引 $index")
+                debugLog("元素隐藏，保留索引: $elementId -> 索引 $index")
             }
         }
         
         if (hiddenElements.isNotEmpty()) {
-            Log.d(TAG, "标记 ${hiddenElements.size} 个元素为隐藏状态")
+            debugLog("标记 ${hiddenElements.size} 个元素为隐藏状态")
         }
     }
     
@@ -143,7 +162,7 @@ object IncrementalIndexManager {
                 elementIdToIndex.remove(elementId)
             }
             
-            Log.d(TAG, "清理了 ${toRemove.size} 个长期未使用的索引")
+            debugLog("清理了 ${toRemove.size} 个长期未使用的索引")
         }
     }
     
@@ -155,7 +174,7 @@ object IncrementalIndexManager {
         indexToElementId.clear()
         reservedIndexes.clear()
         nextAvailableIndex = 1
-        Log.d(TAG, "索引管理器已重置")
+        debugLog("索引管理器已重置")
     }
     
     /**
