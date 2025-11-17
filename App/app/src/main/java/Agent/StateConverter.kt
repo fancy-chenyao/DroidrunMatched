@@ -24,7 +24,7 @@ object StateConverter {
     private const val TAG = "StateConverter"
     
     // 调试开关：是否保存原始元素树和XML文件
-    private const val SAVE_DEBUG_FILES = false
+    private const val SAVE_DEBUG_FILES = true
     
     /**
      * 保存原始元素树到本地文件（调试用）

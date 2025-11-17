@@ -41,6 +41,13 @@ object WebViewController {
                             }
                             
                             const rect = node.getBoundingClientRect();
+                            
+                            // 过滤不可见元素：宽度或高度为0的元素
+                            // 这会过滤掉display:none、visibility:hidden等隐藏元素
+                            if (rect.width <= 0 || rect.height <= 0) {
+                                return null;
+                            }
+                            
                             const children = [];
                             
                             if (node.children && node.children.length > 0) {
