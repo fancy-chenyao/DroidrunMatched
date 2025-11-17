@@ -598,10 +598,20 @@ class DroidAgent(Workflow):
 
         # 新增：热启动检查
         if self.memory_enabled and self.memory_config.hot_start_enabled:
-            similar_experiences = self.memory_manager.batch_find_similar_experiences(
-                self.goal, 
-                threshold=self.memory_config.similarity_threshold
-            )
+            # 使用合并优化：一次LLM调用同时完成相似度计算和排序
+            use_merged_optimization = self.config_manager.get("memory.use_merged_similarity_ranking", True)
+            
+            if use_merged_optimization:
+                similar_experiences = self.memory_manager.find_and_rank_similar_experiences(
+                    self.goal, 
+                    threshold=self.memory_config.similarity_threshold
+                )
+            else:
+                # 旧方法：分别计算相似度和排序
+                similar_experiences = self.memory_manager.batch_find_similar_experiences(
+                    self.goal, 
+                    threshold=self.memory_config.similarity_threshold
+                )
             
             # 打印用户友好的经验检查信息
             if similar_experiences:
@@ -645,26 +655,34 @@ class DroidAgent(Workflow):
                 ExceptionHandler.handle_data_parsing_error(e, "[SIM] Experience processing")
             
             if similar_experiences:
+                # 合并优化后，经验已经按相似度排序，直接使用第一个（最佳）经验
+                use_merged_optimization = self.config_manager.get("memory.use_merged_similarity_ranking", True)
                 
-                # 优化：如果存在相似度=1.0的经验，直接选择，不调用LLM
-                perfect_threshold = self.config_manager.get("memory.perfect_match_threshold", 0.999)
-                perfect_matches = [exp for exp in similar_experiences if exp.similarity_score >= perfect_threshold]
-                best_exp_obj = None  # 初始化变量，用于后续判断
-                
-                if perfect_matches:
-                    # 直接使用相似度最高的完美匹配
-                    best_exp_obj = max(perfect_matches, key=lambda e: e.similarity_score)
+                if use_merged_optimization:
+                    # 新方法：直接使用已排序的第一个经验（最佳匹配）
+                    best_exp_obj = similar_experiences[0]
                     best_experience = best_exp_obj.to_dict()
-                    LoggingUtils.log_success("DroidAgent", "Perfect match found (similarity={score:.2f}), skipping LLM selection", 
-                                            score=best_exp_obj.similarity_score)
+                    LoggingUtils.log_success("DroidAgent", 
+                                           "✅ Using best experience from merged ranking (similarity={score:.2f}), no additional LLM call needed", 
+                                           score=best_exp_obj.similarity_score)
                 else:
-                    # 没有完美匹配时才调用LLM选择
-                    LoggingUtils.log_info("DroidAgent", "No perfect match, using LLM to select best from {count} candidates", 
-                                        count=len(similar_experiences))
-                    best_experience = self.llm_services.select_best_experience(
-                        [exp.to_dict() for exp in similar_experiences], 
-                        self.goal
-                    )
+                    # 旧方法：检查完美匹配或调用LLM选择
+                    perfect_threshold = self.config_manager.get("memory.perfect_match_threshold", 0.999)
+                    perfect_matches = [exp for exp in similar_experiences if exp.similarity_score >= perfect_threshold]
+                    best_exp_obj = None
+                    
+                    if perfect_matches:
+                        best_exp_obj = max(perfect_matches, key=lambda e: e.similarity_score)
+                        best_experience = best_exp_obj.to_dict()
+                        LoggingUtils.log_success("DroidAgent", "✅ Perfect match found (similarity={score:.2f}), skipping LLM selection", 
+                                                score=best_exp_obj.similarity_score)
+                    else:
+                        LoggingUtils.log_info("DroidAgent", "No perfect match, using LLM to select best from {count} candidates", 
+                                            count=len(similar_experiences))
+                        best_experience = self.llm_services.select_best_experience(
+                            [exp.to_dict() for exp in similar_experiences], 
+                            self.goal
+                        )
                 
                 if best_experience:
                     try:
@@ -749,6 +767,23 @@ class DroidAgent(Workflow):
                                     self.pending_hot_context["changed_indices"] = det.get("changed_indices", [])
                                     # 保存 index->reason，用于更具体的微冷启动子目标
                                     self.pending_hot_context["changed_index_reasons"] = det.get("index_reasons", [])
+                                    
+                                    # 使用 INFO 级别确保日志输出
+                                    if self.pending_hot_context['changed_indices']:
+                                        LoggingUtils.log_info("DroidAgent", 
+                                                            "🔄 Detected {count} actions need adaptation: indices={indices}", 
+                                                            count=len(self.pending_hot_context['changed_indices']),
+                                                            indices=self.pending_hot_context['changed_indices'])
+                                        # 打印每个变更动作的理由
+                                        for ir in self.pending_hot_context.get("changed_index_reasons", []):
+                                            LoggingUtils.log_info("DroidAgent", 
+                                                                "  - Action {idx}: {reason}", 
+                                                                idx=ir.get("index"), 
+                                                                reason=ir.get("reason"))
+                                    else:
+                                        LoggingUtils.log_warning("DroidAgent", 
+                                                               "⚠️ No changed actions detected by LLM (may cause hot-start to fail if parameters differ)")
+                                    
                                     LoggingUtils.log_debug("DroidAgent", "Changed action indices predicted: {indices}", 
                                                          indices=self.pending_hot_context['changed_indices'])
                             except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
@@ -863,13 +898,9 @@ class DroidAgent(Workflow):
             if tools and hasattr(tools, '_set_context'):
                 tools._set_context(ctx)
             
-            # 在热启动执行过程中也需要监听事件流
-            async def process_stream_events():
-                async for ev in ctx.stream_events():
-                    self.handle_stream_event(ev, ctx)
-            
-            # 启动事件流处理任务
-            stream_task = asyncio.create_task(process_stream_events())
+            # 注意：热启动直接执行时，事件由 WebSocketTools 通过 ctx.write_event_to_stream() 写入
+            # 这些事件会在主 workflow 的事件循环中被 handle_stream_event 处理
+            # 不需要在这里单独监听事件流（ctx 没有 stream_events 方法）
             step_count = 0
             # 初始化UI
             LoggingUtils.log_debug("DroidAgent", "Initializing UI state cache...")
@@ -912,7 +943,8 @@ class DroidAgent(Workflow):
                             LoggingUtils.log_debug("DroidAgent", "[DEBUG] Is changed param click: {is_changed}, changed_indices={changed}", 
                                                  is_changed=is_changed, changed=(self.pending_hot_context or {}).get("changed_indices", []))
                             if is_changed and not triggered_changed_steps.get(idx_action):
-                                LoggingUtils.log_info("DroidAgent", "[DEBUG] Triggering micro-coldstart for step {step}", step=idx_action)
+                                LoggingUtils.log_info("DroidAgent", "🎯 Triggering micro-coldstart for step {step} (action: {action})", 
+                                                     step=idx_action, action=name)
                                 ok = await self._micro_coldstart_handle_click_step(idx_action, act)
                                 triggered_changed_steps[idx_action] = True
                                 if ok:
@@ -1118,14 +1150,6 @@ class DroidAgent(Workflow):
         except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
             ExceptionHandler.handle_runtime_error(e, "[HOT] Direct execution", reraise=False)
             return False, f"Direct execution failed: {e}"
-        finally:
-            # 取消事件流处理任务
-            if 'stream_task' in locals():
-                stream_task.cancel()
-                try:
-                    await stream_task
-                except asyncio.CancelledError:
-                    pass
 
     async def _capture_ui_state_and_screenshot(self, context: str) -> bool:
         """

@@ -518,7 +518,14 @@ object CommandHandler {
                             if (changed) {
                                 clearCache()
                                 Log.d(TAG, "tap_by_index命令执行成功且检测到页面变化: index=$index, 类型=$changeType")
-                                val data = JSONObject().apply { put("page_change_type", changeType) }
+                                
+                                // 构建详细的描述信息
+                                val elementDesc = buildElementDescription(targetElement, index)
+                                
+                                val data = JSONObject().apply { 
+                                    put("page_change_type", changeType)
+                                    put("message", elementDesc)
+                                }
                                 callback(createSuccessResponse(data))
                             } else {
                                 Log.w(TAG, "tap_by_index命令执行后未检测到页面变化")
@@ -855,9 +862,14 @@ object CommandHandler {
                         ) { changed, changeType ->
                             if (changed) {
                                 smartClearCache("input_text")
+                                
+                                // 构建详细的描述信息
+                                val elementDesc = buildInputTextDescription(targetElement, index, text)
+                                
                                 val data = JSONObject().apply { 
                                     put("page_change_type", changeType)
                                     put("element_index", index)
+                                    put("message", elementDesc)
                                 }
                                 Log.d(TAG, "input_text命令执行成功且检测到页面变化: 类型=$changeType")
                                 callback(createSuccessResponse(data))
@@ -1147,6 +1159,46 @@ object CommandHandler {
             Log.e(TAG, "截图异常", e)
             callback(null)
         }
+    }
+    
+    /**
+     * 构建元素的详细描述信息（点击动作）
+     */
+    private fun buildElementDescription(element: GenericElement, index: Int): String {
+        val className = element.className.substringAfterLast('.')
+        
+        // 优先级：text > contentDesc > resourceId > "no description"
+        val description = when {
+            element.text.isNotEmpty() -> "'${element.text}'"
+            element.contentDesc.isNotEmpty() -> "[desc: '${element.contentDesc}']"
+            element.resourceId.isNotEmpty() -> "[id: ${element.resourceId.substringAfterLast('/')}]"
+            else -> "[no description]"
+        }
+        
+        val centerX = (element.bounds.left + element.bounds.right) / 2
+        val centerY = (element.bounds.top + element.bounds.bottom) / 2
+        
+        return "Tap element at index $index: $description ($className) at coordinates ($centerX, $centerY)"
+    }
+    
+    /**
+     * 构建输入文本的详细描述信息
+     */
+    private fun buildInputTextDescription(element: GenericElement, index: Int, inputText: String): String {
+        val className = element.className.substringAfterLast('.')
+        
+        // 优先级：resourceId > contentDesc > text > "no description"
+        val targetDesc = when {
+            element.resourceId.isNotEmpty() -> "[id: ${element.resourceId.substringAfterLast('/')}]"
+            element.contentDesc.isNotEmpty() -> "[desc: '${element.contentDesc}']"
+            element.text.isNotEmpty() -> "[hint: '${element.text}']"
+            else -> "[no description]"
+        }
+        
+        val centerX = (element.bounds.left + element.bounds.right) / 2
+        val centerY = (element.bounds.top + element.bounds.bottom) / 2
+        
+        return "Input text at index $index: '$inputText' into $targetDesc ($className) at coordinates ($centerX, $centerY)"
     }
     
     /**

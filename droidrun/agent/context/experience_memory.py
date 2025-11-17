@@ -241,6 +241,105 @@ class ExperienceMemory:
             # 批量失败时，降级为逐条计算（保证功能可用）
             return [self._calculate_similarity(goal, exp_goal) for exp_goal in experience_goals]
 
+    def find_and_rank_similar_experiences(self, goal: str, threshold: float = 0.8) -> List[TaskExperience]:
+        """
+        合并优化：一次LLM调用同时完成相似度计算和排序
+        
+        Args:
+            goal: 目标任务
+            threshold: 相似度阈值
+            
+        Returns:
+            按相似度排序的经验列表（已过滤低于阈值的）
+        """
+        if not self.llm:
+            LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for similarity matching")
+            return []
+        
+        if not self.experiences:
+            return []
+        
+        try:
+            # 构建合并的提示词：同时计算相似度和排序
+            prompt = f"""
+请判断目标任务与以下每条历史经验的相似度，并按相似度从高到低排序。
+
+判断标准：
+1. 核心目标是否一致：最终要达成的结果是否相同
+2. 关键对象是否一致：任务操作的核心实体是否相同
+3. 核心操作是否一致：完成任务的核心动作是否相同
+
+忽略参数差异和表面表达差异。
+
+目标任务: {goal}
+
+历史经验列表：
+"""
+            for i, exp in enumerate(self.experiences, 1):
+                prompt += f"{i}. {exp.goal}\n"
+            
+            prompt += f"""
+请返回JSON格式的结果，包含每条经验的相似度分数和排序：
+{{
+    "ranked_experiences": [
+        {{"index": 1, "similarity": 0.95, "reason": "简短理由"}},
+        {{"index": 3, "similarity": 0.85, "reason": "简短理由"}},
+        ...
+    ]
+}}
+
+要求：
+1. 只返回相似度 >= {threshold} 的经验
+2. 按相似度从高到低排序
+3. index 是历史经验列表中的序号（1-{len(self.experiences)}）
+4. similarity 是 0-1 之间的分数（保留2位小数）
+5. reason 控制在15字以内
+"""
+            
+            LoggingUtils.log_info("ExperienceMemory", 
+                                "🚀 Merged LLM call: calculating similarity and ranking for {count} experiences", 
+                                count=len(self.experiences))
+            
+            response = self.llm.complete(prompt)
+            response_text = response.text.strip()
+            
+            # 解析JSON响应
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if not json_match:
+                LoggingUtils.log_warning("ExperienceMemory", "Could not parse JSON from merged response, fallback to batch method")
+                return self.batch_find_similar_experiences(goal, threshold)
+            
+            result = json.loads(json_match.group())
+            ranked_list = result.get("ranked_experiences", [])
+            
+            # 构建结果列表
+            similar_experiences = []
+            for item in ranked_list:
+                idx = item.get("index", 0) - 1  # 转换为0-based索引
+                similarity = item.get("similarity", 0.0)
+                reason = item.get("reason", "")
+                
+                if 0 <= idx < len(self.experiences) and similarity >= threshold:
+                    exp = self.experiences[idx]
+                    exp.similarity_score = similarity
+                    similar_experiences.append(exp)
+                    LoggingUtils.log_debug("ExperienceMemory", 
+                                         "✓ Matched: {goal} (similarity={score:.2f}, reason={reason})",
+                                         goal=exp.goal, score=similarity, reason=reason)
+            
+            LoggingUtils.log_success("ExperienceMemory", 
+                                   "✅ Merged call completed: found {count} similar experiences in 1 LLM call (saved {saved} calls)",
+                                   count=len(similar_experiences), 
+                                   saved=len(self.experiences))
+            
+            return similar_experiences
+            
+        except Exception as e:
+            LoggingUtils.log_warning("ExperienceMemory", 
+                                   "Merged LLM call failed: {error}, fallback to batch method", 
+                                   error=e)
+            return self.batch_find_similar_experiences(goal, threshold)
+    
     def _simple_text_similarity(self, goal1: str, goal2: str) -> float:
         """简单的文本相似度计算（Jaccard相似度）"""
         words1 = set(goal1.lower().split())
