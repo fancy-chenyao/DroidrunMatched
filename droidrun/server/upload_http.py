@@ -231,40 +231,54 @@ class UploadHTTPServer:
 
     def cleanup_expired(self):
         """清理超过 TTL 的目录/文件"""
+        # 检查临时目录是否存在，如果不存在则创建
+        if not os.path.exists(self._cfg.tmp_root):
+            try:
+                os.makedirs(self._cfg.tmp_root, exist_ok=True)
+                LoggingUtils.log_info("UploadHTTP", "Created missing tmp_root directory: {path}", path=self._cfg.tmp_root)
+                return  # 新创建的目录没有文件需要清理
+            except Exception as e:
+                LoggingUtils.log_error("UploadHTTP", "Failed to create tmp_root directory: {error}", error=e)
+                return
+        
         now = time.time()
         ttl = self._cfg.ttl_seconds
         removed = 0
-        for device in os.listdir(self._cfg.tmp_root):
-            dpath = os.path.join(self._cfg.tmp_root, device)
-            if not os.path.isdir(dpath):
-                continue
-            for req in os.listdir(dpath):
-                rpath = os.path.join(dpath, req)
-                if not os.path.isdir(rpath):
+        try:
+            for device in os.listdir(self._cfg.tmp_root):
+                dpath = os.path.join(self._cfg.tmp_root, device)
+                if not os.path.isdir(dpath):
                     continue
-                # 如果目录下所有文件都过期，则删除整个请求目录
-                stale = True
-                for fname in os.listdir(rpath):
-                    fpath = os.path.join(rpath, fname)
-                    try:
-                        mtime = os.path.getmtime(fpath)
-                        if now - mtime <= ttl:
-                            stale = False
-                            break
-                    except Exception:
+                for req in os.listdir(dpath):
+                    rpath = os.path.join(dpath, req)
+                    if not os.path.isdir(rpath):
                         continue
-                if stale:
-                    try:
-                        for fname in os.listdir(rpath):
-                            try:
-                                os.remove(os.path.join(rpath, fname))
-                                removed += 1
-                            except Exception:
-                                pass
-                        os.rmdir(rpath)
-                        LoggingUtils.log_info("UploadHTTP", "Removed expired request dir: {path}", path=rpath)
-                    except Exception:
-                        pass
+                    # 如果目录下所有文件都过期，则删除整个请求目录
+                    stale = True
+                    for fname in os.listdir(rpath):
+                        fpath = os.path.join(rpath, fname)
+                        try:
+                            mtime = os.path.getmtime(fpath)
+                            if now - mtime <= ttl:
+                                stale = False
+                                break
+                        except Exception:
+                            continue
+                    if stale:
+                        try:
+                            for fname in os.listdir(rpath):
+                                try:
+                                    os.remove(os.path.join(rpath, fname))
+                                    removed += 1
+                                except Exception:
+                                    pass
+                            os.rmdir(rpath)
+                            LoggingUtils.log_info("UploadHTTP", "Removed expired request dir: {path}", path=rpath)
+                        except Exception:
+                            pass
+        except Exception as e:
+            LoggingUtils.log_error("UploadHTTP", "Error during cleanup iteration: {error}", error=e)
+            
         if removed:
             LoggingUtils.log_info("UploadHTTP", "Removed {count} expired files", count=removed)
 
