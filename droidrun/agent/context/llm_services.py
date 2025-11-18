@@ -227,11 +227,18 @@ class LLMServices:
             rsp = self.llm.complete(prompt)
             text = getattr(rsp, 'text', str(rsp))
             LoggingUtils.log_debug("LLMServices", "Detect changed actions response: {text}", text=text)
+            
             # 解析严格JSON
             m = re.search(r'\{[\s\S]*\}$', text.strip())
             data = json.loads(m.group()) if m else json.loads(text)
             indices_raw = data.get("changed_indices", [])
             reasons_raw = data.get("reasons", [])
+            
+            # 添加INFO级别日志显示LLM识别结果
+            LoggingUtils.log_info("LLMServices", 
+                                "🔍 LLM detected changed actions: indices={indices}, reasons_count={count}", 
+                                indices=indices_raw, 
+                                count=len(reasons_raw))
             # 规范化索引为整数（保留原有顺序，用于与 reasons 对齐）
             norm_indices: List[int] = []
             for i in indices_raw:
