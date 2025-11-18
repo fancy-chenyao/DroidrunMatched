@@ -979,8 +979,8 @@ class DroidAgent(Workflow):
                                 else:
                                     LoggingUtils.log_warning("DroidAgent", "Micro-coldstart failed for step {step}, fallback to direct tap", 
                                                            step=idx_action)
-                            LoggingUtils.log_info("DroidAgent", "[DEBUG] Executing direct tap_by_index_async for index {idx}", idx=idx)
-                            await tools.tap_by_index_async(idx)
+                            LoggingUtils.log_info("DroidAgent", "[DEBUG] Executing direct tap_by_index for index {idx}", idx=idx)
+                            await tools.tap_by_index(idx)
                             screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                             time.sleep(screenshot_wait)
                             # 使用通用方法捕获UI状态和截图
@@ -1048,7 +1048,7 @@ class DroidAgent(Workflow):
                         ex = int(params.get("end_x", end[0] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("x", default_x)))
                         ey = int(params.get("end_y", end[1] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("y", default_y)))
                         dur = int(params.get("duration_ms", params.get("duration", default_duration)))
-                        await tools.swipe_async(sx, sy, ex, ey, dur)
+                        await tools.swipe(sx, sy, ex, ey, dur)
                         screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                         time.sleep(screenshot_wait)
                         # 使用通用方法捕获UI状态和截图
@@ -1071,8 +1071,8 @@ class DroidAgent(Workflow):
                     elif name == "start_app":
                         pkg = params.get("package", params.get("pkg", ""))
                         pkg = str(pkg) if pkg is not None else ""
-                        if pkg and hasattr(tools, "start_app_async"):
-                            await tools.start_app_async(pkg)
+                        if pkg:
+                            await tools.start_app(pkg)
                             long_wait = self.config_manager.get("tools.long_wait_time", 2.0)
                             time.sleep(long_wait)
                             try:
@@ -1102,7 +1102,7 @@ class DroidAgent(Workflow):
                             ExceptionHandler.handle_data_parsing_error(e, "[HOT] Keycode parsing")
                             keycode = 0
                         if keycode:
-                            await tools.press_key_async(keycode)
+                            await tools.press_key(keycode)
                             wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                             time.sleep(wait_time)
                             # 使用通用方法捕获UI状态和截图
