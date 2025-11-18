@@ -930,7 +930,6 @@ class DroidAgent(Workflow):
                 LoggingUtils.log_debug("DroidAgent", "Executing action {current}/{total}: {name} params={params}", 
                                      current=idx_action+1, total=len(actions), name=name, params=params)
                 try:
-                    # 处理 Added 动作（micro_coldstart）
                     if name == "micro_coldstart":
                         LoggingUtils.log_info("DroidAgent", "🎯 Executing added action at step {step}", step=idx_action)
                         
@@ -940,6 +939,7 @@ class DroidAgent(Workflow):
                             step_count += 1
                             await self._capture_ui_state_and_screenshot("added-action")
                             if idx_action < len(actions) - 1:
+                                wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                                 time.sleep(wait_time)
                         else:
                             LoggingUtils.log_warning("DroidAgent", "⚠️ Added action failed at step {step}", step=idx_action)
@@ -1393,17 +1393,16 @@ class DroidAgent(Workflow):
             self.tools_instance.success = None
             self.tools_instance.reason = None
             
-            # 使用微冷启动专用的 CodeActAgentMicro，支持自动 UI 刷新
             from droidrun.agent.codeact.codeact_agent_micro import CodeActAgentMicro
             agent = CodeActAgentMicro(
                 llm=self.llm,
                 persona=self.cim.get_persona("Default"),
                 vision=self.vision,
-                max_steps=max_micro_steps,  # 限制为5步，避免长链思考
+                max_steps=max_micro_steps,
                 all_tools_list=self.tool_list,
                 tools_instance=self.tools_instance,
                 debug=self.debug,
-                timeout=min(self.timeout, self.config_manager.get("agent.micro_cold_timeout", 60)),  # 减少超时时间
+                timeout=min(self.timeout, self.config_manager.get("agent.micro_cold_timeout", 60)),
             )
             
             # 执行聚焦的微冷启动
@@ -1794,27 +1793,3 @@ class DroidAgent(Workflow):
             })
         
         return actions
-
-    # 旧版本 _capture_ui_state_and_screenshot 已移除，统一使用上方的异步版本
-
-    async def _save_experience_async(self, ev: FinalizeEvent) -> None:
-        """
-        异步保存经验到记忆系统，不阻塞主流程
-        
-        Args:
-            ev: 最终化事件
-        """
-        try:
-            # 确保macro.json已经生成
-            wait_time = self.config_manager.get("tools.macro_generation_wait_time", 0.5)
-            await asyncio.sleep(wait_time)
-            
-            # 构建经验
-            experience = self._build_experience_from_execution(ev)
-            
-            # 保存经验
-            saved_path = self.memory_manager.save_experience(experience)
-            LoggingUtils.log_success("DroidAgent", "Experience saved to: {path}", path=saved_path)
-            
-        except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
-            ExceptionHandler.handle_file_operation_error(e, "[Experience] Save")

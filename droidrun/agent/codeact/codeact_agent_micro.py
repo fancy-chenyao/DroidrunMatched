@@ -41,13 +41,9 @@ class CodeActAgentMicro(Workflow):
     微冷启动专用的 CodeActAgent，支持自动 UI 刷新。
     
     与标准 CodeActAgent 的区别：
-    1. 在每次执行动作后自动刷新 UI 状态
-    2. 在任务完成前刷新最终 UI 状态
-    3. 确保跨页面操作能看到 UI 变化
-    
-    An agent that uses a ReAct-like cycle (Thought -> Code -> Observation)
-    to solve problems requiring code execution. It extracts code from
-    Markdown blocks and uses specific step types for tracking.
+    1. 每次思考前自动获取最新 UI 状态
+    2. 每次执行后自动刷新 UI 状态
+    3. 任务完成前刷新最终 UI 状态
     """
 
     def __init__(
@@ -180,7 +176,6 @@ class CodeActAgentMicro(Workflow):
             await ctx.store.set("remembered_info", self.remembered_info)
             chat_history = await chat_utils.add_memory_block(self.remembered_info, chat_history)
 
-        # 微冷启动专用：每次思考前都获取最新的 UI 状态
         state = await self.tools.get_state_async(include_screenshot=True)
         try:
             a11y_tree = state.get("a11y_tree")
@@ -198,7 +193,6 @@ class CodeActAgentMicro(Workflow):
         except Exception as e:
             logger.warning(f"⚠️ Error processing ui_state/phone_state from get_state_async response: {e}")
 
-        # 如需截图并且 vision 开启，则从 base64 解码
         if any(c == "screenshot" for c in self.required_context):
             screenshot_bytes: Optional[bytes] = None
             try:
@@ -299,7 +293,6 @@ class CodeActAgentMicro(Workflow):
             if self.tools.finished == True:
                 logger.debug("  - Task completed.")
                 
-                # 微冷启动专用：在任务完成前刷新最终 UI 状态
                 try:
                     state = await self.tools.get_state_async(include_screenshot=False)
                     if "error" not in state:
@@ -350,7 +343,6 @@ class CodeActAgentMicro(Workflow):
                 else f"  - Execution output: {output}"
             )
         
-        # 微冷启动专用：自动刷新 UI 状态
         try:
             if not self.tools.finished:
                 state = await self.tools.get_state_async(include_screenshot=False)
@@ -371,7 +363,6 @@ class CodeActAgentMicro(Workflow):
         except Exception as e:
             logger.warning(f"[Micro] UI 刷新失败: {e}")
         
-        # Add the execution output to memory as an user message (observation)
         observation_message = ChatMessage(
             role="user", content=f"Execution Result:\n```\n{output}\n```"
         )
