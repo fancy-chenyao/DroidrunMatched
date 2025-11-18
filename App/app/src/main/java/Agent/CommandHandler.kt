@@ -427,15 +427,17 @@ object CommandHandler {
                 // 动作前状态用于页面变化验证
                 val preActivity = activity
                 val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
-                // 使用NativeController执行坐标点击（dp单位）
-                NativeController.clickByCoordinateDp(activity, x.toFloat(), y.toFloat()) { success ->
+                val preWebHash = PageChangeVerifier.computePreWebViewAggHash(activity)
+                // 根据页面类型分发坐标点击（dp单位）
+                ElementController.clickByCoordinateDp(activity, x.toFloat(), y.toFloat()) { success ->
                     if (success) {
                         // 成功后进行页面变化验证
                         PageChangeVerifier.verifyActionWithPageChange(
                             handler = Handler(Looper.getMainLooper()),
                             getCurrentActivity = { ActivityTracker.getCurrentActivity() },
                             preActivity = preActivity,
-                            preViewTreeHash = preHash
+                            preViewTreeHash = preHash,
+                            preWebViewAggHash = preWebHash
                         ) { changed, changeType ->
                             if (changed) {
                                 clearCache()
@@ -505,15 +507,17 @@ object CommandHandler {
                 // 动作前状态用于页面变化验证
                 val preActivity = activity
                 val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
-                // 使用NativeController执行坐标点击（dp单位）
-                NativeController.clickByCoordinateDp(activity, centerX, centerY) { success ->
+                val preWebHash = PageChangeVerifier.computePreWebViewAggHash(activity)
+                // 根据页面类型分发坐标点击（dp单位）
+                ElementController.clickByCoordinateDp(activity, centerX, centerY) { success ->
                     if (success) {
                         // 成功后进行页面变化验证
                         PageChangeVerifier.verifyActionWithPageChange(
                             handler = Handler(Looper.getMainLooper()),
                             getCurrentActivity = { ActivityTracker.getCurrentActivity() },
                             preActivity = preActivity,
-                            preViewTreeHash = preHash
+                            preViewTreeHash = preHash,
+                            preWebViewAggHash = preWebHash
                         ) { changed, changeType ->
                             if (changed) {
                                 clearCache()
@@ -615,8 +619,9 @@ object CommandHandler {
                 // 动作前状态用于页面变化验证
                 val preActivity = activity
                 val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
-                // 使用NativeController的scrollByTouchDp方法实现滑动
-                NativeController.scrollByTouchDp(
+                val preWebHash = PageChangeVerifier.computePreWebViewAggHash(activity)
+                // 根据页面类型分发滑动
+                ElementController.scrollByTouchDp(
                     activity = activity,
                     startXDp = startX.toFloat(),
                     startYDp = startY.toFloat(),
@@ -630,7 +635,8 @@ object CommandHandler {
                             handler = Handler(Looper.getMainLooper()),
                             getCurrentActivity = { ActivityTracker.getCurrentActivity() },
                             preActivity = preActivity,
-                            preViewTreeHash = preHash
+                            preViewTreeHash = preHash,
+                            preWebViewAggHash = preWebHash
                         ) { changed, changeType ->
                             if (changed) {
                                 clearCache()
@@ -822,6 +828,7 @@ object CommandHandler {
                 // 动作前状态用于页面变化验证
                 val preActivity = activity
                 val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
+                val preWebHash = PageChangeVerifier.computePreWebViewAggHash(activity)
                 
                 Log.d(TAG, "解析输入文本: text='$text', index=$index")
                 
@@ -851,7 +858,8 @@ object CommandHandler {
                             handler = Handler(Looper.getMainLooper()),
                             getCurrentActivity = { ActivityTracker.getCurrentActivity() },
                             preActivity = preActivity,
-                            preViewTreeHash = preHash
+                            preViewTreeHash = preHash,
+                            preWebViewAggHash = preWebHash
                         ) { changed, changeType ->
                             if (changed) {
                                 smartClearCache("input_text")
@@ -920,6 +928,7 @@ object CommandHandler {
                 // 动作前状态用于页面变化验证
                 val preActivity = activity
                 val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
+                val preWebHash = PageChangeVerifier.computePreWebViewAggHash(activity)
                 NativeController.goBack(activity) { success ->
                     if (success) {
                         // 成功后进行页面变化验证
@@ -927,7 +936,8 @@ object CommandHandler {
                             handler = Handler(Looper.getMainLooper()),
                             getCurrentActivity = { ActivityTracker.getCurrentActivity() },
                             preActivity = preActivity,
-                            preViewTreeHash = preHash
+                            preViewTreeHash = preHash,
+                            preWebViewAggHash = preWebHash
                         ) { changed, changeType ->
                             if (changed) {
                                 clearCache()
@@ -998,7 +1008,8 @@ object CommandHandler {
                         handler = Handler(Looper.getMainLooper()),
                         getCurrentActivity = { ActivityTracker.getCurrentActivity() },
                         preActivity = preActivity,
-                        preViewTreeHash = preHash
+                        preViewTreeHash = preHash,
+                        preWebViewAggHash = PageChangeVerifier.computePreWebViewAggHash(activity)
                     ) { changed, changeType ->
                         if (changed) {
                             clearCache()

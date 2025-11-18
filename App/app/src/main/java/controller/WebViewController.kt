@@ -284,7 +284,8 @@ object WebViewController {
     /**
      * 通过坐标点击（dp版本）
      * 优先尝试通过Native根视图进行坐标点击，避免依赖JS；
-     * 若无法获取Activity上下文，则回退到直接在WebView上分发触摸事件。
+     * 使用 getLocationOnScreen 将 WebView 本地坐标映射为窗口坐标以显示特效，
+     * 保持分发触摸事件使用 WebView 本地坐标，确保视觉与交互一致。
      */
     fun clickByCoordinateDp(webView: WebView, xDp: Float, yDp: Float, callback: (Boolean) -> Unit) {
         try {
@@ -299,11 +300,9 @@ object WebViewController {
             val xPxWindow = xPxContent
             val yPxWindow = yPxContent + statusBarHeight
 
-            // 转为WebView本地坐标
-            val loc = IntArray(2)
-            webView.getLocationOnScreen(loc)
-            val xLocal = xPxWindow - loc[0]
-            val yLocal = yPxWindow - loc[1]
+            // WebView本地坐标用于分发触摸事件
+            val xLocal = xPxContent
+            val yLocal = yPxContent
 
             // 先显示发光特效，再延迟发送点击事件，避免UI被阻塞
             try {
@@ -315,11 +314,10 @@ object WebViewController {
                     }
                 }
             } catch (_: Exception) { /* 忽略特效失败 */ }
-
+            Log.d("WebViewController", "clickByCoordinateDp 点击坐标: ($xDp, $yDp) -> ($xLocal, $yLocal)")
             val downTime = SystemClock.uptimeMillis()
             var downResult = false
             val handler = Handler(Looper.getMainLooper())
-
             // 延迟发送ACTION_DOWN，让特效先展示
             handler.postDelayed({
                 val downEvent = MotionEvent.obtain(
@@ -339,9 +337,80 @@ object WebViewController {
 
                     callback(downResult && upResult)
                 }, 60)
-            }, 1000)
+            }, 100)
         } catch (e: Exception) {
             Log.e("WebViewController", "clickByCoordinateDp 失败: ${e.message}")
+            callback(false)
+        }
+    }
+
+    /**
+     * 通过坐标在WebView中执行滑动/滚动（dp版本）
+     * 将dp坐标转换为WebView本地坐标，分发ACTION_DOWN/MOVE/UP事件
+     */
+    fun scrollByTouchDp(
+        webView: WebView,
+        startXDp: Float,
+        startYDp: Float,
+        endXDp: Float,
+        endYDp: Float,
+        duration: Long = 200,
+        callback: (Boolean) -> Unit
+    ) {
+        try {
+            val density = webView.resources.displayMetrics.density
+            val startXContent = startXDp * density
+            val startYContent = startYDp * density
+            val endXContent = endXDp * density
+            val endYContent = endYDp * density
+
+            val statusBarHeight = getStatusBarHeightFromContext(webView.context)
+            val startXWindow = startXContent
+            val startYWindow = startYContent + statusBarHeight
+            val endXWindow = endXContent
+            val endYWindow = endYContent + statusBarHeight
+
+            val loc = IntArray(2)
+            webView.getLocationOnScreen(loc)
+            val startXLocal = startXWindow - loc[0]
+            val startYLocal = startYWindow - loc[1]
+            val endXLocal = endXWindow - loc[0]
+            val endYLocal = endYWindow - loc[1]
+
+            val downTime = SystemClock.uptimeMillis()
+
+            val downEvent = MotionEvent.obtain(
+                downTime, downTime, MotionEvent.ACTION_DOWN, startXLocal, startYLocal, 0
+            )
+            val downResult = webView.dispatchTouchEvent(downEvent)
+            downEvent.recycle()
+
+            val steps = (duration / 20).toInt().coerceAtLeast(1)
+            var allMoveOk = true
+            for (i in 1..steps) {
+                val progress = i.toFloat() / steps
+                val curX = startXLocal + (endXLocal - startXLocal) * progress
+                val curY = startYLocal + (endYLocal - startYLocal) * progress
+                val moveTime = SystemClock.uptimeMillis()
+                val moveEvent = MotionEvent.obtain(
+                    downTime, moveTime, MotionEvent.ACTION_MOVE, curX, curY, 0
+                )
+                val moveOk = webView.dispatchTouchEvent(moveEvent)
+                moveEvent.recycle()
+                if (!moveOk) allMoveOk = false
+                Thread.sleep(20)
+            }
+
+            val upTime = SystemClock.uptimeMillis()
+            val upEvent = MotionEvent.obtain(
+                downTime, upTime, MotionEvent.ACTION_UP, endXLocal, endYLocal, 0
+            )
+            val upResult = webView.dispatchTouchEvent(upEvent)
+            upEvent.recycle()
+
+            callback(downResult && upResult && allMoveOk)
+        } catch (e: Exception) {
+            Log.e("WebViewController", "scrollByTouchDp 失败: ${e.message}")
             callback(false)
         }
     }

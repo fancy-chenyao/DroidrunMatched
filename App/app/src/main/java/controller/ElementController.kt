@@ -119,6 +119,99 @@ object ElementController {
             else -> {
                 // 对于其他类型，尝试使用ElementController
                 Log.d(TAG,"其他类型页面进行坐标点击")
+                callback(false)
+            }
+        }
+    }
+
+    /**
+     * 通过坐标执行滑动/滚动（dp版本）根据页面类型分发
+     * 在原生页面调用NativeController，在WebView页面调用WebViewController
+     */
+    fun scrollByTouchDp(
+        activity: Activity,
+        startXDp: Float,
+        startYDp: Float,
+        endXDp: Float,
+        endYDp: Float,
+        duration: Long = 200,
+        callback: (Boolean) -> Unit
+    ) {
+        when (PageSniffer.getCurrentPageType(activity)) {
+            PageSniffer.PageType.NATIVE -> {
+                NativeController.scrollByTouchDp(
+                    activity,
+                    startXDp,
+                    startYDp,
+                    endXDp,
+                    endYDp,
+                    duration
+                ) { success -> callback(success) }
+            }
+            PageSniffer.PageType.WEB_VIEW -> {
+                val webView = findWebView(activity)
+                if (webView != null) {
+                    WebViewController.scrollByTouchDp(
+                        webView,
+                        startXDp,
+                        startYDp,
+                        endXDp,
+                        endYDp,
+                        duration
+                    ) { success -> callback(success) }
+                } else {
+                    Log.e(TAG, "页面识别为WebView，但是未找到WebView")
+                    callback(false)
+                }
+            }
+            else -> {
+                Log.d(TAG, "其他类型页面进行坐标滚动暂不支持")
+                callback(false)
+            }
+        }
+    }
+
+    /**
+     * 通过坐标激活输入并输入文本（dp版本）按页面类型分发
+     * NATIVE: 直接调用NativeController输入
+     * WEB_VIEW: 先在WebView上坐标点击获取焦点，再调用NativeController输入
+     */
+    fun inputTextByCoordinateDp(
+        activity: Activity,
+        inputXDp: Float,
+        inputYDp: Float,
+        text: String,
+        clearBeforeInput: Boolean = true,
+        callback: (Boolean) -> Unit
+    ) {
+        when (PageSniffer.getCurrentPageType(activity)) {
+            PageSniffer.PageType.NATIVE -> {
+                NativeController.inputTextByCoordinateDp(activity, inputXDp, inputYDp, text, clearBeforeInput) {
+                    callback(it)
+                }
+            }
+            PageSniffer.PageType.WEB_VIEW -> {
+                val webView = findWebView(activity)
+                if (webView != null) {
+                    WebViewController.clickByCoordinateDp(webView, inputXDp, inputYDp) { clickSuccess ->
+                        if (!clickSuccess) {
+                            Log.e(TAG, "WebView坐标点击以获取焦点失败")
+                            callback(false)
+                        } else {
+                            // 焦点已获取，复用NativeController的键盘事件输入
+                            NativeController.inputTextByCoordinateDp(activity, inputXDp, inputYDp, text, clearBeforeInput) {
+                                callback(it)
+                            }
+                        }
+                    }
+                } else {
+                    Log.e(TAG, "页面识别为WebView，但是未找到WebView")
+                    callback(false)
+                }
+            }
+            else -> {
+                Log.d(TAG, "其他类型页面的坐标输入暂不支持")
+                callback(false)
             }
         }
     }

@@ -29,3 +29,7 @@ todo.txt
 .env
 .env.local
 .env.*.local
+/tmp/
+/App/.gradle/
+App/local.properties
+droidrun.yaml
