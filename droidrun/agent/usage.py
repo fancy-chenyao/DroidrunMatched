@@ -15,6 +15,7 @@ SUPPORTED_PROVIDERS = [
     "GenAI",
     "OpenAI",
     "openai_llm",
+    "OpenAILike",  # 阿里云等 OpenAI 兼容 API
     "Anthropic",
     "Ollama",
     "DeepSeek",
@@ -41,7 +42,7 @@ def get_usage_from_response(provider: str, chat_rsp: ChatResponse) -> UsageResul
             total_tokens=rsp["usage_metadata"]["total_token_count"],
             requests=1,
         )
-    elif provider == "OpenAI" or provider == "openai_llm":
+    elif provider == "OpenAI" or provider == "openai_llm" or provider == "OpenAILike":
         from openai.types import CompletionUsage as OpenAIUsage
 
         usage: OpenAIUsage = rsp.usage

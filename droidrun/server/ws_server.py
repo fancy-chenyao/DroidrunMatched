@@ -486,8 +486,10 @@ class WebSocketServer:
                             extra += f", a11y_len={len(data.get('a11y_tree') or [])}"
                         except Exception:
                             pass
-                LoggingUtils.log_info("WebSocketServer", "Parsed message: type={type}, request_id={rid}, data_size={dsize}B, parse_time={ms}ms{extra}", 
-                                      type=mtype, rid=rid, dsize=data_size, ms=parse_ms, extra=extra)
+                # 只记录非 command_response 类型的消息
+                if mtype != "command_response":
+                    LoggingUtils.log_info("WebSocketServer", "Parsed message: type={type}, request_id={rid}, data_size={dsize}B, parse_time={ms}ms{extra}", 
+                                          type=mtype, rid=rid, dsize=data_size, ms=parse_ms, extra=extra)
             
             if parse_error:
                 LoggingUtils.log_error("WebSocketServer", "Failed to parse message from device {device_id}: {error}", 

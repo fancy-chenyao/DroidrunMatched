@@ -1178,12 +1178,13 @@ object CommandHandler {
     private fun buildElementDescription(element: GenericElement, index: Int): String {
         val className = element.className.substringAfterLast('.')
         
-        // 优先级：text > contentDesc > resourceId > "no description"
+        // 构建描述信息，优先级：text > contentDesc > resourceId
+        // 如果都没有，使用 className 作为描述
         val description = when {
             element.text.isNotEmpty() -> "'${element.text}'"
-            element.contentDesc.isNotEmpty() -> "[desc: '${element.contentDesc}']"
-            element.resourceId.isNotEmpty() -> "[id: ${element.resourceId.substringAfterLast('/')}]"
-            else -> "[no description]"
+            element.contentDesc.isNotEmpty() -> "'${element.contentDesc}'"
+            element.resourceId.isNotEmpty() -> "'${element.resourceId.substringAfterLast('/')}'"
+            else -> "'$className'"  // 使用类名作为兜底描述
         }
         
         val centerX = (element.bounds.left + element.bounds.right) / 2
@@ -1198,12 +1199,13 @@ object CommandHandler {
     private fun buildInputTextDescription(element: GenericElement, index: Int, inputText: String): String {
         val className = element.className.substringAfterLast('.')
         
-        // 优先级：resourceId > contentDesc > text > "no description"
+        // 构建目标元素描述，优先级：resourceId > contentDesc > text
+        // 如果都没有，使用 className 作为描述
         val targetDesc = when {
-            element.resourceId.isNotEmpty() -> "[id: ${element.resourceId.substringAfterLast('/')}]"
-            element.contentDesc.isNotEmpty() -> "[desc: '${element.contentDesc}']"
-            element.text.isNotEmpty() -> "[hint: '${element.text}']"
-            else -> "[no description]"
+            element.resourceId.isNotEmpty() -> "'${element.resourceId.substringAfterLast('/')}'"
+            element.contentDesc.isNotEmpty() -> "'${element.contentDesc}'"
+            element.text.isNotEmpty() -> "'${element.text}'"
+            else -> "'$className'"  // 使用类名作为兜底描述
         }
         
         val centerX = (element.bounds.left + element.bounds.right) / 2

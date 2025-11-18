@@ -917,6 +917,9 @@ class DroidAgent(Workflow):
             except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
                 LoggingUtils.log_warning("DroidAgent", "Failed to initialize UI state: {error}", error=e)
                 return False, f"Failed to initialize UI state: {e}"
+            # 重构 actions 列表：处理 Added 和 Removed 动作
+            actions = self._reconstruct_actions_with_changes(actions)
+            
             executed_actions = []
             # 基于 changed_indices 的微冷启动触发记录，避免重复触发同一索引
             triggered_changed_steps: Dict[int, bool] = {}
@@ -927,6 +930,22 @@ class DroidAgent(Workflow):
                 LoggingUtils.log_debug("DroidAgent", "Executing action {current}/{total}: {name} params={params}", 
                                      current=idx_action+1, total=len(actions), name=name, params=params)
                 try:
+                    # 处理 Added 动作（micro_coldstart）
+                    if name == "micro_coldstart":
+                        LoggingUtils.log_info("DroidAgent", "🎯 Executing added action at step {step}", step=idx_action)
+                        
+                        ok = await self._micro_coldstart_handle_click_step(idx_action, act)
+                        if ok:
+                            LoggingUtils.log_success("DroidAgent", "✅ Added action completed at step {step}", step=idx_action)
+                            step_count += 1
+                            await self._capture_ui_state_and_screenshot("added-action")
+                            if idx_action < len(actions) - 1:
+                                time.sleep(wait_time)
+                        else:
+                            LoggingUtils.log_warning("DroidAgent", "⚠️ Added action failed at step {step}", step=idx_action)
+                            return False, f"Added action at step {idx_action} failed"
+                        continue
+                    
                     if name in ("tap_by_index", "tap", "tap_index"):
                         LoggingUtils.log_debug("DroidAgent", "[DEBUG] Processing tap_by_index action {idx_action}/{total}", idx_action=idx_action, total=len(actions))
                         idx_val = params.get("index", params.get("idx"))
@@ -1214,36 +1233,151 @@ class DroidAgent(Workflow):
         """从配置中获取Agent常量"""
         return self.config_manager.get(f"agent.{key}", default)
 
+    def _reconstruct_actions_with_changes(self, actions: List[Dict]) -> List[Dict]:
+        """根据 Added 和 Removed 信息重构 actions 列表
+        
+        处理逻辑：
+        1. 删除 Removed 动作
+        2. 在正确的位置插入 Added 动作
+        3. 标记 Changed 动作
+        
+        Args:
+            actions: 原始动作列表
+            
+        Returns:
+            重构后的动作列表
+        """
+        try:
+            # 获取变更信息
+            changed_index_reasons = (self.pending_hot_context or {}).get("changed_index_reasons", [])
+            
+            if not changed_index_reasons:
+                LoggingUtils.log_debug("DroidAgent", "No changes detected, using original actions")
+                return actions
+            
+            # 构建变更信息映射
+            removed_indices = set()
+            added_actions_map = {}  # {base_index: [(float_index, reason), ...]}
+            changed_reasons = {}
+            
+            for ir in changed_index_reasons:
+                idx = ir.get("index")
+                action_type = ir.get("type", "changed")
+                reason = ir.get("reason", "")
+                
+                if action_type == "removed":
+                    removed_indices.add(idx)
+                elif action_type == "added" and isinstance(idx, float):
+                    base_idx = int(idx)
+                    if base_idx not in added_actions_map:
+                        added_actions_map[base_idx] = []
+                    added_actions_map[base_idx].append((idx, reason))
+                elif action_type == "changed":
+                    changed_reasons[idx] = reason
+            
+            # 第一步：过滤掉 Removed 动作
+            filtered_actions = []
+            for idx, act in enumerate(actions):
+                if idx in removed_indices:
+                    LoggingUtils.log_info("DroidAgent", "➖ Removing action [{idx}]: {desc}", 
+                                        idx=idx, desc=act.get("description", ""))
+                else:
+                    act = act.copy()  # 避免修改原始字典
+                    act["_original_index"] = idx  # 记录原始索引
+                    
+                    # 标记 Changed 动作
+                    if idx in changed_reasons:
+                        act["_is_changed"] = True
+                        act["_change_reason"] = changed_reasons[idx]
+                    
+                    filtered_actions.append(act)
+            
+            # 第二步：插入 Added 动作
+            # 需要从后往前插入，避免索引偏移
+            for base_idx in sorted(added_actions_map.keys(), reverse=True):
+                added_list = sorted(added_actions_map[base_idx])  # 按浮点索引排序
+                
+                # 找到 base_idx 在 filtered_actions 中的位置
+                insert_pos = None
+                for i, act in enumerate(filtered_actions):
+                    original_idx = act.get("_original_index", i)
+                    if original_idx == base_idx:
+                        insert_pos = i + 1
+                        break
+                
+                if insert_pos is None:
+                    # 如果没找到，可能是因为 base_idx 被 removed 了，插入到末尾
+                    insert_pos = len(filtered_actions)
+                
+                # 插入所有 Added 动作
+                for added_idx, reason in reversed(added_list):
+                    added_action = {
+                        "action": "micro_coldstart",
+                        "params": {"goal": reason},
+                        "description": reason,
+                        "_is_added": True,
+                        "_is_changed": True,  # Added 动作也需要微冷启动
+                        "_change_reason": reason,
+                        "_added_index": added_idx,
+                        "_original_index": added_idx
+                    }
+                    
+                    filtered_actions.insert(insert_pos, added_action)
+                    LoggingUtils.log_info("DroidAgent", "➕ Adding action at [{idx}]: {desc}", 
+                                        idx=added_idx, desc=reason)
+            
+            # 统计信息
+            removed_count = len(removed_indices)
+            added_count = sum(len(v) for v in added_actions_map.values())
+            changed_count = len(changed_reasons)
+            
+            LoggingUtils.log_info("DroidAgent", 
+                                "📝 Actions reconstructed: {original} → {final} actions (removed={removed}, added={added}, changed={changed})", 
+                                original=len(actions), 
+                                final=len(filtered_actions),
+                                removed=removed_count,
+                                added=added_count,
+                                changed=changed_count)
+            
+            return filtered_actions
+            
+        except Exception as e:
+            LoggingUtils.log_warning("DroidAgent", 
+                                   "Failed to reconstruct actions: {error}, using original actions", 
+                                   error=e)
+            return actions
+
     def _is_changed_param_click_step(self, step_index: int, action: Dict) -> bool:
+        """检查动作是否需要微冷启动
+        
+        在重构后的 actions 列表中，Changed 和 Added 动作都被标记了 _is_changed
+        """
         try:
             name = (action or {}).get("action") or (action or {}).get("name")
             if name in ("input_text", "type", "input"):
                 return False
-            # 仅在 LLM 识别出的索引上触发微冷启动
-            changed = (self.pending_hot_context or {}).get("changed_indices", [])
-            return step_index in changed
+            
+            # 检查动作是否被标记为需要变更
+            return action.get("_is_changed", False)
+            
         except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
             ExceptionHandler.handle_data_parsing_error(e, "[HOT] Click step detection")
             return False
 
     async def _micro_coldstart_handle_click_step(self, step_index: int, action: Dict) -> bool:
-        """微冷启动处理单步点击操作 - 优先使用 changed_indices 的具体理由作为子目标"""
+        """微冷启动处理单步点击操作
+        
+        在重构后的 actions 列表中，Changed 和 Added 动作都包含 _change_reason
+        """
         try:
             action_name = action.get('action', 'unknown')
             params = action.get('params', {})
             desc = str(action.get('description', ''))
-            # 若 detect_changed_actions 提供了 index->reason，则优先用作微目标
-            micro_goal = None
-            try:
-                for ir in (self.pending_hot_context or {}).get("changed_index_reasons", []):
-                    if ir.get("index") == step_index and ir.get("reason"):
-                        micro_goal = str(ir.get("reason"))
-                        break
-            except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
-                ExceptionHandler.handle_data_parsing_error(e, "[MicroColdStart] Goal extraction")
-                micro_goal = None
             
-            # 若未命中具体 reason，再调用通用生成逻辑
+            # 优先使用动作中的 _change_reason（由重构方法添加）
+            micro_goal = action.get('_change_reason')
+            
+            # 若未找到，再调用通用生成逻辑
             if not micro_goal:
                 micro_goal = self.llm_services.generate_micro_goal(action, {}, self.goal)
             
@@ -1253,7 +1387,15 @@ class DroidAgent(Workflow):
             
             
             max_micro_steps = self.config_manager.get("agent.max_micro_cold_steps", 5)
-            agent = CodeActAgent(
+            
+            # 重置 tools 状态，避免上一个微冷启动的状态影响当前任务
+            self.tools_instance.finished = False
+            self.tools_instance.success = None
+            self.tools_instance.reason = None
+            
+            # 使用微冷启动专用的 CodeActAgentMicro，支持自动 UI 刷新
+            from droidrun.agent.codeact.codeact_agent_micro import CodeActAgentMicro
+            agent = CodeActAgentMicro(
                 llm=self.llm,
                 persona=self.cim.get_persona("Default"),
                 vision=self.vision,
