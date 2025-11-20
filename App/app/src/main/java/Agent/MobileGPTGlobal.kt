@@ -9,7 +9,7 @@ class MobileGPTGlobal private constructor() {
         // 将此IP地址替换为服务器的IP地址
 //        const val HOST_IP = "198.18.0.1"
 //        const val HOST_IP = "192.168.18.53"
-          const val HOST_IP = "192.168.100.32"
+          const val HOST_IP = "192.168.100.26"
 //        const val HOST_IP = "192.168.31.182"
 //        const val HOST_IP = "198.18.0.1"
         const val HOST_PORT = 12345

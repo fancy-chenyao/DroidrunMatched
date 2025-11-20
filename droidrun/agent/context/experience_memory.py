@@ -299,7 +299,7 @@ class ExperienceMemory:
             # 批量失败时，降级为逐条计算（保证功能可用）
             return [self._calculate_similarity(goal, exp_goal) for exp_goal in experience_goals]
 
-    def find_and_rank_similar_experiences(self, goal: str, threshold: float = 0.8) -> List[TaskExperience]:
+    def find_and_rank_similar_experiences(self, goal: str, task_type: str, threshold: float = 0.8) -> List[TaskExperience]:
         """
         合并优化：一次LLM调用同时完成相似度计算和排序
 
@@ -314,7 +314,10 @@ class ExperienceMemory:
             LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for similarity matching")
             return []
 
-        if not self.experiences:
+        # 经验按照类型存在不同文件夹，直接调用对应类型的经验
+        type_experiences = self.type_experience_cache.get(task_type)
+
+        if not type_experiences:
             return []
 
         try:
@@ -333,7 +336,7 @@ class ExperienceMemory:
 
 历史经验列表：
 """
-            for i, exp in enumerate(self.experiences, 1):
+            for i, exp in enumerate(type_experiences, 1):
                 prompt += f"{i}. {exp.goal}\n"
 
             prompt += f"""
@@ -349,14 +352,14 @@ class ExperienceMemory:
 要求：
 1. 只返回相似度 >= {threshold} 的经验
 2. 按相似度从高到低排序
-3. index 是历史经验列表中的序号（1-{len(self.experiences)}）
+3. index 是历史经验列表中的序号（1-{len(type_experiences)}）
 4. similarity 是 0-1 之间的分数（保留2位小数）
 5. reason 控制在15字以内
 """
 
             LoggingUtils.log_info("ExperienceMemory",
                                 "🚀 Merged LLM call: calculating similarity and ranking for {count} experiences",
-                                count=len(self.experiences))
+                                count=len(type_experiences))
 
             response = self.llm.complete(prompt)
             response_text = response.text.strip()
@@ -365,7 +368,7 @@ class ExperienceMemory:
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if not json_match:
                 LoggingUtils.log_warning("ExperienceMemory", "Could not parse JSON from merged response, fallback to batch method")
-                return self.batch_find_similar_experiences(goal, threshold)
+                return self.batch_find_similar_experiences(goal, task_type, threshold)
 
             result = json.loads(json_match.group())
             ranked_list = result.get("ranked_experiences", [])
@@ -377,8 +380,8 @@ class ExperienceMemory:
                 similarity = item.get("similarity", 0.0)
                 reason = item.get("reason", "")
 
-                if 0 <= idx < len(self.experiences) and similarity >= threshold:
-                    exp = self.experiences[idx]
+                if 0 <= idx < len(type_experiences) and similarity >= threshold:
+                    exp = type_experiences[idx]
                     exp.similarity_score = similarity
                     similar_experiences.append(exp)
                     LoggingUtils.log_debug("ExperienceMemory",
@@ -388,7 +391,7 @@ class ExperienceMemory:
             LoggingUtils.log_success("ExperienceMemory",
                                    "✅ Merged call completed: found {count} similar experiences in 1 LLM call (saved {saved} calls)",
                                    count=len(similar_experiences),
-                                   saved=len(self.experiences))
+                                   saved=len(type_experiences))
 
             return similar_experiences
 
@@ -396,7 +399,7 @@ class ExperienceMemory:
             LoggingUtils.log_warning("ExperienceMemory",
                                    "Merged LLM call failed: {error}, fallback to batch method",
                                    error=e)
-            return self.batch_find_similar_experiences(goal, threshold)
+            return self.batch_find_similar_experiences(goal, task_type, threshold)
 
     def _simple_text_similarity(self, goal1: str, goal2: str) -> float:
         """简单的文本相似度计算（Jaccard相似度）"""
@@ -549,6 +552,7 @@ class ExperienceMemory:
 
             # 校验返回的类型是否在支持的清单内
             if task_type in self.supported_types:
+                LoggingUtils.log_info("ExperienceMemory", f"Task type '{task_type}'")
                 return task_type
             else:
                 LoggingUtils.log_info("ExperienceMemory", f"Task type '{task_type}' not in supported list")

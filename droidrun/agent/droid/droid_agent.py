@@ -599,7 +599,6 @@ class DroidAgent(Workflow):
         # 判断新任务的类型（必须在支持的清单内）
         task_type = self.memory_manager.determine_task_type(self.goal)
         if not task_type:
-            LoggingUtils.log_info("ExperienceMemory", f"The function type of the task does not exist in the list.")
             return "暂不支持该功能"  # 这里需要对接一下，后续不执行，且返回前端
         LoggingUtils.log_info("ExperienceMemory", f"Task determined as type: {task_type}")
         self.current_task_type = task_type
@@ -617,12 +616,14 @@ class DroidAgent(Workflow):
             if use_merged_optimization:
                 similar_experiences = self.memory_manager.find_and_rank_similar_experiences(
                     self.goal,
+                    self.current_task_type,
                     threshold=self.memory_config.similarity_threshold
                 )
             else:
                 # 旧方法：分别计算相似度和排序
                 similar_experiences = self.memory_manager.batch_find_similar_experiences(
                     self.goal,
+                    self.current_task_type,
                     threshold=self.memory_config.similarity_threshold
                 )
 
