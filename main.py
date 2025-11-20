@@ -60,7 +60,9 @@ async def main():
     agent_init_start = time.time()
     agent = DroidAgent(
         # goal="打开EmpLab应用，进入请休假系统，提交2025年11月24日到2025年11月25日的年休假申请。请假事由：出去玩，拟前往地区：北京。请尝试完成整个流程，包括登录（如果需要的话）和提交申请。",
-        goal="请帮我提交一个出差申请，出差人为张博涛，出差日期为2025年11月10日，出差性质为客户拜访，费用责任中心为建行集团金融科技创新中心，非业务专项，预算项目为交通费，预算事项为日常运营，出差事由为拜访客户。",
+        goal="帮我申请一个年休假，12月2号到3号，理由和地点分别为探亲和上海。",
+        # goal="请帮我提交一个出差申请，出差人为张博涛，出差日期为2025年11月10日，出差性质为客户拜访，费用责任中心为建行集团金融科技创新中心，非业务专项，预算项目为交通费，预算事项为日常运营，出差事由为拜访客户。",
+        # goal="请帮我提交一个出差申请，出差人为张博涛，出差事由为拜访客户。",
         llm=llm,
         tools=tools,
         config_manager=config_manager,  # 使用统一配置管理器
@@ -116,12 +118,21 @@ async def main():
         experiences = agent.memory_manager.get_all_experiences()
         print(f"\n🧠 记忆系统状态:")
         print(f"总经验数量: {len(experiences)}")
+        # if experiences:
+        #     latest_exp = experiences[-1]
+        #     print(f"最新经验: {latest_exp.goal}")
+        #     print(f"执行成功: {latest_exp.success}")
+        #     print(f"经验ID: {latest_exp.id}")
+        # 按时间戳排序，确保获取最新经验（避免依赖列表顺序）
         if experiences:
-            latest_exp = experiences[-1]
+            # 按 timestamp 降序排序（最新的在最前）
+            sorted_experiences = sorted(experiences, key=lambda x: x.timestamp, reverse=True)
+            latest_exp = sorted_experiences[0]
             print(f"最新经验: {latest_exp.goal}")
             print(f"执行成功: {latest_exp.success}")
+            print(f"经验类型: {latest_exp.type}")  # 新增：显示经验类型（符合按类型存储逻辑）
             print(f"经验ID: {latest_exp.id}")
-    
+
     # 性能分析
     print(f"\n📈 性能分析:")
     if result['success']:
