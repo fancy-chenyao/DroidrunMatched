@@ -609,7 +609,7 @@ class DroidAgent(Workflow):
             else:
                 # 旧方法：分别计算相似度和排序
                 similar_experiences = self.memory_manager.batch_find_similar_experiences(
-                    self.goal, 
+                    self.goal,
                     threshold=self.memory_config.similarity_threshold
                 )
             
