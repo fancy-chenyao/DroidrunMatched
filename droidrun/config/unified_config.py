@@ -59,6 +59,10 @@ class ToolsConfig:
     action_wait_time: float = 0.5
     screenshot_wait_time: float = 1.0
     long_wait_time: float = 2.0
+    
+    # a11y_tree 导出配置
+    export_a11y_tree: bool = False
+    a11y_export_dir: str = "./a11y_exports"
 
 @dataclass
 class APIConfig:

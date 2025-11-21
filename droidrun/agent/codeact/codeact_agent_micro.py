@@ -176,12 +176,16 @@ class CodeActAgentMicro(Workflow):
             await ctx.store.set("remembered_info", self.remembered_info)
             chat_history = await chat_utils.add_memory_block(self.remembered_info, chat_history)
 
+        # 🔄 [Micro] 每次思考前刷新 UI 状态
+        logger.debug(f"🔄 [Micro] Getting current UI state before step {self.steps_counter}...")
         state = await self.tools.get_state_async(include_screenshot=True)
         try:
             a11y_tree = state.get("a11y_tree")
             phone_state = state.get("phone_state")
             
             if a11y_tree:
+                element_count = len(a11y_tree)
+                logger.info(f"✅ [Micro] UI state obtained for step {self.steps_counter}, found {element_count} elements")
                 await ctx.store.set("ui_state", a11y_tree)
                 ctx.write_event_to_stream(RecordUIStateEvent(ui_state=a11y_tree))
                 chat_history = await chat_utils.add_ui_text_block(a11y_tree, chat_history)
@@ -293,11 +297,15 @@ class CodeActAgentMicro(Workflow):
             if self.tools.finished == True:
                 logger.debug("  - Task completed.")
                 
+                # 🔄 [Micro] 任务完成前刷新最终 UI 状态
                 try:
+                    logger.debug("🔄 [Micro] Refreshing final UI state before task completion...")
                     state = await self.tools.get_state_async(include_screenshot=False)
                     if "error" not in state:
                         a11y_tree = state.get("a11y_tree")
                         if a11y_tree:
+                            element_count = len(a11y_tree)
+                            logger.info(f"✅ [Micro] Final UI state refreshed, found {element_count} elements")
                             await ctx.store.set("ui_state", a11y_tree)
                             ctx.write_event_to_stream(RecordUIStateEvent(ui_state=a11y_tree))
                 except Exception as e:
@@ -343,13 +351,17 @@ class CodeActAgentMicro(Workflow):
                 else f"  - Execution output: {output}"
             )
         
+        # 🔄 [Micro] 每次执行后自动刷新 UI 状态
         try:
             if not self.tools.finished:
+                logger.debug("🔄 [Micro] Auto-refreshing UI state after action execution...")
                 state = await self.tools.get_state_async(include_screenshot=False)
                 
                 if "error" not in state:
                     a11y_tree = state.get("a11y_tree")
                     if a11y_tree:
+                        element_count = len(a11y_tree)
+                        logger.info(f"✅ [Micro] UI state auto-refreshed, found {element_count} elements")
                         await ctx.store.set("ui_state", a11y_tree)
                         ctx.write_event_to_stream(RecordUIStateEvent(ui_state=a11y_tree))
                         

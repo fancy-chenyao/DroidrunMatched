@@ -74,12 +74,12 @@ object PageChangeVerifier {
                     try {
                         val rootView = currentActivity.window?.decorView?.rootView
                         if (rootView != null) {
-                            // 延迟两秒后再计算并比较哈希，避免瞬时抖动造成误判
-                            if (elapsed >= 2000L) {
+                            // 延迟500ms后再计算并比较哈希，快速检测UI变化
+                            if (elapsed >= 500L) {
                                 val currentViewTreeHash = calculateViewTreeHash(rootView)
                                 hasViewTreeChange = currentViewTreeHash != initialViewTreeHash
                             } else {
-                                // 未到2秒延迟，本次循环不进行哈希比较
+                                // 未到500ms延迟，本次循环不进行哈希比较
                             }
                         }
                     } catch (e: Exception) {
@@ -88,7 +88,7 @@ object PageChangeVerifier {
                 }
 
                 var hasWebViewChange = false
-                if (currentActivity != null && elapsed >= 2000L) {
+                if (currentActivity != null && elapsed >= 500L) {
                     try {
                         val currentWebViewAggHash = calculateAggregateWebViewHash(currentActivity)
                         hasWebViewChange = currentWebViewAggHash != initialWebViewAggHash
@@ -157,12 +157,18 @@ object PageChangeVerifier {
         var hash = view.javaClass.simpleName.hashCode()
         hash = hash * 31 + view.visibility
         hash = hash * 31 + view.isEnabled.hashCode()
+        
+        // 添加位置和大小信息，使哈希更敏感
+        hash = hash * 31 + view.width
+        hash = hash * 31 + view.height
 
         if (view is TextView) {
             hash = hash * 31 + (view.text?.toString()?.hashCode() ?: 0)
         }
 
         if (view is ViewGroup) {
+            // 包含子元素数量，使结构变化更明显
+            hash = hash * 31 + view.childCount
             for (i in 0 until view.childCount) {
                 hash = hash * 31 + calculateViewTreeHash(view.getChildAt(i))
             }
