@@ -51,6 +51,9 @@ droidrun:
     action_wait_time: 0.5
     screenshot_wait_time: 1.0
     long_wait_time: 2.0
+
+    export_a11y_tree: true
+    a11y_export_dir: "./a11y_exports"
   
   # API配置
   api:

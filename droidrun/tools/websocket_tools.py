@@ -7,8 +7,10 @@ import base64
 import time
 import logging
 import uuid
+import os
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
+from pathlib import Path
 from llama_index.core.workflow import Context
 from droidrun.agent.utils.logging_utils import LoggingUtils
 from droidrun.agent.common.events import (
@@ -49,6 +51,21 @@ class WebSocketTools(Tools):
         self.session_manager = session_manager
         self.config_manager = config_manager
         self.timeout = timeout
+        
+        # a11y_tree 导出配置
+        self.export_a11y_tree = False
+        self.a11y_export_dir = "./a11y_exports"
+        self.a11y_export_counter = 0
+        
+        if config_manager:
+            self.export_a11y_tree = config_manager.get("tools.export_a11y_tree", False)
+            self.a11y_export_dir = config_manager.get("tools.a11y_export_dir", "./a11y_exports")
+            
+            if self.export_a11y_tree:
+                # 创建导出目录
+                Path(self.a11y_export_dir).mkdir(parents=True, exist_ok=True)
+                LoggingUtils.log_info("WebSocketTools", "a11y_tree export enabled, directory: {dir}", 
+                                    dir=self.a11y_export_dir)
         
         # 请求-响应队列
         self.pending_requests: Dict[str, asyncio.Future] = {}
@@ -269,6 +286,29 @@ class WebSocketTools(Tools):
                 pass
             return result
     
+    def _export_a11y_tree_to_json(self, a11y_tree: List[Dict[str, Any]]) -> None:
+        """
+        将 a11y_tree 导出为 JSON 文件
+        
+        Args:
+            a11y_tree: 可访问性树数据
+        """
+        if not self.export_a11y_tree or not a11y_tree:
+            return
+        
+        try:
+            self.a11y_export_counter += 1
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"a11y_tree_{timestamp}_{self.a11y_export_counter:04d}.json"
+            filepath = os.path.join(self.a11y_export_dir, filename)
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(a11y_tree, f, ensure_ascii=False, indent=2)
+            
+            LoggingUtils.log_info("WebSocketTools", "📄 Exported a11y_tree to {file}", file=filepath)
+        except Exception as e:
+            LoggingUtils.log_error("WebSocketTools", "Failed to export a11y_tree: {error}", error=e)
+    
     async def get_state_async(self, include_screenshot: bool = True) -> Dict[str, Any]:
         """
         异步获取设备状态（包含 a11y_tree 和 phone_state）。仅传引用，不回填大对象。
@@ -313,6 +353,9 @@ class WebSocketTools(Tools):
                     filtered_elements.append(filtered_element)
                 self.clickable_elements_cache = filtered_elements
                 LoggingUtils.log_debug("WebSocketTools", "[async] Updated clickable_elements_cache from inline a11y_tree, count={count}", count=len(filtered_elements))
+                
+                # 导出 a11y_tree 到 JSON 文件（如果启用）
+                self._export_a11y_tree_to_json(filtered_elements)
             else:
                 LoggingUtils.log_warning("WebSocketTools", "No a11y_tree data in response")
             

@@ -3,6 +3,7 @@ package Agent
 import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.util.Base64
 import android.util.Log
 import controller.GenericElement
@@ -14,6 +15,14 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+/**
+ * 返回a11y_tree和稳定索引映射的数据类
+ */
+data class A11yTreeResult(
+    val a11yTree: JSONArray,
+    val stableIndexMap: Map<GenericElement, Int>
+)
 
 /**
  * 数据格式转换工具
@@ -144,9 +153,9 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
     }
     
     /**
-     * 收集所有元素并生成增量索引映射
+     * 收集所有元素并生成稳定索引映射
      */
-    private fun collectElementsWithIncrementalIndex(element: GenericElement): List<Pair<GenericElement, Int>> {
+    private fun collectElementsWithStableIndex(element: GenericElement): List<Pair<GenericElement, Int>> {
         val allElements = mutableListOf<GenericElement>()
         
         // 递归收集所有元素
@@ -159,8 +168,8 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
         
         collectElements(element)
         
-        // 使用增量索引管理器分配索引
-        val indexMap = IncrementalIndexManager.assignIncrementalIndexes(allElements)
+        // 使用稳定索引管理器分配索引
+        val indexMap = StableIndexManager.assignStableIndexes(allElements)
         
         // 转换为List<Pair>格式
         return allElements.map { elem -> elem to indexMap[elem]!! }
@@ -184,37 +193,38 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
     }
     
     /**
-     * 获取增量索引映射（公共方法）
+     * 获取稳定索引映射（公共方法）
      */
-    fun getIncrementalIndexMap(element: GenericElement): Map<GenericElement, Int> {
-        return collectElementsWithIncrementalIndex(element).toMap()
+    fun getStableIndexMap(element: GenericElement): Map<GenericElement, Int> {
+        return collectElementsWithStableIndex(element).toMap()
     }
     
     /**
      * 将GenericElement树转换为a11y_tree格式（使用稳定索引）
+     * @return A11yTreeResult 包含a11y_tree和稳定索引映射
      */
-    fun convertElementTreeToA11yTreePruned(element: GenericElement, context: Context? = null): JSONArray {
+    fun convertElementTreeToA11yTreePruned(element: GenericElement, context: Context? = null): A11yTreeResult {
         // 保存原始元素树和XML到本地文件
         saveOriginalElementTree(element, context)
         saveElementTreeAsXml(element, context)
         
-        // 生成增量索引映射
-        val incrementalIndexMap = collectElementsWithIncrementalIndex(element).toMap()
+        // 生成稳定索引映射
+        val stableIndexMap = collectElementsWithStableIndex(element).toMap()
         
         // 调试日志：输出索引映射信息
-        Log.d(TAG, "生成增量索引映射，共${incrementalIndexMap.size}个元素")
-        Log.d(TAG, "索引管理器状态: ${IncrementalIndexManager.getStatusInfo()}")
+        Log.d(TAG, "生成稳定索引映射，共${stableIndexMap.size}个元素")
+        Log.d(TAG, "索引管理器状态: ${StableIndexManager.getStatusInfo()}")
         
         if (SAVE_DEBUG_FILES) {
-            incrementalIndexMap.entries.take(5).forEach { (elem, incrementalIndex) ->
-                Log.d(TAG, "元素[${elem.className}:${elem.text}:${elem.contentDesc}] 原索引=${elem.index} 增量索引=$incrementalIndex")
+            stableIndexMap.entries.take(5).forEach { (elem, stableIndex) ->
+                Log.d(TAG, "元素[${elem.className}:${elem.text}:${elem.contentDesc}] 原索引=${elem.index} 稳定索引=$stableIndex")
             }
             
             // 特别关注"请休假"相关元素
-            incrementalIndexMap.entries.filter { 
+            stableIndexMap.entries.filter { 
                 it.key.text.contains("请休假") || it.key.contentDesc.contains("请休假") 
-            }.forEach { (elem, incrementalIndex) ->
-                Log.d(TAG, "🎯请休假元素: [${elem.className}:${elem.text}:${elem.contentDesc}] 增量索引=$incrementalIndex bounds=${elem.bounds}")
+            }.forEach { (elem, stableIndex) ->
+                Log.d(TAG, "🎯请休假元素: [${elem.className}:${elem.text}:${elem.contentDesc}] 稳定索引=$stableIndex bounds=${elem.bounds}")
             }
         }
         
@@ -222,8 +232,8 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
         
         fun recurse(e: GenericElement, parent: JSONArray) {
             val obj = JSONObject()
-            // 使用增量索引替代原始index
-            obj.put("index", incrementalIndexMap[e] ?: e.index)
+            // 使用稳定索引替代原始index
+            obj.put("index", stableIndexMap[e] ?: e.index)
             
             // 优先使用additionalProps中的resourceName，构造完整的resourceId
             val resourceName = e.additionalProps["resourceName"]
@@ -276,7 +286,7 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
         // 保存JSON数组到本地文件
         saveJsonArray(result, context)
         
-        return result
+        return A11yTreeResult(result, stableIndexMap)
     }
     
     /**

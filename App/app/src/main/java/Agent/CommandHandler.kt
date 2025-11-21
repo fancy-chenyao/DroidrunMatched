@@ -36,6 +36,8 @@ object CommandHandler {
     @Volatile
     private var cachedStateResponse: JSONObject? = null
     @Volatile
+    private var cachedStableIndexMap: Map<GenericElement, Int>? = null  // 稳定索引映射
+    @Volatile
     private var lastScreenHash: Int? = null
     @Volatile
     private var lastCacheTime: Long = 0
@@ -213,8 +215,10 @@ object CommandHandler {
                     // 2. 在后台线程生成 a11y_tree
                     Thread {
                         try {
-                            // 生成 a11y_tree（JSON 数组）
-                            val a11yTree = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
+                            // 生成 a11y_tree 和稳定索引映射
+                            val result = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
+                            val a11yTree = result.a11yTree
+                            val stableIndexMap = result.stableIndexMap
                             Log.d(TAG, "a11y_tree 生成完成，节点数: ${a11yTree.length()}")
 
                             // 获取截图并转为 Base64（如果需要）
@@ -245,10 +249,8 @@ object CommandHandler {
 
                             // 更新缓存并返回响应
                             Handler(Looper.getMainLooper()).post {
-                                // 为缓存的元素树应用增量索引
-                                val incrementalIndexMap = StateConverter.getIncrementalIndexMap(elementTree)
-                                val elementTreeWithIncrementalIndex = applyIncrementalIndexToElementTree(elementTree, incrementalIndexMap)
-                                updateCache(elementTreeWithIncrementalIndex, stateResponse, currentScreenHash)
+                                // 缓存元素树和稳定索引映射
+                                updateCache(elementTree, stateResponse, currentScreenHash, stableIndexMap)
                                 callback(stateResponse)
                                 
                                 // 计算总耗时和数据大小
@@ -333,7 +335,8 @@ object CommandHandler {
     private fun updateCache(
         elementTree: GenericElement,
         stateResponse: JSONObject,
-        screenHash: Int?
+        screenHash: Int?,
+        stableIndexMap: Map<GenericElement, Int>? = null
     ) {
         // 释放旧的截图资源
         recycleOldScreenshot()
@@ -341,10 +344,11 @@ object CommandHandler {
         // 更新缓存
         cachedElementTree = elementTree
         cachedStateResponse = stateResponse
+        cachedStableIndexMap = stableIndexMap
         lastScreenHash = screenHash
         lastCacheTime = System.currentTimeMillis()
         
-        Log.d(TAG, "UI状态缓存已更新")
+        Log.d(TAG, "UI状态缓存已更新（包含稳定索引映射: ${stableIndexMap != null}）")
     }
     
     /**
@@ -353,6 +357,7 @@ object CommandHandler {
     fun clearCache() {
         cachedElementTree = null
         cachedStateResponse = null
+        cachedStableIndexMap = null
         lastScreenHash = null
         lastCacheTime = 0
         recycleOldScreenshot()
@@ -437,7 +442,8 @@ object CommandHandler {
                             getCurrentActivity = { ActivityTracker.getCurrentActivity() },
                             preActivity = preActivity,
                             preViewTreeHash = preHash,
-                            preWebViewAggHash = preWebHash
+                            preWebViewAggHash = preWebHash,
+                            timeoutMs = 5000L  // 增加超时时间到5秒
                         ) { changed, changeType ->
                             if (changed) {
                                 clearCache()
@@ -517,7 +523,8 @@ object CommandHandler {
                             getCurrentActivity = { ActivityTracker.getCurrentActivity() },
                             preActivity = preActivity,
                             preViewTreeHash = preHash,
-                            preWebViewAggHash = preWebHash
+                            preWebViewAggHash = preWebHash,
+                            timeoutMs = 5000L  // 增加超时时间到5秒
                         ) { changed, changeType ->
                             if (changed) {
                                 clearCache()
@@ -549,12 +556,24 @@ object CommandHandler {
     }
     
     /**
-     * 从元素树中查找指定索引的元素
+     * 从元素树中查找指定稳定索引的元素
      */
     private fun findElementByIndex(root: GenericElement?, targetIndex: Int): GenericElement? {
         if (root == null) return null
         
-        // 深度优先搜索
+        // 优先使用稳定索引映射查找
+        val stableIndexMap = cachedStableIndexMap
+        if (stableIndexMap != null) {
+            // 反向查找：从稳定索引找到对应的元素
+            val element = stableIndexMap.entries.find { it.value == targetIndex }?.key
+            if (element != null) {
+                Log.d(TAG, "✅ 使用稳定索引映射找到元素: index=$targetIndex, className=${element.className}, text=${element.text}")
+                return element
+            }
+        }
+        
+        // 降级方案：使用原始索引查找（兼容旧逻辑）
+        Log.w(TAG, "⚠️ 稳定索引映射不可用，使用原始索引查找: index=$targetIndex")
         fun searchElement(element: GenericElement): GenericElement? {
             if (element.index == targetIndex) {
                 return element
@@ -570,23 +589,6 @@ object CommandHandler {
         }
         
         return searchElement(root)
-    }
-    
-    /**
-     * 为元素树应用增量索引
-     */
-    private fun applyIncrementalIndexToElementTree(root: GenericElement, incrementalIndexMap: Map<GenericElement, Int>): GenericElement {
-        fun applyIncrementalIndex(element: GenericElement): GenericElement {
-            val incrementalIndex = incrementalIndexMap[element] ?: element.index
-            val updatedChildren = element.children.map { applyIncrementalIndex(it) }
-            
-            return element.copy(
-                index = incrementalIndex,
-                children = updatedChildren
-            )
-        }
-        
-        return applyIncrementalIndex(root)
     }
     
     /**
