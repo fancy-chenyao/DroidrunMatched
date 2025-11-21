@@ -9,6 +9,7 @@ import os
 import re
 import uuid
 import logging
+import time
 from droidrun.agent.utils.logging_utils import LoggingUtils
 
 logger = logging.getLogger("droidrun")
@@ -214,6 +215,14 @@ class ExperienceMemory:
             LoggingUtils.log_info("ExperienceMemory", f"No experiences found for type: {task_type}")
             return []  #返回空列表，后续直接冷启动
 
+        # 记录相似度计算与排序开始时间
+        llm_start_time = time.time()
+        start_timestamp = time.strftime("%H:%M:%S", time.localtime())
+        LoggingUtils.log_info(
+                "ExperienceMemory",
+                f"🤔 开始相似度计算与排序 at {start_timestamp}"
+        )
+
         type_experiences_goals = [exp.goal for exp in type_experiences]
         similarity_scores = self._batch_calculate_similarity(goal, type_experiences_goals)
 
@@ -249,6 +258,15 @@ class ExperienceMemory:
         similar_experiences.sort(key=lambda x: x.similarity_score or 0, reverse=True)
         LoggingUtils.log_info("ExperienceMemory", "Found {count} similar experiences for goal: {goal}",
                                       count=len(similar_experiences), goal=goal)
+
+        # 计算并记录相似度计算与排序耗时
+        thinking_time = time.time() - llm_start_time
+        end_timestamp = time.strftime("%H:%M:%S", time.localtime())
+        LoggingUtils.log_info(
+            "ExperienceMemory",
+            f"💡 完成相似度计算与排序 at {end_timestamp}, 耗时: {thinking_time:.2f}s"
+        )
+
         return similar_experiences
 
     def _batch_calculate_similarity(self, goal:str, experience_goals:List[str])-> List[float]:
@@ -321,6 +339,14 @@ class ExperienceMemory:
             return []
 
         try:
+            # 记录LLM思考开始时间
+            llm_start_time = time.time()
+            start_timestamp = time.strftime("%H:%M:%S", time.localtime())
+            LoggingUtils.log_info(
+                "ExperienceMemory",
+                f"🤔 LLM 开始相似度计算与排序 at {start_timestamp}"
+            )
+
             # 构建合并的提示词：同时计算相似度和排序
             prompt = f"""
 请判断目标任务与以下每条历史经验的相似度，并按相似度从高到低排序。
@@ -392,7 +418,13 @@ class ExperienceMemory:
                                    "✅ Merged call completed: found {count} similar experiences in 1 LLM call (saved {saved} calls)",
                                    count=len(similar_experiences),
                                    saved=len(type_experiences))
-
+            # 计算并记录LLM思考耗时
+            thinking_time = time.time() - llm_start_time
+            end_timestamp = time.strftime("%H:%M:%S", time.localtime())
+            LoggingUtils.log_info(
+                "ExperienceMemory",
+                f"💡 LLM 完成相似度计算与排序 at {end_timestamp}, 耗时: {thinking_time:.2f}s"
+            )
             return similar_experiences
 
         except Exception as e:
@@ -536,6 +568,14 @@ class ExperienceMemory:
 
     def determine_task_type(self, goal: str) -> Optional[str]:
         """用大模型判断任务类型，必须属于支持的类型清单"""
+        # 记录 LLM 思考开始时间
+        llm_start_time = time.time()
+        start_timestamp = time.strftime("%H:%M:%S", time.localtime())
+        LoggingUtils.log_info(
+            "ExperienceMemory",
+            f"🤔 LLM 开始思考判断任务类型 at {start_timestamp} "
+        )
+
         try:
             # 构建类型判断提示词   # 这里需要对接一下
             prompt = f"""
@@ -549,6 +589,14 @@ class ExperienceMemory:
 """
             response = self.llm.complete(prompt)
             task_type = response.text.strip()
+
+            # 计算并记录 LLM 思考耗时
+            thinking_time = time.time() - llm_start_time
+            end_timestamp = time.strftime("%H:%M:%S", time.localtime())
+            LoggingUtils.log_info(
+                "ExperienceMemory",
+                f"💡 LLM 完成思考判断任务类型 at {end_timestamp}, 耗时: {thinking_time:.2f}s"
+            )
 
             # 校验返回的类型是否在支持的清单内
             if task_type in self.supported_types:

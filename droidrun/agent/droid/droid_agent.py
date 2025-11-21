@@ -605,11 +605,11 @@ class DroidAgent(Workflow):
 
         # 新增：热启动检查
         if self.memory_enabled and self.memory_config.hot_start_enabled:
-            similar_experiences = self.memory_manager.batch_find_similar_experiences(
-                self.goal,
-                self.current_task_type,
-                threshold=self.memory_config.similarity_threshold
-            )
+            # similar_experiences = self.memory_manager.batch_find_similar_experiences(
+            #     self.goal,
+            #     self.current_task_type,
+            #     threshold=self.memory_config.similarity_threshold
+            # )
             # 使用合并优化：一次LLM调用同时完成相似度计算和排序
             use_merged_optimization = self.config_manager.get("memory.use_merged_similarity_ranking", True)
 
