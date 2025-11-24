@@ -86,9 +86,6 @@ class WebSocketTools(Tools):
         self.memory: List[str] = []
         self.screenshots: List[Dict[str, Any]] = []
         self.save_trajectories = "none"
-        
-        LoggingUtils.log_info("WebSocketTools", "WebSocketTools initialized for device {device_id}", 
-                            device_id=device_id)
     
     def _set_context(self, ctx: Context):
         """设置上下文，用于事件流记录"""
@@ -118,10 +115,6 @@ class WebSocketTools(Tools):
         request_id = self._generate_request_id()
         timeout = timeout or self.timeout
         t_create = time.time()
-        try:
-            LoggingUtils.log_debug("WebSocketTools", "Create request {rid} cmd={cmd} timeout={to}s", rid=request_id, cmd=command, to=timeout)
-        except Exception:
-            pass
         
         # 创建 Future 用于等待响应
         loop = asyncio.get_running_loop()
@@ -254,19 +247,10 @@ class WebSocketTools(Tools):
                 # 使用 run_coroutine_threadsafe 在主事件循环中执行协程
                 # 这样不会阻塞事件循环，其他协程可以继续执行
                 import concurrent.futures
-                try:
-                    LoggingUtils.log_debug("WebSocketTools", "_sync_wait using run_coroutine_threadsafe (timeout={secs}s)", secs=self.timeout)
-                except Exception:
-                    pass
-                
                 future = asyncio.run_coroutine_threadsafe(coro, loop)
                 try:
                     return future.result(timeout=self.timeout)
                 except concurrent.futures.TimeoutError:
-                    try:
-                        LoggingUtils.log_error("WebSocketTools", "_sync_wait timeout after {secs}s", secs=self.timeout)
-                    except Exception:
-                        pass
                     raise TimeoutError(f"Operation timed out after {self.timeout} seconds")
                     
             else:
@@ -274,17 +258,7 @@ class WebSocketTools(Tools):
                 return loop.run_until_complete(coro)
         except RuntimeError:
             # 如果没有事件循环，使用 asyncio.run（回退方案）
-            t0 = time.time()
-            try:
-                LoggingUtils.log_debug("WebSocketTools", "_sync_wait using asyncio.run path")
-            except Exception:
-                pass
-            result = asyncio.run(coro)
-            try:
-                LoggingUtils.log_debug("WebSocketTools", "_sync_wait asyncio.run elapsed {ms}ms", ms=int((time.time()-t0)*1000))
-            except Exception:
-                pass
-            return result
+            return asyncio.run(coro)
     
     def _export_a11y_tree_to_json(self, a11y_tree: List[Dict[str, Any]]) -> None:
         """
@@ -305,7 +279,6 @@ class WebSocketTools(Tools):
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(a11y_tree, f, ensure_ascii=False, indent=2)
             
-            LoggingUtils.log_info("WebSocketTools", "📄 Exported a11y_tree to {file}", file=filepath)
         except Exception as e:
             LoggingUtils.log_error("WebSocketTools", "Failed to export a11y_tree: {error}", error=e)
     
@@ -314,20 +287,16 @@ class WebSocketTools(Tools):
         异步获取设备状态（包含 a11y_tree 和 phone_state）。仅传引用，不回填大对象。
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "[async] Getting state from device {device_id}", device_id=self.device_id)
             response = await self._send_request_and_wait("get_state", {"include_screenshot": include_screenshot})
 
             if response.get("status") == "error":
                 error_msg = response.get("error", "Unknown error")
-                LoggingUtils.log_error("WebSocketTools", "Error in get_state response: {error}", error=error_msg)
                 return {"error": "Error", "message": error_msg}
 
             # 验证必需字段（允许仅返回引用）
             if "a11y_tree" not in response and "a11y_ref" not in response:
-                LoggingUtils.log_error("WebSocketTools", "Response missing a11y_tree/a11y_ref field")
                 return {"error": "Missing Data", "message": "a11y_tree/a11y_ref not found in response"}
             if "phone_state" not in response:
-                LoggingUtils.log_error("WebSocketTools", "Response missing phone_state field")
                 return {"error": "Missing Data", "message": "phone_state not found in response"}
 
             # 定义过滤函数（去除 type 字段）
@@ -352,12 +321,11 @@ class WebSocketTools(Tools):
                         filtered_element["children"] = filter_children_recursive(element["children"])
                     filtered_elements.append(filtered_element)
                 self.clickable_elements_cache = filtered_elements
-                LoggingUtils.log_debug("WebSocketTools", "[async] Updated clickable_elements_cache from inline a11y_tree, count={count}", count=len(filtered_elements))
                 
                 # 导出 a11y_tree 到 JSON 文件（如果启用）
                 self._export_a11y_tree_to_json(filtered_elements)
             else:
-                LoggingUtils.log_warning("WebSocketTools", "No a11y_tree data in response")
+                pass
             
             # 构建返回结果
             result = {

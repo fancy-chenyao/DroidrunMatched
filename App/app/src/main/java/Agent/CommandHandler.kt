@@ -12,6 +12,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.PixelCopy
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import Agent.ActivityTracker
@@ -20,6 +21,7 @@ import controller.GenericElement
 import controller.NativeController
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import utlis.PageChangeVerifier
 
 /**
@@ -88,8 +90,6 @@ object CommandHandler {
         activity: Activity?,
         callback: (JSONObject) -> Unit
     ) {
-        Log.d(TAG, "处理命令: $command, requestId: $requestId")
-        
         if (activity == null) {
             callback(createErrorResponse("No active activity"))
             return
@@ -108,13 +108,10 @@ object CommandHandler {
                     protectedCallback(createErrorResponse("No active activity"))
                     return
                 }
-                Log.d(TAG, "处理单独截图命令")
                 Handler(Looper.getMainLooper()).post {
                     try {
                         val t0 = System.currentTimeMillis()
                         takeScreenshotAsync(activity) { bitmap ->
-                            val t1 = System.currentTimeMillis()
-                            Log.d(TAG, "截图完成: hasBitmap=${bitmap != null && !bitmap.isRecycled}, captureTime=${t1 - t0}ms")
                             if (bitmap != null && !bitmap.isRecycled) {
                                 // 在后台线程执行网络上传，避免 NetworkOnMainThreadException
                                 Thread {
@@ -129,7 +126,6 @@ object CommandHandler {
                                                 put("size", uploadResp.optInt("size"))
                                             }
                                             val data = JSONObject().apply { put("screenshot_ref", ref) }
-                                            Log.d(TAG, "截图回包: 使用引用 path=${ref.optString("path")}")
                                             protectedCallback(createSuccessResponse(data))
                                         } else {
                                             protectedCallback(createErrorResponse("Upload screenshot failed"))
@@ -187,9 +183,7 @@ object CommandHandler {
         activity: Activity?,
         callback: (JSONObject) -> Unit
     ) {
-        // 记录开始处理时间
         val startTime = System.currentTimeMillis()
-        Log.d(TAG, "⏱️ [get_state] 开始处理 | request_id=$requestId")
         
         if (activity == null) {
             callback(createErrorResponse("No active activity"))
@@ -204,7 +198,6 @@ object CommandHandler {
                 val cacheValid = isCacheValid(currentScreenHash)
                 
                 if (cacheValid && cachedStateResponse != null) {
-                    Log.d(TAG, "使用缓存的UI状态")
                     callback(cachedStateResponse!!)
                     return@post
                 }
@@ -219,7 +212,6 @@ object CommandHandler {
                             val result = StateConverter.convertElementTreeToA11yTreePruned(elementTree, activity)
                             val a11yTree = result.a11yTree
                             val stableIndexMap = result.stableIndexMap
-                            Log.d(TAG, "a11y_tree 生成完成，节点数: ${a11yTree.length()}")
 
                             // 获取截图并转为 Base64（如果需要）
                             var screenshotBase64: String? = null
@@ -229,7 +221,6 @@ object CommandHandler {
                                     takeScreenshotAsync(activity) { screenshot ->
                                         if (screenshot != null && !screenshot.isRecycled) {
                                             screenshotBase64 = StateConverter.bitmapToBase64(screenshot, 30)
-                                            Log.d(TAG, "截图转换完成，Base64 长度: ${screenshotBase64?.length ?: 0}")
                                             screenshot.recycle()
                                         }
                                         screenshotLatch.countDown()
@@ -254,11 +245,6 @@ object CommandHandler {
                                 callback(stateResponse)
                                 
                                 // 计算总耗时和数据大小
-                                val totalTime = System.currentTimeMillis() - startTime
-                                val responseSize = stateResponse.toString().length
-                                val screenshotSize = screenshotBase64?.length ?: 0
-                                Log.d(TAG, "⏱️ [get_state] 完成 | 总耗时=${totalTime}ms | 响应大小=${responseSize}B | 截图大小=${screenshotSize}B | request_id=$requestId")
-                                Log.d(TAG, "✓ 响应已发送（内联 a11y_tree + screenshot_base64）")
                             }
 
                         } catch (e: Exception) {
@@ -347,8 +333,6 @@ object CommandHandler {
         cachedStableIndexMap = stableIndexMap
         lastScreenHash = screenHash
         lastCacheTime = System.currentTimeMillis()
-        
-        Log.d(TAG, "UI状态缓存已更新（包含稳定索引映射: ${stableIndexMap != null}）")
     }
     
     /**
@@ -361,7 +345,6 @@ object CommandHandler {
         lastScreenHash = null
         lastCacheTime = 0
         recycleOldScreenshot()
-        Log.d(TAG, "UI状态缓存已清理")
     }
     
     /**
@@ -375,7 +358,6 @@ object CommandHandler {
                 // 保留稳定索引映射，只清理截图缓存
                 lastScreenHash = null
                 recycleOldScreenshot()
-                Log.d(TAG, "input_text操作：保留元素树缓存，仅清理截图缓存")
             }
             else -> {
                 // 其他操作使用完整的缓存清理
@@ -392,7 +374,6 @@ object CommandHandler {
             val oldScreenshot = lastScreenshot
             if (oldScreenshot != null && !oldScreenshot.isRecycled) {
                 oldScreenshot.recycle()
-                Log.d(TAG, "已回收旧截图资源")
             }
             lastScreenshot = null
         } catch (e: Exception) {
@@ -418,7 +399,6 @@ object CommandHandler {
         
         val x = params.getInt("x")
         val y = params.getInt("y")
-        Log.d(TAG, "执行tap命令: ($x, $y)")
         
         if (activity == null) {
             Log.w(TAG, "tap命令执行失败: Activity为空")
@@ -427,38 +407,98 @@ object CommandHandler {
         }
         
         // 在主线程执行点击
+        val tapStartTime = System.currentTimeMillis()
+        
         Handler(Looper.getMainLooper()).post {
             try {
-                // 动作前状态用于页面变化验证
-                val preActivity = activity
-                val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
-                val preWebHash = PageChangeVerifier.computePreWebViewAggHash(activity)
                 // 根据页面类型分发坐标点击（dp单位）
                 ElementController.clickByCoordinateDp(activity, x.toFloat(), y.toFloat()) { success ->
-                    if (success) {
-                        // 成功后进行页面变化验证
-                        PageChangeVerifier.verifyActionWithPageChange(
-                            handler = Handler(Looper.getMainLooper()),
-                            getCurrentActivity = { ActivityTracker.getCurrentActivity() },
-                            preActivity = preActivity,
-                            preViewTreeHash = preHash,
-                            preWebViewAggHash = preWebHash,
-                            timeoutMs = 5000L  // 增加超时时间到5秒
-                        ) { changed, changeType ->
-                            if (changed) {
-                                clearCache()
-                                Log.d(TAG, "tap命令执行成功且检测到页面变化: ($x, $y), 类型=$changeType")
-                                val data = JSONObject().apply { put("page_change_type", changeType) }
-                                callback(createSuccessResponse(data))
-                            } else {
-                                Log.w(TAG, "tap命令执行后未检测到页面变化")
-                                callback(createErrorResponse("Tap succeeded but page unchanged"))
-                            }
-                        }
-                    } else {
-                        Log.w(TAG, "tap命令执行失败: NativeController返回false")
+                    
+                    if (!success) {
+                        Log.w(TAG, "tap命令执行失败: 点击操作返回false")
                         callback(createErrorResponse("Tap action failed"))
+                        return@clickByCoordinateDp
                     }
+                    
+                    val observerStartTime = System.currentTimeMillis()
+                    // 使用 ViewTreeObserver 监听 UI 变化
+                    val layoutChanged = AtomicBoolean(false)
+                    val layoutChangeTime = AtomicLong(0L)
+                    val activityChanged = AtomicBoolean(false)
+                    val hasReturned = AtomicBoolean(false)  // 防止重复返回
+                    val initialActivity = ActivityTracker.getCurrentActivity()
+                    
+                    // 声明 listener 变量（稍后初始化）
+                    var listener: ViewTreeObserver.OnGlobalLayoutListener? = null
+                    
+                    // 返回结果的通用方法
+                    val returnResult = {
+                        if (!hasReturned.getAndSet(true)) {
+                            try {
+                                listener?.let { activity.window?.decorView?.viewTreeObserver?.removeOnGlobalLayoutListener(it) }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "移除 ViewTreeObserver 失败: ${e.message}")
+                            }
+                            
+                            // 检查 Activity 是否变化
+                            val currentActivity = ActivityTracker.getCurrentActivity()
+                            if (currentActivity != initialActivity) {
+                                activityChanged.set(true)
+                            }
+                            
+                            // 总是清理缓存
+                            clearCache()
+                            
+                            val hasChange = layoutChanged.get() || activityChanged.get()
+                            val changeTypes = mutableListOf<String>()
+                            if (activityChanged.get()) changeTypes.add("activity_switch")
+                            if (layoutChanged.get()) changeTypes.add("layout_change")
+                            
+                            val data = JSONObject().apply {
+                                put("ui_changed", hasChange)
+                                if (changeTypes.isNotEmpty()) {
+                                    put("change_type", changeTypes.joinToString("_and_"))
+                                }
+                            }
+                            
+                            if (!hasChange) {
+                                Log.w(TAG, "tap未检测到UI变化: ($x, $y)")
+                            }
+                            
+                            callback(createSuccessResponse(data))
+                        }
+                    }
+                    
+                    // 初始化 listener
+                    listener = ViewTreeObserver.OnGlobalLayoutListener {
+                        if (!layoutChanged.get()) {
+                            layoutChanged.set(true)
+                            // 检测到变化后，等待 100ms 确认，然后提前返回
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                returnResult()
+                            }, 100L)
+                        }
+                    }
+                    
+                    try {
+                        activity.window?.decorView?.viewTreeObserver?.addOnGlobalLayoutListener(listener)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "添加 ViewTreeObserver 失败: ${e.message}")
+                    }
+                    
+                    // 100ms 后检查，如果没有变化则提前返回
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (!layoutChanged.get() && !hasReturned.get()) {
+                            returnResult()
+                        }
+                    }, 100L)
+                    
+                    // 最多等待 500ms（兜底保障）
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (!hasReturned.get()) {
+                            returnResult()
+                        }
+                    }, 500L)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "tap命令执行异常: ${e.message}", e)
@@ -484,7 +524,6 @@ object CommandHandler {
         }
         
         val index = params.getInt("index")
-        Log.d(TAG, "执行tap_by_index命令: index=$index")
         
         if (activity == null) {
             Log.w(TAG, "tap_by_index命令执行失败: Activity为空")
@@ -500,53 +539,107 @@ object CommandHandler {
             return
         }
         
-        Log.d(TAG, "找到目标元素: className=${targetElement.className}, text=${targetElement.text}, bounds=${targetElement.bounds}")
-        
         // 计算元素中心坐标（dp单位）
         val centerX = (targetElement.bounds.left + targetElement.bounds.right) / 2f
         val centerY = (targetElement.bounds.top + targetElement.bounds.bottom) / 2f
-        Log.d(TAG, "目标元素中心坐标: ($centerX, $centerY) dp")
         
         // 在主线程执行点击
+        val tapStartTime = System.currentTimeMillis()
+        
         Handler(Looper.getMainLooper()).post {
             try {
-                // 动作前状态用于页面变化验证
-                val preActivity = activity
-                val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
-                val preWebHash = PageChangeVerifier.computePreWebViewAggHash(activity)
                 // 根据页面类型分发坐标点击（dp单位）
                 ElementController.clickByCoordinateDp(activity, centerX, centerY) { success ->
-                    if (success) {
-                        // 成功后进行页面变化验证
-                        PageChangeVerifier.verifyActionWithPageChange(
-                            handler = Handler(Looper.getMainLooper()),
-                            getCurrentActivity = { ActivityTracker.getCurrentActivity() },
-                            preActivity = preActivity,
-                            preViewTreeHash = preHash,
-                            preWebViewAggHash = preWebHash,
-                            timeoutMs = 5000L  // 增加超时时间到5秒
-                        ) { changed, changeType ->
-                            if (changed) {
-                                clearCache()
-                                Log.d(TAG, "tap_by_index命令执行成功且检测到页面变化: index=$index, 类型=$changeType")
-                                
-                                // 构建详细的描述信息
-                                val elementDesc = buildElementDescription(targetElement, index)
-                                
-                                val data = JSONObject().apply { 
-                                    put("page_change_type", changeType)
-                                    put("message", elementDesc)
-                                }
-                                callback(createSuccessResponse(data))
-                            } else {
-                                Log.w(TAG, "tap_by_index命令执行后未检测到页面变化")
-                                callback(createErrorResponse("Tap by index succeeded but page unchanged"))
-                            }
-                        }
-                    } else {
-                        Log.w(TAG, "tap_by_index命令执行失败: NativeController返回false")
+                    
+                    if (!success) {
+                        Log.w(TAG, "tap_by_index命令执行失败: 点击操作返回false")
                         callback(createErrorResponse("Tap by index action failed"))
+                        return@clickByCoordinateDp
                     }
+                    
+                    val observerStartTime = System.currentTimeMillis()
+                    // 使用 ViewTreeObserver 监听 UI 变化
+                    val layoutChanged = AtomicBoolean(false)
+                    val layoutChangeTime = AtomicLong(0L)
+                    val activityChanged = AtomicBoolean(false)
+                    val hasReturned = AtomicBoolean(false)  // 防止重复返回
+                    val initialActivity = ActivityTracker.getCurrentActivity()
+                    
+                    // 声明 listener 变量（稍后初始化）
+                    var listener: ViewTreeObserver.OnGlobalLayoutListener? = null
+                    
+                    // 返回结果的通用方法
+                    val returnResult = {
+                        if (!hasReturned.getAndSet(true)) {
+                            try {
+                                listener?.let { activity.window?.decorView?.viewTreeObserver?.removeOnGlobalLayoutListener(it) }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "移除 ViewTreeObserver 失败: ${e.message}")
+                            }
+                            
+                            // 检查 Activity 是否变化
+                            val currentActivity = ActivityTracker.getCurrentActivity()
+                            if (currentActivity != initialActivity) {
+                                activityChanged.set(true)
+                            }
+                            
+                            // 总是清理缓存
+                            clearCache()
+                            
+                            // 构建详细的描述信息
+                            val elementDesc = buildElementDescription(targetElement, index)
+                            
+                            val hasChange = layoutChanged.get() || activityChanged.get()
+                            val changeTypes = mutableListOf<String>()
+                            if (activityChanged.get()) changeTypes.add("activity_switch")
+                            if (layoutChanged.get()) changeTypes.add("layout_change")
+                            
+                            val data = JSONObject().apply {
+                                put("message", elementDesc)
+                                put("ui_changed", hasChange)
+                                if (changeTypes.isNotEmpty()) {
+                                    put("change_type", changeTypes.joinToString("_and_"))
+                                }
+                            }
+                            
+                            if (!hasChange) {
+                                Log.w(TAG, "tap_by_index未检测到UI变化: index=$index")
+                            }
+                            
+                            callback(createSuccessResponse(data))
+                        }
+                    }
+                    
+                    // 初始化 listener
+                    listener = ViewTreeObserver.OnGlobalLayoutListener {
+                        if (!layoutChanged.get()) {
+                            layoutChanged.set(true)
+                            // 检测到变化后，等待 100ms 确认，然后提前返回
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                returnResult()
+                            }, 100L)
+                        }
+                    }
+                    
+                    try {
+                        activity.window?.decorView?.viewTreeObserver?.addOnGlobalLayoutListener(listener)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "添加 ViewTreeObserver 失败: ${e.message}")
+                    }
+                    
+                    // 100ms 后检查，如果没有变化则提前返回
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (!layoutChanged.get() && !hasReturned.get()) {
+                            returnResult()
+                        }
+                    }, 100L)
+                    
+                    // 最多等待 500ms（兜底保障）
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        if (!hasReturned.get()) {
+                            returnResult()
+                        }
+                    }, 500L)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "tap_by_index命令执行异常: ${e.message}", e)
@@ -567,13 +660,12 @@ object CommandHandler {
             // 反向查找：从稳定索引找到对应的元素
             val element = stableIndexMap.entries.find { it.value == targetIndex }?.key
             if (element != null) {
-                Log.d(TAG, "✅ 使用稳定索引映射找到元素: index=$targetIndex, className=${element.className}, text=${element.text}")
                 return element
             }
         }
         
         // 降级方案：使用原始索引查找（兼容旧逻辑）
-        Log.w(TAG, "⚠️ 稳定索引映射不可用，使用原始索引查找: index=$targetIndex")
+        Log.w(TAG, "稳定索引映射不可用，使用原始索引: index=$targetIndex")
         fun searchElement(element: GenericElement): GenericElement? {
             if (element.index == targetIndex) {
                 return element
@@ -615,7 +707,6 @@ object CommandHandler {
         val endX = params.getInt("end_x")
         val endY = params.getInt("end_y")
         val duration = params.optInt("duration_ms", 300)
-        Log.d(TAG, "执行swipe命令: ($startX, $startY) -> ($endX, $endY), duration=${duration}ms")
         
         if (activity == null) {
             Log.w(TAG, "swipe命令执行失败: Activity为空")
@@ -649,7 +740,6 @@ object CommandHandler {
                         ) { changed, changeType ->
                             if (changed) {
                                 clearCache()
-                                Log.d(TAG, "swipe命令执行成功且检测到页面变化: 类型=$changeType")
                                 val data = JSONObject().apply { put("page_change_type", changeType) }
                                 callback(createSuccessResponse(data))
                             } else {
@@ -822,9 +912,7 @@ object CommandHandler {
         }
         
         val text = params.getString("text")
-        val index = params.optInt("index", 0)  // 默认为0，如果未提供index
-        
-        Log.d(TAG, "执行input_text命令: text=\"$text\", index=$index")
+        val index = params.optInt("index", 0)
         
         if (activity == null) {
             Log.w(TAG, "input_text命令执行失败: Activity为空")
@@ -838,8 +926,6 @@ object CommandHandler {
                 val preActivity = activity
                 val preHash = PageChangeVerifier.computePreViewTreeHash(activity)
                 val preWebHash = PageChangeVerifier.computePreWebViewAggHash(activity)
-                
-                Log.d(TAG, "解析输入文本: text='$text', index=$index")
                 
                 // 从缓存中获取元素树
                 val elementTree = cachedElementTree
@@ -856,8 +942,6 @@ object CommandHandler {
                     callback(createErrorResponse("Element with index $index not found"))
                     return@post
                 }
-                
-                Log.d(TAG, "找到目标元素: resourceId=${targetElement.resourceId}, className=${targetElement.className}")
                 
                 // 使用ElementController设置输入值
                 ElementController.setInputValue(activity, targetElement.resourceId, text) { success ->
@@ -881,7 +965,6 @@ object CommandHandler {
                                     put("element_index", index)
                                     put("message", elementDesc)
                                 }
-                                Log.d(TAG, "input_text命令执行成功且检测到页面变化: 类型=$changeType")
                                 callback(createSuccessResponse(data))
                             } else {
                                 Log.w(TAG, "input_text命令执行后未检测到页面变化")
@@ -929,8 +1012,6 @@ object CommandHandler {
         activity: Activity?,
         callback: (JSONObject) -> Unit
     ) {
-        Log.d(TAG, "执行back命令")
-        
         if (activity == null) {
             Log.w(TAG, "back命令执行失败: Activity为空")
             callback(createErrorResponse("No active activity"))
@@ -955,7 +1036,6 @@ object CommandHandler {
                         ) { changed, changeType ->
                             if (changed) {
                                 clearCache()
-                                Log.d(TAG, "back命令执行成功且检测到页面变化: 类型=$changeType")
                                 val data = JSONObject().apply { put("page_change_type", changeType) }
                                 callback(createSuccessResponse(data))
                             } else {
@@ -992,7 +1072,6 @@ object CommandHandler {
         }
         
         val keycode = params.getInt("keycode")
-        Log.d(TAG, "执行press_key命令: keycode=$keycode")
         
         if (activity == null) {
             Log.w(TAG, "press_key命令执行失败: Activity为空")
@@ -1064,7 +1143,6 @@ object CommandHandler {
         
         val packageName = params.getString("package")
         val activityName = params.optString("activity", null)
-        Log.d(TAG, "执行start_app命令: package=$packageName, activity=$activityName")
         
         if (activity == null) {
             Log.w(TAG, "start_app命令执行失败: Activity为空")

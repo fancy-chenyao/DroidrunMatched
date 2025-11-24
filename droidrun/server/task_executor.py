@@ -30,8 +30,6 @@ class TaskExecutor:
         self.config_manager = get_config_manager()
         self._current_task = None
         self._current_agent = None
-        
-        LoggingUtils.log_info("TaskExecutor", "TaskExecutor initialized for device {device_id}", device_id=device_id)
     
     async def execute_task(
         self,
@@ -51,9 +49,6 @@ class TaskExecutor:
             任务执行结果
         """
         try:
-            LoggingUtils.log_info("TaskExecutor", "Starting task execution for device {device_id}, goal: {goal}", 
-                                device_id=self.device_id, goal=goal[:100])
-            
             # 1. 获取服务器实例和工具（延迟导入以避免循环导入）
             from droidrun.server import get_global_server
             server = get_global_server()
@@ -76,14 +71,8 @@ class TaskExecutor:
             # 注册工具实例到服务器
             server.register_tools_instance(self.device_id, tools)
             
-            LoggingUtils.log_info("TaskExecutor", "WebSocketTools created for device {device_id}", device_id=self.device_id)
-            
             # 3. 加载 LLM（使用与 main.py 相同的方式）
-            LoggingUtils.log_info("TaskExecutor", "Starting LLM loading...")
-            
             api_config = self.config_manager.get_api_config()
-            LoggingUtils.log_info("TaskExecutor", "API config retrieved: model={model}, base_url={base_url}", 
-                                model=api_config.model, base_url=api_config.api_base)
             
             if not api_config.api_key:
                 raise ValueError("未配置 LLM API Key，请设置环境变量或配置文件")
@@ -91,7 +80,6 @@ class TaskExecutor:
             # 使用与 main.py 相同的方式加载 LLM：直接使用 OpenAILike
             # 这样可以避免 load_llm 中可能的阻塞问题
             try:
-                LoggingUtils.log_info("TaskExecutor", "Loading LLM using OpenAILike (same as main.py)...")
                 from llama_index.llms.openai_like import OpenAILike
                 
                 llm = OpenAILike(
@@ -100,8 +88,6 @@ class TaskExecutor:
                     api_key=api_config.api_key,
                     is_chat_model=True,  # droidrun需要聊天模型支持
                 )
-                LoggingUtils.log_info("TaskExecutor", "LLM loaded successfully using OpenAILike: model={model}", 
-                                    model=api_config.model)
             except Exception as e:
                 LoggingUtils.log_error("TaskExecutor", "Failed to load LLM: {error}", error=e)
                 import traceback
@@ -118,9 +104,6 @@ class TaskExecutor:
             save_trajectory = task_options.get("save_trajectory") or self.config_manager.get("agent.save_trajectories", "none")
             
             # 5. 创建 DroidAgent
-            LoggingUtils.log_info("TaskExecutor", "Creating DroidAgent with options: max_steps={max_steps}, vision={vision}, reasoning={reasoning}, reflection={reflection}", 
-                                max_steps=max_steps, vision=vision, reasoning=reasoning, reflection=reflection)
-            
             try:
                 agent = DroidAgent(
                     goal=goal,
@@ -134,7 +117,6 @@ class TaskExecutor:
                     debug=debug,
                     save_trajectories=save_trajectory,
                 )
-                LoggingUtils.log_info("TaskExecutor", "DroidAgent created successfully")
             except Exception as e:
                 LoggingUtils.log_error("TaskExecutor", "Failed to create DroidAgent: {error}", error=e)
                 import traceback
@@ -144,10 +126,7 @@ class TaskExecutor:
             self._current_agent = agent
             self._current_task = request_id
             
-            LoggingUtils.log_info("TaskExecutor", "DroidAgent created, starting execution...")
-            
             # 6. 执行任务
-            LoggingUtils.log_info("TaskExecutor", "Calling agent.run()...")
             try:
                 # 启动任务级事件循环看门狗（仅日志用途）
                 watchdog_task = None
@@ -162,7 +141,6 @@ class TaskExecutor:
                         watchdog_task.cancel()
                     except Exception:
                         pass
-                LoggingUtils.log_info("TaskExecutor", "agent.run() completed, result keys: {keys}", keys=list(result.keys()) if result else "None")
             except Exception as e:
                 LoggingUtils.log_error("TaskExecutor", "Error during agent.run(): {error}", error=e)
                 import traceback
@@ -180,9 +158,6 @@ class TaskExecutor:
             # 添加额外信息（如果有）
             if "trajectory_id" in result:
                 execution_result["trajectory_id"] = result["trajectory_id"]
-            
-            LoggingUtils.log_info("TaskExecutor", "Task execution completed: success={success}, steps={steps}", 
-                                success=execution_result["success"], steps=execution_result["steps"])
             
             # 清理
             self._current_agent = None
@@ -231,7 +206,6 @@ class TaskExecutor:
         """取消当前任务"""
         if self._current_agent:
             # 这里可以添加取消逻辑
-            LoggingUtils.log_info("TaskExecutor", "Cancelling task for device {device_id}", device_id=self.device_id)
             self._current_agent = None
             self._current_task = None
 
