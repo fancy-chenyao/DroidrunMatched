@@ -287,6 +287,9 @@ class WebSocketTools(Tools):
         异步获取设备状态（包含 a11y_tree 和 phone_state）。仅传引用，不回填大对象。
         """
         try:
+            # 性能分析：记录 get_state 开始时间
+            get_state_start = time.time()
+            # print(f"🔍 [Performance] get_state started")  # 可选：太频繁可以注释
             response = await self._send_request_and_wait("get_state", {"include_screenshot": include_screenshot})
 
             if response.get("status") == "error":
@@ -336,9 +339,14 @@ class WebSocketTools(Tools):
             # 处理截图（如果有 screenshot_base64）
             if "screenshot_base64" in response:
                 result["screenshot_base64"] = response.get("screenshot_base64")
-                screenshot_len = len(response.get("screenshot_base64", ""))
-                LoggingUtils.log_debug("WebSocketTools", "[async] Received screenshot_base64, length={length}", length=screenshot_len)
-            LoggingUtils.log_debug("WebSocketTools", "[async] State retrieved ok")
+                self.last_screenshot = response.get("screenshot_base64")
+            
+            # 性能分析：记录 get_state 总耗时
+            get_state_duration = time.time() - get_state_start
+            print(f"⏱️ [Performance] get_state total: {get_state_duration:.2f}s (elements: {len(filtered_elements)})")
+            LoggingUtils.log_info("Performance", "⏱️ get_state total: {duration:.2f}s (elements: {count})", 
+                                duration=get_state_duration, count=len(filtered_elements))
+            
             return result
         except TimeoutError as e:
             LoggingUtils.log_error("WebSocketTools", "Timeout getting state: {error}", error=e)

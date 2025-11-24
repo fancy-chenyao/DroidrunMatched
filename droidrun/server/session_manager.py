@@ -384,15 +384,3 @@ class SessionManager:
                 self._enqueue_ts.pop(rid, None)
         except Exception as e:
             LoggingUtils.log_error("SessionManager", "Error cleaning up enqueue timestamps: {error}", error=e)
-
-
-
-
-
-
-
-
-
-
-
-

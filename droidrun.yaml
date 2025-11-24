@@ -48,8 +48,8 @@ droidrun:
     
     # 时间相关配置
     macro_generation_wait_time: 0.5
-    action_wait_time: 0.5
-    screenshot_wait_time: 1.0
+    action_wait_time: 0.2
+    screenshot_wait_time: 0.3
     long_wait_time: 2.0
 
     export_a11y_tree: true

@@ -166,6 +166,13 @@ class CodeActAgent(Workflow):
 
         self.steps_counter += 1
         logger.info(f"🧠 Step {self.steps_counter}: Thinking...")
+        
+        # 性能分析：记录 LLM 思考开始时间
+        llm_start_time = time.time()
+        llm_start_timestamp = time.strftime("%H:%M:%S", time.localtime(llm_start_time))
+        from droidrun.agent.utils.logging_utils import LoggingUtils
+        print(f"🤔 [Performance] LLM 开始思考 at {llm_start_timestamp}")
+        LoggingUtils.log_info("Performance", "🤔 LLM 开始思考 at {time}", time=llm_start_timestamp)
 
         model = self.llm.class_name()
         
@@ -220,6 +227,14 @@ class CodeActAgent(Workflow):
                 )
 
         response = await self._get_llm_response(ctx, chat_history)
+        
+        # 性能分析：记录 LLM 思考结束时间
+        llm_duration = time.time() - llm_start_time
+        llm_end_timestamp = time.strftime("%H:%M:%S", time.localtime())
+        print(f"💡 [Performance] LLM 完成思考 at {llm_end_timestamp}, 耗时: {llm_duration:.2f}s")
+        LoggingUtils.log_info("Performance", "💡 LLM 完成思考 at {time}, 耗时: {duration:.2f}s", 
+                            time=llm_end_timestamp, duration=llm_duration)
+        
         if response is None:
             return TaskEndEvent(
                 success=False, reason="LLM response is None. This is a critical error."
