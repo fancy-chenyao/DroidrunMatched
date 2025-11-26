@@ -64,8 +64,16 @@ object WebViewController {
                             const rawText = hasElementChildren ? '' : ((node.textContent || node.value || '') || '');
                             const text = (rawText.trim()).substring(0, 100);
                             
+                            // 为没有ID的元素动态分配临时ID
+                            let elementId = node.id;
+                            if (!elementId || elementId.trim() === '') {
+                                elementId = 'auto_gen_' + indexCounter;
+                                node.id = elementId;  // 设置到DOM元素上
+                                console.log('WebViewController: 为元素动态分配ID: ' + elementId + ', tagName: ' + node.tagName);
+                            }
+                            
                             return {
-                                resourceId: node.id || '',
+                                resourceId: elementId,
                                 className: node.tagName || '',
                                 text: text, // 仅保留叶子节点文本以减少冗余
                                 contentDesc: node.placeholder || '',
@@ -161,13 +169,38 @@ object WebViewController {
                 },
                 clickElement: function(elementId) {
                     try {
+                        console.log('JavaScript clickElement: 尝试点击元素 ID=' + elementId);
                         const element = document.getElementById(elementId);
-                        if (element && element.click) {
-                            element.click();
-                            return true;
+                        
+                        if (!element) {
+                            console.log('JavaScript clickElement: 元素不存在 ID=' + elementId);
+                            return false;
                         }
-                        return false;
+                        
+                        if (!element.click) {
+                            console.log('JavaScript clickElement: 元素没有click方法 ID=' + elementId);
+                            return false;
+                        }
+                        
+                        // 检查元素是否可见和可点击
+                        const style = window.getComputedStyle(element);
+                        if (style.display === 'none' || style.visibility === 'hidden') {
+                            console.log('JavaScript clickElement: 元素不可见 ID=' + elementId);
+                            return false;
+                        }
+                        
+                        if (element.disabled) {
+                            console.log('JavaScript clickElement: 元素被禁用 ID=' + elementId);
+                            return false;
+                        }
+                        
+                        console.log('JavaScript clickElement: 执行点击 ID=' + elementId);
+                        element.click();
+                        console.log('JavaScript clickElement: 点击成功 ID=' + elementId);
+                        return true;
+                        
                     } catch (error) {
+                        console.log('JavaScript clickElement: 异常 ID=' + elementId + ', 错误=' + error.message);
                         return false;
                     }
                 },
@@ -269,8 +302,26 @@ object WebViewController {
     }
     
     fun clickElement(webView: WebView, elementId: String, callback: (Boolean) -> Unit) {
-        webView.evaluateJavascript("window.__NativeBridge.clickElement('$elementId');") { result ->
-            callback(result == "true")
+        Log.d("WebViewController", "尝试JavaScript点击元素: elementId='$elementId'")
+        
+        // 先检查元素是否存在
+        webView.evaluateJavascript("document.getElementById('$elementId') !== null;") { existsResult ->
+            Log.d("WebViewController", "元素存在检查结果: $existsResult")
+            
+            if (existsResult == "true") {
+                // 元素存在，尝试点击
+                webView.evaluateJavascript("window.__NativeBridge.clickElement('$elementId');") { clickResult ->
+                    Log.d("WebViewController", "JavaScript点击执行结果: $clickResult")
+                    val success = clickResult == "true"
+                    if (!success) {
+                        Log.w("WebViewController", "JavaScript点击失败 - elementId='$elementId', 返回值='$clickResult'")
+                    }
+                    callback(success)
+                }
+            } else {
+                Log.w("WebViewController", "JavaScript点击失败 - 元素不存在: elementId='$elementId'")
+                callback(false)
+            }
         }
     }
     
