@@ -102,6 +102,7 @@ class MobileService : Service() {
     private var monitoredWebView: WebView? = null
     private var webViewDrawListener: ViewTreeObserver.OnDrawListener? = null
     private var webViewScrollListener: ViewTreeObserver.OnScrollChangedListener? = null
+    private var pageChangeListenerEnabled: Boolean = false
 
     /**
      * 本地绑定器类
@@ -150,10 +151,10 @@ class MobileService : Service() {
                         }
                         
                     // 初始化页面变化的参数
-                        xmlPending = true
-                        screenNeedUpdate = true
-                        firstScreen = true
-                    WaitScreenUpdate()
+//                        xmlPending = true
+//                        screenNeedUpdate = true
+//                        firstScreen = true
+//                    WaitScreenUpdate()
                     } else {
                         Log.e(TAG, "Received null instruction from intent")
                     }
@@ -306,7 +307,7 @@ class MobileService : Service() {
 
 
 
-        // 初始化页面变化监听
+        // 初始化页面变化监听（默认关闭）
         initPageChangeListener()
 
         
@@ -368,6 +369,11 @@ class MobileService : Service() {
      * 设置Activity变化监听器，当Activity切换时会自动更新ViewTreeObserver监听
      */
     private fun initPageChangeListener() {
+        if (!pageChangeListenerEnabled) {
+            Log.d(TAG, "页面变化监听已关闭")
+            removeViewTreeObserver()
+            return
+        }
         // 设置Activity变化监听器
         ActivityTracker.setActivityChangeListener(object : ActivityTracker.ActivityChangeListener {
             override fun onActivityChanged(newActivity: Activity?, oldActivity: Activity?) {
@@ -416,6 +422,10 @@ class MobileService : Service() {
      * @param activity 要监听的Activity
      */
     private fun setupViewTreeObserver(activity: Activity) {
+        if (!pageChangeListenerEnabled) {
+            Log.d(TAG, "页面变化监听已关闭，跳过设置")
+            return
+        }
         try {
             // 如果已经在监听同一个Activity，不需要重复设置
             if (currentMonitoredActivity == activity && currentViewTreeObserver != null) {
@@ -544,9 +554,28 @@ class MobileService : Service() {
      * @param reason 变化原因
      */
     private fun onPageChanged(reason: String) {
+        if (!pageChangeListenerEnabled) {
+            return
+        }
         val currentTime = System.currentTimeMillis()
         LogDedup.d(TAG, "处理页面变化: $reason")
         WaitScreenUpdate()
+    }
+
+    /**
+     * 启用页面变化监听
+     */
+    fun enablePageChangeListener() {
+        pageChangeListenerEnabled = true
+        initPageChangeListener()
+    }
+
+    /**
+     * 关闭页面变化监听
+     */
+    fun disablePageChangeListener() {
+        pageChangeListenerEnabled = false
+        removeViewTreeObserver()
     }
 
     /**

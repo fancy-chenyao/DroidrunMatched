@@ -28,6 +28,7 @@ import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import utlis.PageChangeVerifier
+import utlis.PageStableVerifier
 
 /**
  * 命令处理器
@@ -145,10 +146,24 @@ object CommandHandler {
                         Log.e(TAG, "处理截图命令异常", e)
                         protectedCallback(createErrorResponse("Exception: ${e.message}"))
                     }
-                }
+        }
             }
             "get_state" -> {
-                handleGetState(requestId, params, activity, protectedCallback)
+                val handler = Handler(Looper.getMainLooper())
+                val stabilizeTimeout = params.optLong("stabilize_timeout_ms", 5000L)
+                val stableWindow = params.optLong("stable_window_ms", 500L)
+                val waitStart = System.currentTimeMillis()
+                PageStableVerifier.waitUntilStable(
+                    handler = handler,
+                    getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                    timeoutMs = stabilizeTimeout,
+                    minStableMs = stableWindow,
+                    intervalMs = 100L
+                ) {
+                    val waitedMs = System.currentTimeMillis() - waitStart
+                    Log.d(TAG, "页面稳定等待耗时: ${waitedMs}ms (timeout=${stabilizeTimeout}ms, stable_window=${stableWindow}ms)")
+                    handleGetState(requestId, params, activity, protectedCallback)
+                }
             }
             "tap" -> {
                 handleTap(requestId, params, activity, protectedCallback)
