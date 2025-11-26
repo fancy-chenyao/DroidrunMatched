@@ -33,3 +33,4 @@ todo.txt
 /App/.gradle/
 App/local.properties
 droidrun.yaml
+.gradle/

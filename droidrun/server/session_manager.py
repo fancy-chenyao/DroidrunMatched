@@ -51,8 +51,6 @@ class SessionManager:
         self._enqueue_ts: Dict[str, float] = {}
         # 事件循环健康监控任务
         self._watchdog_task: Optional[asyncio.Task] = None
-        LoggingUtils.log_info("SessionManager", "SessionManager initialized (heartbeat_timeout={timeout}s)", 
-                             timeout=heartbeat_timeout)
         # 启动事件循环看门狗（仅日志用途）
         try:
             self._watchdog_task = asyncio.create_task(self._event_loop_watchdog())
@@ -93,8 +91,6 @@ class SessionManager:
             except Exception:
                 session.out_queue = asyncio.Queue()
             self.sessions[device_id] = session
-            LoggingUtils.log_info("SessionManager", "Device {device_id} registered (total sessions: {count})", 
-                                device_id=device_id, count=len(self.sessions))
             # 启动发送协程
             try:
                 task = asyncio.create_task(self._sender_loop(device_id))
@@ -123,8 +119,6 @@ class SessionManager:
                     except Exception:
                         pass
                 del self.sessions[device_id]
-                LoggingUtils.log_info("SessionManager", "Device {device_id} unregistered (remaining sessions: {count})", 
-                                    device_id=device_id, count=len(self.sessions))
     
     async def get_session(self, device_id: str) -> Optional[DeviceSession]:
         """
@@ -168,14 +162,6 @@ class SessionManager:
                 await session.websocket.send(json.dumps(message))
                 return True
             try:
-                # 记录入队
-                try:
-                    rid = message.get("request_id") if isinstance(message, dict) else None
-                    if rid:
-                        self._enqueue_ts[rid] = time.time()
-                except Exception:
-                    pass
-                
                 # 根据消息类型确定优先级
                 priority = self._get_message_priority(message)
                 
@@ -185,21 +171,6 @@ class SessionManager:
                 
                 # 入队: (priority, counter, message)
                 q.put_nowait((priority, counter, message))
-                # 入队耗时与队列大小
-                try:
-                    enqueue_cost_ms = int((time.time() - t_enqueue_start) * 1000)
-                    LoggingUtils.log_debug("SessionManager", "Enqueue done | device={device_id} | rid={rid} | type={mtype} | prio={prio} | cost_ms={c} | qsize={qsize}",
-                                           device_id=device_id, rid=rid, mtype=mtype, prio=priority, c=enqueue_cost_ms,
-                                           qsize=getattr(q, "qsize", lambda: -1)())
-                except Exception:
-                    pass
-                try:
-                    mtype = message.get("type") if isinstance(message, dict) else None
-                    priority_name = {0: "HIGH", 1: "MED", 2: "LOW"}.get(priority, "UNK")
-                    LoggingUtils.log_debug("SessionManager", "Enqueued message type={mtype}, priority={prio}({pname}), request_id={rid}, qsize={qsize}",
-                                           mtype=mtype, prio=priority, pname=priority_name, rid=rid, qsize=getattr(q, "qsize", lambda: -1)())
-                except Exception:
-                    pass
                 return True
             except asyncio.QueueFull:
                 try:
@@ -288,34 +259,11 @@ class SessionManager:
                             
                             await session.websocket.send(message_str)
                             send_duration = int((time.time() - send_start) * 1000)
-                            try:
-                                # 特别记录 get_state 响应的发送时间
-                                if mtype == "command_response" and message.get("data", {}).get("a11y_tree"):
-                                    LoggingUtils.log_info("SessionManager", "✓ 发送完成 | type={mtype} | 大小={size}B | 发送耗时={dur}ms | request_id={rid}", 
-                                                        mtype=mtype, size=message_size, dur=send_duration, rid=rid)
-                                else:
-                                    LoggingUtils.log_debug("SessionManager", "Sent message type={mtype}, request_id={rid}", mtype=mtype, rid=rid)
-                            except Exception:
-                                pass
                         except Exception as e:
                             LoggingUtils.log_error("SessionManager", "Failed to send message: {error}", error=e)
                     
                     # 创建发送任务并等待完成，确保消息及时发送
-                    try:
-                        prep_cost_ms = int((time.time() - t_prep_start) * 1000)
-                        LoggingUtils.log_debug("SessionManager", "SenderLoop pre-schedule | device={device_id} | prep_cost_ms={c} | type={mtype} | rid={rid}",
-                                               device_id=device_id, c=prep_cost_ms, mtype=mtype, rid=rid)
-                    except Exception:
-                        pass
-                    t_sched_start = time.time()
-                    # 等待发送任务完成，避免消息延迟
                     await send_async()
-                    try:
-                        schedule_cost_ms = int((time.time() - t_sched_start) * 1000)
-                        LoggingUtils.log_debug("SessionManager", "SenderLoop post-send | device={device_id} | send_cost_ms={c} | type={mtype} | rid={rid}",
-                                               device_id=device_id, c=schedule_cost_ms, mtype=mtype, rid=rid)
-                    except Exception:
-                        pass
                 except Exception as e:
                     LoggingUtils.log_error("SessionManager", "Sender loop failed to send to {device_id}: {error}", 
                                          device_id=device_id, error=e)
@@ -397,9 +345,6 @@ class SessionManager:
                         pass
                 del self.sessions[device_id]
             
-            if timeout_devices:
-                LoggingUtils.log_info("SessionManager", "Cleaned up {count} timeout sessions", count=len(timeout_devices))
-            
             # 同时清理过期的入队时间记录
             self._cleanup_old_enqueue_timestamps()
     
@@ -437,21 +382,5 @@ class SessionManager:
             ]
             for rid in expired_keys:
                 self._enqueue_ts.pop(rid, None)
-            
-            if expired_keys:
-                LoggingUtils.log_debug("SessionManager", "Cleaned up {count} expired enqueue timestamps", 
-                                     count=len(expired_keys))
         except Exception as e:
             LoggingUtils.log_error("SessionManager", "Error cleaning up enqueue timestamps: {error}", error=e)
-
-
-
-
-
-
-
-
-
-
-
-

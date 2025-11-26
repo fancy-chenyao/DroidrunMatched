@@ -83,9 +83,6 @@ class WebSocketServer:
         
         # 注册到全局（用于同一进程内的访问）
         set_global_server(self)
-        
-        LoggingUtils.log_info("WebSocketServer", "WebSocketServer initialized (host={host}, port={port}, path={path})", 
-                             host=host, port=port, path=websocket_path)
     
     async def _handle_client(self, websocket):
         """
@@ -134,7 +131,6 @@ class WebSocketServer:
                     # request.path 可能包含完整路径和查询参数
                     if hasattr(request, 'path'):
                         request_path = request.path
-                        LoggingUtils.log_debug("WebSocketServer", "request.path = {path}", path=request_path)
                         # 检查path是否包含查询参数
                         if '?' in str(request_path):
                             path_part, query_part = str(request_path).split('?', 1)
@@ -142,7 +138,6 @@ class WebSocketServer:
                                 path = path_part
                             if not query_string:
                                 query_string = query_part
-                                LoggingUtils.log_info("WebSocketServer", "Found query string from request.path: {query}", query=query_string)
                         elif path is None:
                             path = request_path
                     
@@ -150,20 +145,13 @@ class WebSocketServer:
                     if not query_string:
                         if hasattr(request, 'query_string'):
                             query_string = request.query_string
-                            if query_string:
-                                LoggingUtils.log_info("WebSocketServer", "Found query string from request.query_string: {query}", query=query_string)
                         elif hasattr(request, 'query'):
                             query_string = request.query
-                            if query_string:
-                                LoggingUtils.log_info("WebSocketServer", "Found query string from request.query: {query}", query=query_string)
                         elif hasattr(request, 'raw_path'):
                             raw_path = request.raw_path
                             if raw_path and '?' in str(raw_path):
                                 query_string = str(raw_path).split('?', 1)[1]
-                                if query_string:
-                                    LoggingUtils.log_info("WebSocketServer", "Found query string from request.raw_path: {query}", query=query_string)
                 except (AttributeError, TypeError, Exception) as e:
-                    LoggingUtils.log_debug("WebSocketServer", "Error accessing request: {error}", error=e)
                     pass
             
             # 方法3: 从websocket.path获取（如果前面没有获取到）
@@ -214,11 +202,8 @@ class WebSocketServer:
                         if uri.query:
                             query_string = uri.query
                             path_str = f"{path}?{query_string}"
-                            LoggingUtils.log_info("WebSocketServer", "Found query string from request_uri: {query}", query=query_string)
                     except Exception as e:
                         debug_info.append(f"request_uri access error: {str(e)[:50]}")
-                
-                LoggingUtils.log_info("WebSocketServer", "WebSocket attributes: {attrs}", attrs=", ".join(debug_info))
             
             # 验证路径
             if not (path_str == self.websocket_path or (path_str.startswith(self.websocket_path) and (len(path_str) == len(self.websocket_path) or path_str[len(self.websocket_path)] in ['?', '/']))):
@@ -227,8 +212,6 @@ class WebSocketServer:
                 await websocket.close(code=4004, reason="Path not found")
                 return
             
-            LoggingUtils.log_info("WebSocketServer", "New client connected from {address}, path: {path}", 
-                                address=client_address, path=path_str)
             
             # 从查询参数或首部获取设备ID
             device_id = await self._extract_device_id(websocket, path_str)
@@ -255,10 +238,7 @@ class WebSocketServer:
             
             # 注册会话（记录协议）
             await self.session_manager.register_session(device_id, websocket, protocol=protocol)
-            LoggingUtils.log_info("WebSocketServer", "Device {device_id} connected from {address}", 
-                                device_id=device_id, address=client_address)
-            LoggingUtils.log_info("WebSocketServer", "Negotiated protocol for device {device_id}: {protocol}", 
-                                  device_id=device_id, protocol=protocol)
+            LoggingUtils.log_info("WebSocketServer", "✅ Device {device_id} connected", device_id=device_id)
             
             # 发送欢迎消息
             await self._send_welcome_message(websocket, device_id)
@@ -273,7 +253,7 @@ class WebSocketServer:
                     break
             
         except asyncio.CancelledError:
-            LoggingUtils.log_info("WebSocketServer", "Connection cancelled for device {device_id}", device_id=device_id)
+            pass
         except Exception as e:
             LoggingUtils.log_error("WebSocketServer", "Connection error for device {device_id}: {error}", 
                                  device_id=device_id, error=e)
@@ -281,7 +261,7 @@ class WebSocketServer:
             # 清理会话
             if device_id:
                 await self.session_manager.unregister_session(device_id)
-                LoggingUtils.log_info("WebSocketServer", "Device {device_id} disconnected", device_id=device_id)
+                LoggingUtils.log_info("WebSocketServer", "❌ Device {device_id} disconnected", device_id=device_id)
     
     async def _process_request(self, path, request_headers):
         """
@@ -396,8 +376,6 @@ class WebSocketServer:
         self.message_router.register_default_handler(
             self._handle_unknown_message
         )
-        
-        LoggingUtils.log_info("MessageRouter", "Message handlers registered")
     
     async def _send_welcome_message(self, websocket, device_id: str):
         """发送欢迎消息（使用标准协议）"""
@@ -458,12 +436,7 @@ class WebSocketServer:
             # 若仍未得到 parsed_message 且存在文本，走 JSON 解析
             parse_ms = 0
             if parsed_message is None and 'message_str' in locals():
-                t0 = datetime.now()
-                msg_len = len(message_str or "")
-                LoggingUtils.log_debug("WebSocketServer", "Processing message from device {device_id}: len={length}, head={head}", 
-                                     device_id=device_id, length=msg_len, head=message_str[:200])
                 parsed_message, parse_error = MessageProtocol.parse_message(message_str)
-                parse_ms = int((datetime.now() - t0).total_seconds() * 1000)
             
             if parsed_message:
                 mtype = parsed_message.get("type")
@@ -486,8 +459,9 @@ class WebSocketServer:
                             extra += f", a11y_len={len(data.get('a11y_tree') or [])}"
                         except Exception:
                             pass
-                LoggingUtils.log_info("WebSocketServer", "Parsed message: type={type}, request_id={rid}, data_size={dsize}B, parse_time={ms}ms{extra}", 
-                                      type=mtype, rid=rid, dsize=data_size, ms=parse_ms, extra=extra)
+                # 只记录非 heartbeat 和 command_response 类型的消息
+                if mtype not in ["command_response", "heartbeat"]:
+                    LoggingUtils.log_info("WebSocketServer", "📋 Task received: {type}", type=mtype)
             
             if parse_error:
                 LoggingUtils.log_error("WebSocketServer", "Failed to parse message from device {device_id}: {error}", 
@@ -559,8 +533,7 @@ class WebSocketServer:
             
             options = data.get("options", {})
             
-            LoggingUtils.log_info("WebSocketServer", "Received task request from device {device_id}: goal={goal}", 
-                                device_id=device_id, goal=goal[:100])
+            LoggingUtils.log_info("WebSocketServer", "📋 Task received: {goal}", goal=goal[:100] + "..." if len(goal) > 100 else goal)
             
             # 创建或获取任务执行器
             if device_id not in self._device_task_executors:
@@ -572,19 +545,12 @@ class WebSocketServer:
             async def execute_in_background():
                 """在后台执行任务"""
                 try:
-                    LoggingUtils.log_info("WebSocketServer", "Background task started for device {device_id}, request_id={request_id}", 
-                                        device_id=device_id, request_id=request_id)
-                    
-                    LoggingUtils.log_info("WebSocketServer", "Calling executor.execute_task()...")
-                    
                     # 执行任务
                     result = await executor.execute_task(
                         goal=goal,
                         request_id=request_id,
                         options=options
                     )
-                    
-                    LoggingUtils.log_info("WebSocketServer", "Task execution completed, result: {result}", result=result)
                     
                     # 发送成功响应
                     response = MessageProtocol.create_task_response(
@@ -595,8 +561,7 @@ class WebSocketServer:
                     )
                     await self.session_manager.send_to_device(device_id, response)
                     
-                    LoggingUtils.log_info("WebSocketServer", "Task completed successfully for device {device_id}, request_id={request_id}", 
-                                        device_id=device_id, request_id=request_id)
+                    LoggingUtils.log_info("WebSocketServer", "✅ Task completed successfully", )
                     
                 except Exception as e:
                     LoggingUtils.log_error("WebSocketServer", "Error executing task for device {device_id}: {error}", 
@@ -619,9 +584,6 @@ class WebSocketServer:
             
             # 启动后台任务
             asyncio.create_task(execute_in_background())
-            
-            LoggingUtils.log_info("WebSocketServer", "Task execution started for device {device_id}, request_id={request_id}", 
-                                device_id=device_id, request_id=request_id)
             
         except Exception as e:
             LoggingUtils.log_error("WebSocketServer", "Error handling task request from device {device_id}: {error}", 
@@ -652,8 +614,6 @@ class WebSocketServer:
         # 发送心跳确认（使用标准协议）
         ack_message = MessageProtocol.create_heartbeat_ack(device_id=device_id)
         await self.session_manager.send_to_device(device_id, ack_message)
-        
-        LoggingUtils.log_debug("WebSocketServer", "Heartbeat received from device {device_id}", device_id=device_id)
     
     async def _handle_command_response_async(self, device_id: str, message: Dict[str, Any]):
         """
@@ -775,8 +735,6 @@ class WebSocketServer:
             tools_instance: WebSocketTools 实例
         """
         self._device_tools_map[device_id] = tools_instance
-        LoggingUtils.log_debug("WebSocketServer", "Registered WebSocketTools instance for device {device_id}", 
-                             device_id=device_id)
     
     def unregister_tools_instance(self, device_id: str):
         """
@@ -787,8 +745,6 @@ class WebSocketServer:
         """
         if device_id in self._device_tools_map:
             del self._device_tools_map[device_id]
-            LoggingUtils.log_debug("WebSocketServer", "Unregistered WebSocketTools instance for device {device_id}", 
-                                 device_id=device_id)
     
     def get_connected_devices(self) -> List[str]:
         """

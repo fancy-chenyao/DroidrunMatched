@@ -595,24 +595,58 @@ class DroidAgent(Workflow):
 
         self.step_counter = 0
         self.retry_counter = 0
+        
+        # 性能分析：记录任务开始时间
+        task_start_time = time.time()
+        self._task_start_time = task_start_time  # 保存以便 finalize 时计算总耗时
+        start_time_str = time.strftime("%H:%M:%S", time.localtime(task_start_time))
+        print(f"⏱️ [Performance] Task started at {start_time_str}")
+        LoggingUtils.log_info("Performance", "⏱️ Task started at {time}", time=start_time_str)
+
+        # 判断新任务的类型（必须在支持的清单内）
+        type_start = time.time()
+        task_type = self.memory_manager.determine_task_type(self.goal)
+        if not task_type:
+            return "暂不支持该功能"  # 这里需要对接一下，后续不执行，且返回前端
+        LoggingUtils.log_info("ExperienceMemory", f"Task determined as type: {task_type}")
+        self.current_task_type = task_type
+        type_duration = time.time() - type_start
+        print(f"⏱️ [Performance] Task type determination: {type_duration:.2f}s")
+        LoggingUtils.log_info("Performance", "⏱️ Task type determination: {duration:.2f}s", duration=type_duration)
 
         # 新增：热启动检查
         if self.memory_enabled and self.memory_config.hot_start_enabled:
+            # similar_experiences = self.memory_manager.batch_find_similar_experiences(
+            #     self.goal,
+            #     self.current_task_type,
+            #     threshold=self.memory_config.similarity_threshold
+            # )
             # 使用合并优化：一次LLM调用同时完成相似度计算和排序
-            use_merged_optimization = self.config_manager.get("memory.use_merged_similarity_ranking", True)
+            use_merged_optimization = self.config_manager.get("memory.use_merged_similarity_ranking", False)
+
+            # 性能分析：记录经验检索开始时间
+            retrieval_start = time.time()
             
             if use_merged_optimization:
                 similar_experiences = self.memory_manager.find_and_rank_similar_experiences(
-                    self.goal, 
+                    self.goal,
+                    self.current_task_type,
                     threshold=self.memory_config.similarity_threshold
                 )
             else:
                 # 旧方法：分别计算相似度和排序
                 similar_experiences = self.memory_manager.batch_find_similar_experiences(
-                    self.goal, 
+                    self.goal,
+                    self.current_task_type,
                     threshold=self.memory_config.similarity_threshold
                 )
             
+            retrieval_duration = time.time() - retrieval_start
+            exp_count = len(similar_experiences) if similar_experiences else 0
+            print(f"⏱️ [Performance] Experience retrieval: {retrieval_duration:.2f}s (found {exp_count} experiences)")
+            LoggingUtils.log_info("Performance", "⏱️ Experience retrieval: {duration:.2f}s (found {count} experiences)", 
+                                duration=retrieval_duration, count=exp_count)
+
             # 打印用户友好的经验检查信息
             if similar_experiences:
                 print(f"🔥 发现 {len(similar_experiences)} 个相似经验，将使用热启动")
@@ -657,30 +691,30 @@ class DroidAgent(Workflow):
             if similar_experiences:
                 # 合并优化后，经验已经按相似度排序，直接使用第一个（最佳）经验
                 use_merged_optimization = self.config_manager.get("memory.use_merged_similarity_ranking", True)
-                
+
                 if use_merged_optimization:
                     # 新方法：直接使用已排序的第一个经验（最佳匹配）
                     best_exp_obj = similar_experiences[0]
                     best_experience = best_exp_obj.to_dict()
-                    LoggingUtils.log_success("DroidAgent", 
-                                           "✅ Using best experience from merged ranking (similarity={score:.2f}), no additional LLM call needed", 
+                    LoggingUtils.log_success("DroidAgent",
+                                           "✅ Using best experience from merged ranking (similarity={score:.2f}), no additional LLM call needed",
                                            score=best_exp_obj.similarity_score)
                 else:
                     # 旧方法：检查完美匹配或调用LLM选择
                     perfect_threshold = self.config_manager.get("memory.perfect_match_threshold", 0.999)
                     perfect_matches = [exp for exp in similar_experiences if exp.similarity_score >= perfect_threshold]
                     best_exp_obj = None
-                    
+
                     if perfect_matches:
                         best_exp_obj = max(perfect_matches, key=lambda e: e.similarity_score)
                         best_experience = best_exp_obj.to_dict()
-                        LoggingUtils.log_success("DroidAgent", "✅ Perfect match found (similarity={score:.2f}), skipping LLM selection", 
+                        LoggingUtils.log_success("DroidAgent", "✅ Perfect match found (similarity={score:.2f}), skipping LLM selection",
                                                 score=best_exp_obj.similarity_score)
                     else:
-                        LoggingUtils.log_info("DroidAgent", "No perfect match, using LLM to select best from {count} candidates", 
+                        LoggingUtils.log_info("DroidAgent", "No perfect match, using LLM to select best from {count} candidates",
                                             count=len(similar_experiences))
                         best_experience = self.llm_services.select_best_experience(
-                            [exp.to_dict() for exp in similar_experiences], 
+                            [exp.to_dict() for exp in similar_experiences],
                             self.goal
                         )
                 
@@ -705,10 +739,15 @@ class DroidAgent(Workflow):
                                 adapted_actions = best_experience.get("action_sequence", [])
                             else:
                                 LoggingUtils.log_progress("DroidAgent", "Adapting parameters for similar goal (similarity < 1.0)")
+                                # 性能分析：记录参数适配耗时
+                                adapt_start = time.time()
                                 adapted_actions = self.memory_manager.adapt_parameters(
                                     TaskExperience.from_dict(best_experience), 
                                     self.goal
                                 )
+                                adapt_duration = time.time() - adapt_start
+                                print(f"⏱️ [Performance] Parameter adaptation (LLM): {adapt_duration:.2f}s")
+                                LoggingUtils.log_info("Performance", "⏱️ Parameter adaptation (LLM): {duration:.2f}s", duration=adapt_duration)
                                 LoggingUtils.log_progress("DroidAgent", "Parameters adapted for hot start")
                         else:
                             # 优先从对应的trajectories子文件夹加载macro.json
@@ -759,32 +798,37 @@ class DroidAgent(Workflow):
                                             a["description"] = f"{name} with params {json.dumps(params, ensure_ascii=False)}"
 
                                     LoggingUtils.log_info("DroidAgent", "Detecting changed actions for similar goal (similarity < 1.0)")
+                                    # 性能分析：记录变更检测耗时
+                                    detect_start = time.time()
                                     det = self.llm_services.detect_changed_actions(
                                         self.pending_hot_context["experience_goal"],
                                         self.goal,
                                         self.pending_hot_actions
                                     )
+                                    detect_duration = time.time() - detect_start
+                                    print(f"⏱️ [Performance] Change detection (LLM): {detect_duration:.2f}s")
+                                    LoggingUtils.log_info("Performance", "⏱️ Change detection (LLM): {duration:.2f}s", duration=detect_duration)
                                     self.pending_hot_context["changed_indices"] = det.get("changed_indices", [])
                                     # 保存 index->reason，用于更具体的微冷启动子目标
                                     self.pending_hot_context["changed_index_reasons"] = det.get("index_reasons", [])
-                                    
+
                                     # 使用 INFO 级别确保日志输出
                                     if self.pending_hot_context['changed_indices']:
-                                        LoggingUtils.log_info("DroidAgent", 
-                                                            "🔄 Detected {count} actions need adaptation: indices={indices}", 
+                                        LoggingUtils.log_info("DroidAgent",
+                                                            "🔄 Detected {count} actions need adaptation: indices={indices}",
                                                             count=len(self.pending_hot_context['changed_indices']),
                                                             indices=self.pending_hot_context['changed_indices'])
                                         # 打印每个变更动作的理由
                                         for ir in self.pending_hot_context.get("changed_index_reasons", []):
-                                            LoggingUtils.log_info("DroidAgent", 
-                                                                "  - Action {idx}: {reason}", 
-                                                                idx=ir.get("index"), 
+                                            LoggingUtils.log_info("DroidAgent",
+                                                                "  - Action {idx}: {reason}",
+                                                                idx=ir.get("index"),
                                                                 reason=ir.get("reason"))
                                     else:
-                                        LoggingUtils.log_warning("DroidAgent", 
+                                        LoggingUtils.log_warning("DroidAgent",
                                                                "⚠️ No changed actions detected by LLM (may cause hot-start to fail if parameters differ)")
-                                    
-                                    LoggingUtils.log_debug("DroidAgent", "Changed action indices predicted: {indices}", 
+
+                                    LoggingUtils.log_debug("DroidAgent", "Changed action indices predicted: {indices}",
                                                          indices=self.pending_hot_context['changed_indices'])
                             except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                                 ExceptionHandler.handle_data_parsing_error(e, "[HOT] Change detection")
@@ -815,6 +859,13 @@ class DroidAgent(Workflow):
     @step
     async def finalize(self, ctx: Context, ev: FinalizeEvent) -> StopEvent:
         ctx.write_event_to_stream(ev)
+        
+        # 性能分析：计算任务总耗时
+        if hasattr(self, '_task_start_time'):
+            total_duration = time.time() - self._task_start_time
+            print(f"⏱️ [Performance] ✅ Task completed in {total_duration:.2f}s (success={ev.success}, steps={ev.steps})")
+            LoggingUtils.log_info("Performance", "⏱️ ✅ Task completed in {duration:.2f}s (success={success}, steps={steps})", 
+                                duration=total_duration, success=ev.success, steps=ev.steps)
         
         capture(
             DroidAgentFinalizeEvent(
@@ -891,21 +942,28 @@ class DroidAgent(Workflow):
         """
         直接执行热启动动作（异步），必要时触发微冷启动子流程。
         """
+        # 性能分析：记录热启动执行开始时间
+        hot_start_begin = time.time()
+        print(f"\n🔥 [Performance] Hot start execution begins with {len(actions)} actions")
+        
         try:
             tools = self.tools_instance
-            
+
             # 为工具设置上下文，确保 MacroEvent 能够正确创建
             if tools and hasattr(tools, '_set_context'):
                 tools._set_context(ctx)
-            
+
             # 注意：热启动直接执行时，事件由 WebSocketTools 通过 ctx.write_event_to_stream() 写入
             # 这些事件会在主 workflow 的事件循环中被 handle_stream_event 处理
             # 不需要在这里单独监听事件流（ctx 没有 stream_events 方法）
             step_count = 0
             # 初始化UI
+            init_ui_start = time.time()
             LoggingUtils.log_debug("DroidAgent", "Initializing UI state cache...")
             try:
                 ui_state = await tools.get_state_async(include_screenshot=True)
+                init_ui_duration = time.time() - init_ui_start
+                print(f"⏱️ [Performance] Initial UI state: {init_ui_duration:.2f}s")
                 LoggingUtils.log_debug("DroidAgent", "UI state initialized with {count} elements", 
                                      count=len(ui_state.get('elements', [])))
                 
@@ -917,16 +975,45 @@ class DroidAgent(Workflow):
             except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
                 LoggingUtils.log_warning("DroidAgent", "Failed to initialize UI state: {error}", error=e)
                 return False, f"Failed to initialize UI state: {e}"
+            # 重构 actions 列表：处理 Added 和 Removed 动作
+            reconstruct_start = time.time()
+            actions = self._reconstruct_actions_with_changes(actions)
+            reconstruct_duration = time.time() - reconstruct_start
+            print(f"⏱️ [Performance] Actions reconstruction: {reconstruct_duration:.2f}s")
+
             executed_actions = []
             # 基于 changed_indices 的微冷启动触发记录，避免重复触发同一索引
             triggered_changed_steps: Dict[int, bool] = {}
+            
+            # 性能分析：记录动作执行开始时间
+            actions_loop_start = time.time()
+            print(f"\n🔄 [Performance] Starting actions loop ({len(actions)} actions)")
+            
             for idx_action, act in enumerate(actions):
+                action_start = time.time()
                 name = (act or {}).get("action") or (act or {}).get("name")
                 params = (act or {}).get("params", {}) or (act or {}).get("parameters", {})
                 desc = str((act or {}).get("description", ""))
+                print(f"  ➡️ [Performance] Action {idx_action+1}/{len(actions)}: {name}")
                 LoggingUtils.log_debug("DroidAgent", "Executing action {current}/{total}: {name} params={params}", 
                                      current=idx_action+1, total=len(actions), name=name, params=params)
                 try:
+                    if name == "micro_coldstart":
+                        LoggingUtils.log_info("DroidAgent", "🎯 Executing added action at step {step}", step=idx_action)
+
+                        ok = await self._micro_coldstart_handle_click_step(idx_action, act)
+                        if ok:
+                            LoggingUtils.log_success("DroidAgent", "✅ Added action completed at step {step}", step=idx_action)
+                            step_count += 1
+                            await self._capture_ui_state_and_screenshot("added-action")
+                            if idx_action < len(actions) - 1:
+                                wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
+                                time.sleep(wait_time)
+                        else:
+                            LoggingUtils.log_warning("DroidAgent", "⚠️ Added action failed at step {step}", step=idx_action)
+                            return False, f"Added action at step {idx_action} failed"
+                        continue
+
                     if name in ("tap_by_index", "tap", "tap_index"):
                         LoggingUtils.log_debug("DroidAgent", "[DEBUG] Processing tap_by_index action {idx_action}/{total}", idx_action=idx_action, total=len(actions))
                         idx_val = params.get("index", params.get("idx"))
@@ -940,10 +1027,10 @@ class DroidAgent(Workflow):
                         if idx >= 0:
                             # 变化参数且为点击 → 基于 changed_indices 直接触发微冷启动（无窗口 gating）
                             is_changed = self._is_changed_param_click_step(idx_action, act)
-                            LoggingUtils.log_debug("DroidAgent", "[DEBUG] Is changed param click: {is_changed}, changed_indices={changed}", 
+                            LoggingUtils.log_debug("DroidAgent", "[DEBUG] Is changed param click: {is_changed}, changed_indices={changed}",
                                                  is_changed=is_changed, changed=(self.pending_hot_context or {}).get("changed_indices", []))
                             if is_changed and not triggered_changed_steps.get(idx_action):
-                                LoggingUtils.log_info("DroidAgent", "🎯 Triggering micro-coldstart for step {step} (action: {action})", 
+                                LoggingUtils.log_info("DroidAgent", "🎯 Triggering micro-coldstart for step {step} (action: {action})",
                                                      step=idx_action, action=name)
                                 ok = await self._micro_coldstart_handle_click_step(idx_action, act)
                                 triggered_changed_steps[idx_action] = True
@@ -960,12 +1047,25 @@ class DroidAgent(Workflow):
                                 else:
                                     LoggingUtils.log_warning("DroidAgent", "Micro-coldstart failed for step {step}, fallback to direct tap", 
                                                            step=idx_action)
-                            LoggingUtils.log_info("DroidAgent", "[DEBUG] Executing direct tap_by_index_async for index {idx}", idx=idx)
-                            await tools.tap_by_index_async(idx)
+                            LoggingUtils.log_info("DroidAgent", "[DEBUG] Executing direct tap_by_index for index {idx}", idx=idx)
+                            
+                            # 性能分析：记录 tap 操作耗时
+                            tap_start = time.time()
+                            await tools.tap_by_index(idx)
+                            tap_duration = time.time() - tap_start
+                            
+                            # 性能分析：记录等待时间
                             screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
+                            wait_start = time.time()
                             time.sleep(screenshot_wait)
-                            # 使用通用方法捕获UI状态和截图
+                            wait_duration = time.time() - wait_start
+                            
+                            # 性能分析：记录 UI 捕捉耗时
+                            capture_start = time.time()
                             await self._capture_ui_state_and_screenshot("tap")
+                            capture_duration = time.time() - capture_start
+                            
+                            print(f"    ├─ tap: {tap_duration:.2f}s, wait: {wait_duration:.2f}s, capture: {capture_duration:.2f}s")
                             
                             # 创建TapActionEvent并添加到macro
                             default_x = self.config_manager.get("tools.default_x_coordinate", 0)
@@ -986,20 +1086,36 @@ class DroidAgent(Workflow):
                                 "success": True,
                                 "timestamp": time.time()
                             })
+                            
+                            # 性能分析：记录单个动作总耗时
+                            action_duration = time.time() - action_start
+                            print(f"    └─ Total action time: {action_duration:.2f}s")
                     elif name in ("input_text", "type", "input"):
                         text = params.get("text", params.get("value", ""))
                         text = str(text) if text is not None else ""
                         index = params.get("index", None)
                         # 不再在直执中做就地文本适配，保持经验参数或上层已适配结果
                         if text:
+                            # 性能分析：记录 input 操作耗时
+                            input_start = time.time()
                             if index is not None:
                                 await tools.input_text(text, index)
                             else:
                                 await tools.input_text(text)
+                            input_duration = time.time() - input_start
+                            
+                            # 性能分析：记录等待时间
                             wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
+                            wait_start = time.time()
                             time.sleep(wait_time)
-                            # 使用通用方法捕获UI状态和截图
+                            wait_duration = time.time() - wait_start
+                            
+                            # 性能分析：记录 UI 捕捉耗时
+                            capture_start = time.time()
                             await self._capture_ui_state_and_screenshot("input")
+                            capture_duration = time.time() - capture_start
+                            
+                            print(f"    ├─ input: {input_duration:.2f}s, wait: {wait_duration:.2f}s, capture: {capture_duration:.2f}s")
                             
                             # 创建InputTextActionEvent并添加到macro
                             
@@ -1018,6 +1134,10 @@ class DroidAgent(Workflow):
                                 "success": True,
                                 "timestamp": time.time()
                             })
+                            
+                            # 性能分析：记录单个动作总耗时
+                            action_duration = time.time() - action_start
+                            print(f"    └─ Total action time: {action_duration:.2f}s")
                     elif name == "swipe":
                         start = params.get("start") or params.get("from") or {}
                         end = params.get("end") or params.get("to") or {}
@@ -1029,7 +1149,7 @@ class DroidAgent(Workflow):
                         ex = int(params.get("end_x", end[0] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("x", default_x)))
                         ey = int(params.get("end_y", end[1] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("y", default_y)))
                         dur = int(params.get("duration_ms", params.get("duration", default_duration)))
-                        await tools.swipe_async(sx, sy, ex, ey, dur)
+                        await tools.swipe(sx, sy, ex, ey, dur)
                         screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                         time.sleep(screenshot_wait)
                         # 使用通用方法捕获UI状态和截图
@@ -1052,8 +1172,8 @@ class DroidAgent(Workflow):
                     elif name == "start_app":
                         pkg = params.get("package", params.get("pkg", ""))
                         pkg = str(pkg) if pkg is not None else ""
-                        if pkg and hasattr(tools, "start_app_async"):
-                            await tools.start_app_async(pkg)
+                        if pkg:
+                            await tools.start_app(pkg)
                             long_wait = self.config_manager.get("tools.long_wait_time", 2.0)
                             time.sleep(long_wait)
                             try:
@@ -1083,7 +1203,7 @@ class DroidAgent(Workflow):
                             ExceptionHandler.handle_data_parsing_error(e, "[HOT] Keycode parsing")
                             keycode = 0
                         if keycode:
-                            await tools.press_key_async(keycode)
+                            await tools.press_key(keycode)
                             wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                             time.sleep(wait_time)
                             # 使用通用方法捕获UI状态和截图
@@ -1144,6 +1264,14 @@ class DroidAgent(Workflow):
                         self.trajectory.events.append(event)
                 except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                     ExceptionHandler.handle_data_parsing_error(e, "[HOT] Trajectory event creation")
+            # 性能分析：计算动作循环总耗时
+            actions_loop_duration = time.time() - actions_loop_start
+            print(f"\n⏱️ [Performance] Actions loop completed: {actions_loop_duration:.2f}s")
+            
+            # 性能分析：计算热启动总耗时
+            hot_start_total = time.time() - hot_start_begin
+            print(f"🔥 [Performance] Hot start total time: {hot_start_total:.2f}s\n")
+            
             if step_count == 0:
                 return False, "No hot-start actions were executed (unrecognized schema)."
             return True, f"Hot-start direct execution finished with {step_count} actions"
@@ -1169,7 +1297,7 @@ class DroidAgent(Workflow):
             if ui_state and 'a11y_tree' in ui_state:
                 ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
                 self.trajectory.ui_states.append(ui_state_event.ui_state)
-            
+
             return True
             
         except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
@@ -1214,36 +1342,151 @@ class DroidAgent(Workflow):
         """从配置中获取Agent常量"""
         return self.config_manager.get(f"agent.{key}", default)
 
+    def _reconstruct_actions_with_changes(self, actions: List[Dict]) -> List[Dict]:
+        """根据 Added 和 Removed 信息重构 actions 列表
+
+        处理逻辑：
+        1. 删除 Removed 动作
+        2. 在正确的位置插入 Added 动作
+        3. 标记 Changed 动作
+
+        Args:
+            actions: 原始动作列表
+
+        Returns:
+            重构后的动作列表
+        """
+        try:
+            # 获取变更信息
+            changed_index_reasons = (self.pending_hot_context or {}).get("changed_index_reasons", [])
+
+            if not changed_index_reasons:
+                LoggingUtils.log_debug("DroidAgent", "No changes detected, using original actions")
+                return actions
+
+            # 构建变更信息映射
+            removed_indices = set()
+            added_actions_map = {}  # {base_index: [(float_index, reason), ...]}
+            changed_reasons = {}
+
+            for ir in changed_index_reasons:
+                idx = ir.get("index")
+                action_type = ir.get("type", "changed")
+                reason = ir.get("reason", "")
+
+                if action_type == "removed":
+                    removed_indices.add(idx)
+                elif action_type == "added" and isinstance(idx, float):
+                    base_idx = int(idx)
+                    if base_idx not in added_actions_map:
+                        added_actions_map[base_idx] = []
+                    added_actions_map[base_idx].append((idx, reason))
+                elif action_type == "changed":
+                    changed_reasons[idx] = reason
+
+            # 第一步：过滤掉 Removed 动作
+            filtered_actions = []
+            for idx, act in enumerate(actions):
+                if idx in removed_indices:
+                    LoggingUtils.log_info("DroidAgent", "➖ Removing action [{idx}]: {desc}",
+                                        idx=idx, desc=act.get("description", ""))
+                else:
+                    act = act.copy()  # 避免修改原始字典
+                    act["_original_index"] = idx  # 记录原始索引
+
+                    # 标记 Changed 动作
+                    if idx in changed_reasons:
+                        act["_is_changed"] = True
+                        act["_change_reason"] = changed_reasons[idx]
+
+                    filtered_actions.append(act)
+
+            # 第二步：插入 Added 动作
+            # 需要从后往前插入，避免索引偏移
+            for base_idx in sorted(added_actions_map.keys(), reverse=True):
+                added_list = sorted(added_actions_map[base_idx])  # 按浮点索引排序
+
+                # 找到 base_idx 在 filtered_actions 中的位置
+                insert_pos = None
+                for i, act in enumerate(filtered_actions):
+                    original_idx = act.get("_original_index", i)
+                    if original_idx == base_idx:
+                        insert_pos = i + 1
+                        break
+
+                if insert_pos is None:
+                    # 如果没找到，可能是因为 base_idx 被 removed 了，插入到末尾
+                    insert_pos = len(filtered_actions)
+
+                # 插入所有 Added 动作
+                for added_idx, reason in reversed(added_list):
+                    added_action = {
+                        "action": "micro_coldstart",
+                        "params": {"goal": reason},
+                        "description": reason,
+                        "_is_added": True,
+                        "_is_changed": True,  # Added 动作也需要微冷启动
+                        "_change_reason": reason,
+                        "_added_index": added_idx,
+                        "_original_index": added_idx
+                    }
+
+                    filtered_actions.insert(insert_pos, added_action)
+                    LoggingUtils.log_info("DroidAgent", "➕ Adding action at [{idx}]: {desc}",
+                                        idx=added_idx, desc=reason)
+
+            # 统计信息
+            removed_count = len(removed_indices)
+            added_count = sum(len(v) for v in added_actions_map.values())
+            changed_count = len(changed_reasons)
+
+            LoggingUtils.log_info("DroidAgent",
+                                "📝 Actions reconstructed: {original} → {final} actions (removed={removed}, added={added}, changed={changed})",
+                                original=len(actions),
+                                final=len(filtered_actions),
+                                removed=removed_count,
+                                added=added_count,
+                                changed=changed_count)
+
+            return filtered_actions
+
+        except Exception as e:
+            LoggingUtils.log_warning("DroidAgent",
+                                   "Failed to reconstruct actions: {error}, using original actions",
+                                   error=e)
+            return actions
+
     def _is_changed_param_click_step(self, step_index: int, action: Dict) -> bool:
+        """检查动作是否需要微冷启动
+
+        在重构后的 actions 列表中，Changed 和 Added 动作都被标记了 _is_changed
+        """
         try:
             name = (action or {}).get("action") or (action or {}).get("name")
             if name in ("input_text", "type", "input"):
                 return False
-            # 仅在 LLM 识别出的索引上触发微冷启动
-            changed = (self.pending_hot_context or {}).get("changed_indices", [])
-            return step_index in changed
+
+            # 检查动作是否被标记为需要变更
+            return action.get("_is_changed", False)
+
         except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
             ExceptionHandler.handle_data_parsing_error(e, "[HOT] Click step detection")
             return False
 
     async def _micro_coldstart_handle_click_step(self, step_index: int, action: Dict) -> bool:
-        """微冷启动处理单步点击操作 - 优先使用 changed_indices 的具体理由作为子目标"""
+        """微冷启动处理单步点击操作
+
+        在重构后的 actions 列表中，Changed 和 Added 动作都包含 _change_reason
+        """
         try:
             action_name = action.get('action', 'unknown')
             params = action.get('params', {})
             desc = str(action.get('description', ''))
-            # 若 detect_changed_actions 提供了 index->reason，则优先用作微目标
-            micro_goal = None
-            try:
-                for ir in (self.pending_hot_context or {}).get("changed_index_reasons", []):
-                    if ir.get("index") == step_index and ir.get("reason"):
-                        micro_goal = str(ir.get("reason"))
-                        break
-            except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
-                ExceptionHandler.handle_data_parsing_error(e, "[MicroColdStart] Goal extraction")
-                micro_goal = None
             
-            # 若未命中具体 reason，再调用通用生成逻辑
+            # 优先使用动作中的 _change_reason（由重构方法添加）
+            micro_goal = action.get('_change_reason')
+
+            # 若未找到，再调用通用生成逻辑
             if not micro_goal:
                 micro_goal = self.llm_services.generate_micro_goal(action, {}, self.goal)
             
@@ -1253,15 +1496,22 @@ class DroidAgent(Workflow):
             
             
             max_micro_steps = self.config_manager.get("agent.max_micro_cold_steps", 5)
-            agent = CodeActAgent(
+
+            # 重置 tools 状态，避免上一个微冷启动的状态影响当前任务
+            self.tools_instance.finished = False
+            self.tools_instance.success = None
+            self.tools_instance.reason = None
+
+            from droidrun.agent.codeact.codeact_agent_micro import CodeActAgentMicro
+            agent = CodeActAgentMicro(
                 llm=self.llm,
                 persona=self.cim.get_persona("Default"),
                 vision=self.vision,
-                max_steps=max_micro_steps,  # 限制为5步，避免长链思考
+                max_steps=max_micro_steps,
                 all_tools_list=self.tool_list,
                 tools_instance=self.tools_instance,
                 debug=self.debug,
-                timeout=min(self.timeout, self.config_manager.get("agent.micro_cold_timeout", 60)),  # 减少超时时间
+                timeout=min(self.timeout, self.config_manager.get("agent.micro_cold_timeout", 60)),
             )
             
             # 执行聚焦的微冷启动
@@ -1349,6 +1599,7 @@ class DroidAgent(Workflow):
         experience = TaskExperience(
             id=self.experience_id,  # 使用共享的experience_id
             goal=self.goal,
+            type=self.current_task_type,
             success=ev.success,
             timestamp=time.time(),
             page_sequence=page_sequence,
@@ -1652,27 +1903,3 @@ class DroidAgent(Workflow):
             })
         
         return actions
-
-    # 旧版本 _capture_ui_state_and_screenshot 已移除，统一使用上方的异步版本
-
-    async def _save_experience_async(self, ev: FinalizeEvent) -> None:
-        """
-        异步保存经验到记忆系统，不阻塞主流程
-        
-        Args:
-            ev: 最终化事件
-        """
-        try:
-            # 确保macro.json已经生成
-            wait_time = self.config_manager.get("tools.macro_generation_wait_time", 0.5)
-            await asyncio.sleep(wait_time)
-            
-            # 构建经验
-            experience = self._build_experience_from_execution(ev)
-            
-            # 保存经验
-            saved_path = self.memory_manager.save_experience(experience)
-            LoggingUtils.log_success("DroidAgent", "Experience saved to: {path}", path=saved_path)
-            
-        except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
-            ExceptionHandler.handle_file_operation_error(e, "[Experience] Save")

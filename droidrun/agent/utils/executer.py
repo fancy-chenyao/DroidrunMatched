@@ -123,6 +123,39 @@ class SimpleCodeExecutor:
                 **{k: v for k, v in self.globals.items() if k not in self.locals},
             }
 
+    def _extract_action_comments(self, code: str) -> Dict[str, str]:
+        """
+        提取代码中动作函数调用前的注释
+        
+        Returns:
+            Dict[函数调用, 注释内容]
+            例如: {"tap_by_index(64)": "点击"年休假"选项"}
+        """
+        action_comments = {}
+        lines = code.split('\n')
+        last_comment = None
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            # 如果是注释行
+            if stripped.startswith('#'):
+                last_comment = stripped[1:].strip()
+            # 如果是函数调用且前面有注释
+            elif stripped and not stripped.startswith('#'):
+                # 检查是否是工具函数调用
+                if any(func in stripped for func in ['tap_by_index', 'input_text', 'swipe', 'long_press', 'start_app']):
+                    if last_comment:
+                        # 提取函数调用部分（去除赋值等）
+                        if '=' in stripped:
+                            func_call = stripped.split('=', 1)[1].strip()
+                        else:
+                            func_call = stripped
+                        action_comments[func_call] = last_comment
+                last_comment = None  # 重置注释
+        
+        return action_comments
+    
     async def execute(self, ctx: Context, code: str) -> Dict[str, Any]:
         """
         Execute Python code and capture output and return values.
@@ -138,6 +171,9 @@ class SimpleCodeExecutor:
         
         start_time = time.time()
         
+        # 提取代码中的动作注释
+        action_comments = self._extract_action_comments(code)
+        
         # Update UI elements before execution
         self.globals['ui_state'] = await ctx.store.get("ui_state", None)
         self.globals['step_screenshots'] = []
@@ -147,6 +183,8 @@ class SimpleCodeExecutor:
         if self.tools_instance:
             if isinstance(self.tools_instance, (AdbTools, WebSocketTools)):
                 self.tools_instance._set_context(ctx)
+                # 传递动作注释信息
+                self.tools_instance._action_comments = action_comments
 
         # Capture stdout and stderr
         stdout = io.StringIO()

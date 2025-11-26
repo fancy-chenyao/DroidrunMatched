@@ -9,6 +9,7 @@ import os
 import re
 import uuid
 import logging
+import time
 from droidrun.agent.utils.logging_utils import LoggingUtils
 
 logger = logging.getLogger("droidrun")
@@ -18,6 +19,7 @@ class TaskExperience:
     """任务经验数据结构"""
     id: str
     goal: str
+    type: Optional[str]
     success: bool
     timestamp: float
     page_sequence: List[Dict[str, Any]]
@@ -48,21 +50,33 @@ class ExperienceMemory:
     def __init__(self, storage_dir: str = "experiences", llm=None):
         self.storage_dir = storage_dir
         self.llm = llm
-        self.experiences: List[TaskExperience] = []
-        self._ensure_storage_dir()
-        self._load_experiences()
-        LoggingUtils.log_info("ExperienceMemory", "ExperienceMemory initialized with {count} experiences", count=len(self.experiences))
+        # self.experiences: List[TaskExperience] = []
+        self.type_experience_cache: Dict[str, List[TaskExperience]] = {}
+        self.supported_types = ["请休假", "员工差旅"]
+        self._ensure_storage_dirs()
+        self._load_type_experiences()
+        # LoggingUtils.log_info("ExperienceMemory", "ExperienceMemory initialized with {count} experiences", count=len(self.experiences))
     
     def _ensure_storage_dir(self):
         """确保存储目录存在"""
         os.makedirs(self.storage_dir, exist_ok=True)
-    
+
+    def _ensure_storage_dirs(self):
+        """确保存储目录存在"""
+        os.makedirs(self.storage_dir, exist_ok=True)
+
+        for type_name in self.supported_types:
+            # 处理特殊字符（避免文件夹命名非法）
+            safe_type_name = re.sub(r'[<>:"/\\|?*]', '_', type_name)
+            type_dir = os.path.join(self.storage_dir, safe_type_name)
+            os.makedirs(type_dir, exist_ok=True)
+
     def _load_experiences(self):
         """从存储目录加载所有经验"""
         self.experiences = []
         if not os.path.exists(self.storage_dir):
             return
-        
+
         for filename in os.listdir(self.storage_dir):
             if filename.endswith('.json'):
                 filepath = os.path.join(self.storage_dir, filename)
@@ -72,9 +86,39 @@ class ExperienceMemory:
                         experience = TaskExperience.from_dict(data)
                         self.experiences.append(experience)
                 except Exception as e:
-                    LoggingUtils.log_warning("ExperienceMemory", "Failed to load experience from {filename}: {error}", 
+                    LoggingUtils.log_warning("ExperienceMemory", "Failed to load experience from {filename}: {error}",
                                             filename=filename, error=e)
-    
+
+    def _load_type_experiences(self):
+        """预加载所有类型文件夹下的经验，按类型缓存到 type_experience_cache"""
+        # 遍历根目录下的所有子文件夹（即 task_type 文件夹）
+        if not os.path.exists(self.storage_dir):
+            return
+
+        for type_dir in os.listdir(self.storage_dir):
+            type_dir_path = os.path.join(self.storage_dir, type_dir)
+            if not os.path.isdir(type_dir_path):
+                continue  # 跳过非文件夹
+
+            task_type = type_dir
+
+            # 加载该文件夹下的所有经验
+            experiences = []
+            for filename in os.listdir(type_dir_path):
+                if filename.endswith('.json'):
+                    filepath = os.path.join(type_dir_path, filename)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            exp = TaskExperience.from_dict(data)
+                            experiences.append(exp)
+                    except Exception as e:
+                        LoggingUtils.log_warning("ExperienceMemory", f"Failed to load {filename}: {e}")
+
+            # 缓存该类型的经验
+            self.type_experience_cache[task_type] = experiences
+            LoggingUtils.log_info("ExperienceMemory", f"Preloaded {len(experiences)} experiences for type: {task_type}")
+
     def find_similar_experiences(self, goal: str, threshold: float = 0.8) -> List[TaskExperience]:
         """查找相似经验 - 使用LLM进行语义匹配"""
         if not self.llm:
@@ -153,18 +197,41 @@ class ExperienceMemory:
             LoggingUtils.log_warning("ExperienceMemory", "LLM similarity calculation failed: {error}", error=e)
             return self._simple_text_similarity(goal1, goal2)
 
-    def batch_find_similar_experiences(self, goal: str, threshold: float = 0.8) -> List[TaskExperience]:
+    def batch_find_similar_experiences(self, goal: str, task_type: str, threshold: float = 0.8) -> List[TaskExperience]:
         """查找相似经验 - 使用LLM进行语义匹配"""
         if not self.llm:
-            LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for similarity matching")
+            LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for batch similarity matching")
             return []
+
+        # 改成经验按照功能存在不同文件夹，直接调用
+        type_experiences = self.type_experience_cache.get(task_type)
+
+        # 实时遍历所有经验，筛选出类型匹配的经验.
+        # type_experiences = [
+        #     exp for exp in self.experiences
+        #     if hasattr(exp, 'type') and exp.type == task_type  # 检查经验是否有type属性，且与任务类型一致
+        # ]
+        if not type_experiences:
+            LoggingUtils.log_info("ExperienceMemory", f"No experiences found for type: {task_type}")
+            return []  #返回空列表，后续直接冷启动
+
+        # 记录相似度计算与排序开始时间
+        llm_start_time = time.time()
+        start_timestamp = time.strftime("%H:%M:%S", time.localtime())
+        LoggingUtils.log_info(
+                "ExperienceMemory",
+                f"🤔 开始相似度计算与排序 at {start_timestamp}"
+        )
+
+        type_experiences_goals = [exp.goal for exp in type_experiences]
+        similarity_scores = self._batch_calculate_similarity(goal, type_experiences_goals)
 
         similar_experiences = []
 
-        all_experiences_goals = [exp.goal for exp in self.experiences]
-        similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
+        # all_experiences_goals = [exp.goal for exp in self.experiences]
+        # similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
 
-        for i, experience in enumerate(self.experiences):
+        for i, experience in enumerate(type_experiences):
             try:
                 similarity = similarity_scores[i]
                 # 记录相似度日志
@@ -191,6 +258,15 @@ class ExperienceMemory:
         similar_experiences.sort(key=lambda x: x.similarity_score or 0, reverse=True)
         LoggingUtils.log_info("ExperienceMemory", "Found {count} similar experiences for goal: {goal}",
                                       count=len(similar_experiences), goal=goal)
+
+        # 计算并记录相似度计算与排序耗时
+        thinking_time = time.time() - llm_start_time
+        end_timestamp = time.strftime("%H:%M:%S", time.localtime())
+        LoggingUtils.log_info(
+            "ExperienceMemory",
+            f"💡 完成相似度计算与排序 at {end_timestamp}, 耗时: {thinking_time:.2f}s"
+        )
+
         return similar_experiences
 
     def _batch_calculate_similarity(self, goal:str, experience_goals:List[str])-> List[float]:
@@ -241,25 +317,36 @@ class ExperienceMemory:
             # 批量失败时，降级为逐条计算（保证功能可用）
             return [self._calculate_similarity(goal, exp_goal) for exp_goal in experience_goals]
 
-    def find_and_rank_similar_experiences(self, goal: str, threshold: float = 0.8) -> List[TaskExperience]:
+    def find_and_rank_similar_experiences(self, goal: str, task_type: str, threshold: float = 0.8) -> List[TaskExperience]:
         """
         合并优化：一次LLM调用同时完成相似度计算和排序
-        
+
         Args:
             goal: 目标任务
             threshold: 相似度阈值
-            
+
         Returns:
             按相似度排序的经验列表（已过滤低于阈值的）
         """
         if not self.llm:
             LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for similarity matching")
             return []
-        
-        if not self.experiences:
+
+        # 经验按照类型存在不同文件夹，直接调用对应类型的经验
+        type_experiences = self.type_experience_cache.get(task_type)
+
+        if not type_experiences:
             return []
-        
+
         try:
+            # 记录LLM思考开始时间
+            llm_start_time = time.time()
+            start_timestamp = time.strftime("%H:%M:%S", time.localtime())
+            LoggingUtils.log_info(
+                "ExperienceMemory",
+                f"🤔 LLM 开始相似度计算与排序 at {start_timestamp}"
+            )
+
             # 构建合并的提示词：同时计算相似度和排序
             prompt = f"""
 请判断目标任务与以下每条历史经验的相似度，并按相似度从高到低排序。
@@ -275,9 +362,9 @@ class ExperienceMemory:
 
 历史经验列表：
 """
-            for i, exp in enumerate(self.experiences, 1):
+            for i, exp in enumerate(type_experiences, 1):
                 prompt += f"{i}. {exp.goal}\n"
-            
+
             prompt += f"""
 请返回JSON格式的结果，包含每条经验的相似度分数和排序：
 {{
@@ -291,55 +378,61 @@ class ExperienceMemory:
 要求：
 1. 只返回相似度 >= {threshold} 的经验
 2. 按相似度从高到低排序
-3. index 是历史经验列表中的序号（1-{len(self.experiences)}）
+3. index 是历史经验列表中的序号（1-{len(type_experiences)}）
 4. similarity 是 0-1 之间的分数（保留2位小数）
 5. reason 控制在15字以内
 """
-            
-            LoggingUtils.log_info("ExperienceMemory", 
-                                "🚀 Merged LLM call: calculating similarity and ranking for {count} experiences", 
-                                count=len(self.experiences))
-            
+
+            LoggingUtils.log_info("ExperienceMemory",
+                                "🚀 Merged LLM call: calculating similarity and ranking for {count} experiences",
+                                count=len(type_experiences))
+
             response = self.llm.complete(prompt)
             response_text = response.text.strip()
-            
+
             # 解析JSON响应
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if not json_match:
                 LoggingUtils.log_warning("ExperienceMemory", "Could not parse JSON from merged response, fallback to batch method")
-                return self.batch_find_similar_experiences(goal, threshold)
-            
+                return self.batch_find_similar_experiences(goal, task_type, threshold)
+
             result = json.loads(json_match.group())
             ranked_list = result.get("ranked_experiences", [])
-            
+
             # 构建结果列表
             similar_experiences = []
             for item in ranked_list:
                 idx = item.get("index", 0) - 1  # 转换为0-based索引
                 similarity = item.get("similarity", 0.0)
                 reason = item.get("reason", "")
-                
-                if 0 <= idx < len(self.experiences) and similarity >= threshold:
-                    exp = self.experiences[idx]
+
+                if 0 <= idx < len(type_experiences) and similarity >= threshold:
+                    exp = type_experiences[idx]
                     exp.similarity_score = similarity
                     similar_experiences.append(exp)
-                    LoggingUtils.log_debug("ExperienceMemory", 
+                    LoggingUtils.log_debug("ExperienceMemory",
                                          "✓ Matched: {goal} (similarity={score:.2f}, reason={reason})",
                                          goal=exp.goal, score=similarity, reason=reason)
-            
-            LoggingUtils.log_success("ExperienceMemory", 
+
+            LoggingUtils.log_success("ExperienceMemory",
                                    "✅ Merged call completed: found {count} similar experiences in 1 LLM call (saved {saved} calls)",
-                                   count=len(similar_experiences), 
-                                   saved=len(self.experiences))
-            
+                                   count=len(similar_experiences),
+                                   saved=len(type_experiences))
+            # 计算并记录LLM思考耗时
+            thinking_time = time.time() - llm_start_time
+            end_timestamp = time.strftime("%H:%M:%S", time.localtime())
+            LoggingUtils.log_info(
+                "ExperienceMemory",
+                f"💡 LLM 完成相似度计算与排序 at {end_timestamp}, 耗时: {thinking_time:.2f}s"
+            )
             return similar_experiences
-            
+
         except Exception as e:
-            LoggingUtils.log_warning("ExperienceMemory", 
-                                   "Merged LLM call failed: {error}, fallback to batch method", 
+            LoggingUtils.log_warning("ExperienceMemory",
+                                   "Merged LLM call failed: {error}, fallback to batch method",
                                    error=e)
-            return self.batch_find_similar_experiences(goal, threshold)
-    
+            return self.batch_find_similar_experiences(goal, task_type, threshold)
+
     def _simple_text_similarity(self, goal1: str, goal2: str) -> float:
         """简单的文本相似度计算（Jaccard相似度）"""
         words1 = set(goal1.lower().split())
@@ -353,18 +446,26 @@ class ExperienceMemory:
     def save_experience(self, experience: TaskExperience) -> str:
         """保存经验到存储"""
         try:
+            task_type = experience.type
+            # 处理特殊字符，确保文件夹名称合法
+            safe_type_name = re.sub(r'[<>:"/\\|?*]', '_', task_type)
+            # 构建类型子文件夹路径
+            type_dir = os.path.join(self.storage_dir, safe_type_name)
+            os.makedirs(type_dir, exist_ok=True)
+
             # 生成文件名
             safe_goal = "".join(c if c.isalnum() or c in "._-" else "_" for c in experience.goal)
             filename = f"{safe_goal}_{int(experience.timestamp)}.json"
-            filepath = os.path.join(self.storage_dir, filename)
+            filepath = os.path.join(type_dir, filename)
             
             # 保存到文件
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(experience.to_dict(), f, indent=2, ensure_ascii=False)
             
             # 添加到内存列表
-            self.experiences.append(experience)
-            
+            # self.experiences.append(experience)
+            self.type_experience_cache[task_type].append(experience)
+
             LoggingUtils.log_success("ExperienceMemory", "Experience saved: {path}", path=filepath)
             return filepath
             
@@ -386,6 +487,12 @@ class ExperienceMemory:
 历史动作序列: {json.dumps(experience.action_sequence, ensure_ascii=False, indent=2)}
 
 新目标: {new_goal}
+
+**重要约束**：
+1. 只修改动作的参数值（如日期、文本内容、索引等）
+2. 必须保持动作的顺序完全不变
+3. 特别注意：确认按钮、提交按钮、页面跳转等流程控制动作必须保留
+4. 如果某个动作的参数不需要修改，保持原值不变
 
 请分析新目标与历史目标的差异，并返回调整后的动作序列。
 返回格式应该是JSON数组，每个动作包含action和params字段。
@@ -421,22 +528,83 @@ class ExperienceMemory:
     
     def get_experience_by_id(self, experience_id: str) -> Optional[TaskExperience]:
         """根据ID获取经验"""
-        for exp in self.experiences:
-            if exp.id == experience_id:
-                return exp
-        return None
-    
+        # for exp in self.experiences:
+        #     if exp.id == experience_id:
+        #         return exp
+        # return None
+        for experiences in self.type_experience_cache.values():  # 遍历所有类型的经验列表
+            for exp in experiences:
+                if exp.id == experience_id:  # 匹配唯一ID
+                    return exp
+        return None  # 未找到时返回None
+
     def get_all_experiences(self) -> List[TaskExperience]:
         """获取所有经验"""
-        return self.experiences.copy()
-    
+        # return self.experiences.copy()
+        all_experiences = []
+        # 遍历所有类型的缓存，汇总所有经验
+        for experiences in self.type_experience_cache.values():
+            all_experiences.extend(experiences)
+        return all_experiences.copy()  # 返回副本，避免外部修改缓存
+
     def clear_experiences(self):
         """清空所有经验"""
-        self.experiences = []
+        # self.experiences = []
+        # # 清空存储目录
+        # if os.path.exists(self.storage_dir):
+        #     for filename in os.listdir(self.storage_dir):
+        #         if filename.endswith('.json'):
+        #             os.remove(os.path.join(self.storage_dir, filename))
+        # logger.info("🧹 All experiences cleared")
+        # 清空缓存
+        self.type_experience_cache.clear()
         # 清空存储目录
         if os.path.exists(self.storage_dir):
-            for filename in os.listdir(self.storage_dir):
-                if filename.endswith('.json'):
-                    os.remove(os.path.join(self.storage_dir, filename))
-        logger.info("🧹 All experiences cleared")
+            for root, dirs, files in os.walk(self.storage_dir):
+                for filename in files:
+                    if filename.endswith('.json'):
+                        os.remove(os.path.join(root, filename))
+        LoggingUtils.log_info("ExperienceMemory", "🧹 All experiences (files + cache) cleared")
 
+    def determine_task_type(self, goal: str) -> Optional[str]:
+        """用大模型判断任务类型，必须属于支持的类型清单"""
+        # 记录 LLM 思考开始时间
+        llm_start_time = time.time()
+        start_timestamp = time.strftime("%H:%M:%S", time.localtime())
+        LoggingUtils.log_info(
+            "ExperienceMemory",
+            f"🤔 LLM 开始思考判断任务类型 at {start_timestamp} "
+        )
+
+        try:
+            # 构建类型判断提示词   # 这里需要对接一下
+            prompt = f"""
+请判断以下任务属于哪种功能类型（只能从给定的类型清单中选择，若都不符合则返回"未知"）。
+
+支持的类型清单：{self.supported_types}  
+
+任务：{goal}
+
+请只返回类型名称（如"请休假"），不要添加任何解释。若不属于任何类型，返回"未知"。
+"""
+            response = self.llm.complete(prompt)
+            task_type = response.text.strip()
+
+            # 计算并记录 LLM 思考耗时
+            thinking_time = time.time() - llm_start_time
+            end_timestamp = time.strftime("%H:%M:%S", time.localtime())
+            LoggingUtils.log_info(
+                "ExperienceMemory",
+                f"💡 LLM 完成思考判断任务类型 at {end_timestamp}, 耗时: {thinking_time:.2f}s"
+            )
+
+            # 校验返回的类型是否在支持的清单内
+            if task_type in self.supported_types:
+                LoggingUtils.log_info("ExperienceMemory", f"Task type '{task_type}'")
+                return task_type
+            else:
+                LoggingUtils.log_info("ExperienceMemory", f"Task type '{task_type}' not in supported list")
+                return None
+        except Exception as e:
+            LoggingUtils.log_error("ExperienceMemory", f"Failed to determine task type: {e}")
+            return None

@@ -36,11 +36,14 @@ from droidrun.agent.context.agent_persona import AgentPersona
 logger = logging.getLogger("droidrun")
 
 
-class CodeActAgent(Workflow):
+class CodeActAgentMicro(Workflow):
     """
-    An agent that uses a ReAct-like cycle (Thought -> Code -> Observation)
-    to solve problems requiring code execution. It extracts code from
-    Markdown blocks and uses specific step types for tracking.
+    微冷启动专用的 CodeActAgent，支持自动 UI 刷新。
+    
+    与标准 CodeActAgent 的区别：
+    1. 每次思考前自动获取最新 UI 状态
+    2. 每次执行后自动刷新 UI 状态
+    3. 任务完成前刷新最终 UI 状态
     """
 
     def __init__(
@@ -165,14 +168,7 @@ class CodeActAgent(Workflow):
             return ev
 
         self.steps_counter += 1
-        logger.info(f"🧠 Step {self.steps_counter}: Thinking...")
-        
-        # 性能分析：记录 LLM 思考开始时间
-        llm_start_time = time.time()
-        llm_start_timestamp = time.strftime("%H:%M:%S", time.localtime(llm_start_time))
-        from droidrun.agent.utils.logging_utils import LoggingUtils
-        print(f"🤔 [Performance] LLM 开始思考 at {llm_start_timestamp}")
-        LoggingUtils.log_info("Performance", "🤔 LLM 开始思考 at {time}", time=llm_start_timestamp)
+        logger.info(f"🧠 [Micro] Step {self.steps_counter}: Thinking...")
 
         model = self.llm.class_name()
         
@@ -180,28 +176,27 @@ class CodeActAgent(Workflow):
             await ctx.store.set("remembered_info", self.remembered_info)
             chat_history = await chat_utils.add_memory_block(self.remembered_info, chat_history)
 
-        # 统一先取一次状态（包含截图引用），后续根据需要下载截图字节
+        # 🔄 [Micro] 每次思考前刷新 UI 状态
+        logger.debug(f"🔄 [Micro] Getting current UI state before step {self.steps_counter}...")
         state = await self.tools.get_state_async(include_screenshot=True)
         try:
             a11y_tree = state.get("a11y_tree")
             phone_state = state.get("phone_state")
             
-            # 调试日志：确认 a11y_tree 是否存在
             if a11y_tree:
-                element_count = len(a11y_tree) if isinstance(a11y_tree, list) else 0
-                logger.info(f"✅ a11y_tree 已获取，包含 {element_count} 个顶层元素")
+                element_count = len(a11y_tree)
+                logger.info(f"✅ [Micro] UI state obtained for step {self.steps_counter}, found {element_count} elements")
                 await ctx.store.set("ui_state", a11y_tree)
                 ctx.write_event_to_stream(RecordUIStateEvent(ui_state=a11y_tree))
                 chat_history = await chat_utils.add_ui_text_block(a11y_tree, chat_history)
             else:
-                logger.warning("⚠️ a11y_tree 为空或不存在！大模型将无法看到 UI 元素")
+                logger.warning("⚠️ [Micro] UI 状态为空")
                 
             if phone_state:
                 chat_history = await chat_utils.add_phone_state_block(phone_state, chat_history)
         except Exception as e:
             logger.warning(f"⚠️ Error processing ui_state/phone_state from get_state_async response: {e}")
 
-        # 如需截图并且 vision 开启，则从 base64 解码
         if any(c == "screenshot" for c in self.required_context):
             screenshot_bytes: Optional[bytes] = None
             try:
@@ -227,14 +222,6 @@ class CodeActAgent(Workflow):
                 )
 
         response = await self._get_llm_response(ctx, chat_history)
-        
-        # 性能分析：记录 LLM 思考结束时间
-        llm_duration = time.time() - llm_start_time
-        llm_end_timestamp = time.strftime("%H:%M:%S", time.localtime())
-        print(f"💡 [Performance] LLM 完成思考 at {llm_end_timestamp}, 耗时: {llm_duration:.2f}s")
-        LoggingUtils.log_info("Performance", "💡 LLM 完成思考 at {time}, 耗时: {duration:.2f}s", 
-                            time=llm_end_timestamp, duration=llm_duration)
-        
         if response is None:
             return TaskEndEvent(
                 success=False, reason="LLM response is None. This is a critical error."
@@ -309,6 +296,21 @@ class CodeActAgent(Workflow):
 
             if self.tools.finished == True:
                 logger.debug("  - Task completed.")
+                
+                # 🔄 [Micro] 任务完成前刷新最终 UI 状态
+                try:
+                    logger.debug("🔄 [Micro] Refreshing final UI state before task completion...")
+                    state = await self.tools.get_state_async(include_screenshot=False)
+                    if "error" not in state:
+                        a11y_tree = state.get("a11y_tree")
+                        if a11y_tree:
+                            element_count = len(a11y_tree)
+                            logger.info(f"✅ [Micro] Final UI state refreshed, found {element_count} elements")
+                            await ctx.store.set("ui_state", a11y_tree)
+                            ctx.write_event_to_stream(RecordUIStateEvent(ui_state=a11y_tree))
+                except Exception as e:
+                    logger.warning(f"[Micro] 最终 UI 刷新失败: {e}")
+                
                 event = TaskEndEvent(
                     success=self.tools.success, reason=self.tools.reason
                 )
@@ -335,8 +337,8 @@ class CodeActAgent(Workflow):
     async def handle_execution_result(
         self, ctx: Context, ev: TaskExecutionResultEvent
     ) -> TaskInputEvent:
-        """Handle the execution result. Currently it just returns InputEvent."""
-        logger.debug("📊 Handling execution result...")
+        """Handle the execution result and automatically refresh UI state (Micro version)."""
+        logger.debug("📊 [Micro] Handling execution result...")
         # Get the output from the event
         output = ev.output
         if output is None:
@@ -348,7 +350,31 @@ class CodeActAgent(Workflow):
                 if len(output) > 100
                 else f"  - Execution output: {output}"
             )
-        # Add the output to memory as an user message (observation)
+        
+        # 🔄 [Micro] 每次执行后自动刷新 UI 状态
+        try:
+            if not self.tools.finished:
+                logger.debug("🔄 [Micro] Auto-refreshing UI state after action execution...")
+                state = await self.tools.get_state_async(include_screenshot=False)
+                
+                if "error" not in state:
+                    a11y_tree = state.get("a11y_tree")
+                    if a11y_tree:
+                        element_count = len(a11y_tree)
+                        logger.info(f"✅ [Micro] UI state auto-refreshed, found {element_count} elements")
+                        await ctx.store.set("ui_state", a11y_tree)
+                        ctx.write_event_to_stream(RecordUIStateEvent(ui_state=a11y_tree))
+                        
+                        from droidrun.agent.utils import chat_utils
+                        ui_state_message = chat_utils.format_ui_text_block(a11y_tree)
+                        ui_update_message = ChatMessage(
+                            role="user",
+                            content=f"Updated UI State (after action):\n{ui_state_message}"
+                        )
+                        await self.chat_memory.aput(ui_update_message)
+        except Exception as e:
+            logger.warning(f"[Micro] UI 刷新失败: {e}")
+        
         observation_message = ChatMessage(
             role="user", content=f"Execution Result:\n```\n{output}\n```"
         )
