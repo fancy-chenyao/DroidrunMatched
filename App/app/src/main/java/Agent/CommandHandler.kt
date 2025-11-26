@@ -1020,17 +1020,21 @@ object CommandHandler {
                         Log.d(TAG, "input_text执行成功，开始验证输入内容")
                         verifyInputTextContent(activity, targetElement, text, 300L) { contentVerified ->
                             if (contentVerified) {
-                                // 内容验证成功
-                                smartClearCache("input_text")
-                                Log.d(TAG, "input_text内容验证成功")
-                                
-                                val elementDesc = buildInputTextDescription(targetElement, index, text)
-                                val data = JSONObject().apply { 
-                                    put("page_change_type", "input_content_verified")
-                                    put("element_index", index)
-                                    put("message", elementDesc)
-                                }
-                                callback(createSuccessResponse(data))
+                                // 内容验证成功，额外等待让Accessibility Tree有时间更新
+                                Log.d(TAG, "input_text内容验证成功，等待Accessibility Tree更新")
+                                Handler(Looper.getMainLooper()).postDelayed({
+                                    smartClearCache("input_text")
+                                    Log.d(TAG, "input_text完成，Accessibility Tree应已更新")
+                                    
+                                    val elementDesc = buildInputTextDescription(targetElement, index, text)
+                                    val data = JSONObject().apply { 
+                                        put("page_change_type", "input_content_verified")
+                                        put("element_index", index)
+                                        put("message", elementDesc)
+                                        put("input_text", text)  // 返回输入的文本，让服务端知道输入成功
+                                    }
+                                    callback(createSuccessResponse(data))
+                                }, 300L)  // 额外等待300ms让Accessibility Tree更新
                             } else {
                                 // 内容验证失败，回退到页面变化检测
                                 Log.d(TAG, "input_text内容验证失败，回退到页面变化检测")
