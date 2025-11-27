@@ -61,7 +61,27 @@ object WebViewController {
 
                             // 仅在叶子节点保留文本，避免父级聚合产生的冗余
                             const hasElementChildren = !!(node.childElementCount && node.childElementCount > 0);
-                            const rawText = hasElementChildren ? '' : ((node.textContent || node.value || '') || '');
+                            
+                            // 对于表单输入元素（INPUT、TEXTAREA、SELECT），优先获取value属性
+                            // 这样可以正确获取用户实际输入的内容，而不是placeholder
+                            let rawText = '';
+                            if (!hasElementChildren) {
+                                const isFormInput = node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.tagName === 'SELECT';
+                                if (isFormInput) {
+                                    // 表单元素：优先value，回退到textContent
+                                    const nodeValue = node.value;
+                                    const nodeTextContent = node.textContent;
+                                    rawText = (nodeValue !== undefined && nodeValue !== '') ? nodeValue : (nodeTextContent || '');
+                                    
+                                    // 调试日志：记录表单元素的value获取情况
+                                    if (node.id && (node.id.includes('textarea') || node.id.includes('input'))) {
+                                        console.log('WebViewController: 表单元素文本获取 - ID=' + node.id + ', tagName=' + node.tagName + ', value="' + nodeValue + '", textContent="' + nodeTextContent + '", 最终text="' + rawText + '"');
+                                    }
+                                } else {
+                                    // 非表单元素：优先textContent，回退到value
+                                    rawText = node.textContent || node.value || '';
+                                }
+                            }
                             const text = (rawText.trim()).substring(0, 100);
                             
                             // 为没有ID的元素动态分配临时ID

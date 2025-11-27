@@ -246,11 +246,17 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
             
             obj.put("className", e.className)
             
-            // text字段：优先使用contentDesc，如果为空则使用text，如果都为空则使用className
+            // text字段：对于表单输入元素（INPUT、TEXTAREA、SELECT），优先使用text（实际输入值）
+            // 对于其他元素，优先使用contentDesc，如果为空则使用text
+            val isFormInput = e.className.equals("INPUT", ignoreCase = true) || 
+                             e.className.equals("TEXTAREA", ignoreCase = true) || 
+                             e.className.equals("SELECT", ignoreCase = true)
+            
             val displayText = when {
-                e.contentDesc.isNotEmpty() -> e.contentDesc
-                e.text.isNotEmpty() -> e.text
-                else -> e.className
+                isFormInput && e.text.isNotEmpty() -> e.text  // 表单元素：优先text（实际值）
+                e.contentDesc.isNotEmpty() -> e.contentDesc   // 其他元素：优先contentDesc
+                e.text.isNotEmpty() -> e.text                 // 回退到text
+                else -> e.className                           // 最后回退到className
             }
             obj.put("text", displayText)
             
