@@ -1,5 +1,5 @@
 from llama_index.core.workflow import Event
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 class ScreenshotEvent(Event):
     screenshot: bytes
@@ -8,6 +8,7 @@ class MacroEvent(Event):
     """Base class for coordinate-based action events"""
     action_type: str
     description: str
+    specific_behavior: Optional[str] = None  
 
 class TapActionEvent(MacroEvent):
     """Event for tap actions with coordinates"""

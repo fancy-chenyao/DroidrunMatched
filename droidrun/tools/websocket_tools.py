@@ -62,33 +62,27 @@ class WebSocketTools(Tools):
             self.a11y_export_dir = config_manager.get("tools.a11y_export_dir", "./a11y_exports")
             
             if self.export_a11y_tree:
-                # 创建导出目录
                 Path(self.a11y_export_dir).mkdir(parents=True, exist_ok=True)
                 LoggingUtils.log_info("WebSocketTools", "a11y_tree export enabled, directory: {dir}", 
                                     dir=self.a11y_export_dir)
         
-        # 请求-响应队列
         self.pending_requests: Dict[str, asyncio.Future] = {}
         self.request_counter = 0
         self._request_lock = asyncio.Lock()
         
-        # 上下文（用于事件流）
         self._ctx = None
         
-        # 缓存数据
         self.clickable_elements_cache: List[Dict[str, Any]] = []
         self.last_screenshot = None
         self.reason = None
         self.success = None
         self.finished = False
         
-        # 内存存储
         self.memory: List[str] = []
         self.screenshots: List[Dict[str, Any]] = []
         self.save_trajectories = "none"
     
     def _set_context(self, ctx: Context):
-        """设置上下文，用于事件流记录"""
         self._ctx = ctx
     
     def _generate_request_id(self) -> str:
@@ -116,14 +110,12 @@ class WebSocketTools(Tools):
         timeout = timeout or self.timeout
         t_create = time.time()
         
-        # 创建 Future 用于等待响应
         loop = asyncio.get_running_loop()
-        future = loop.create_future()  # 确保在当前事件循环中创建
+        future = loop.create_future()
         
         async with self._request_lock:
             self.pending_requests[request_id] = future
         
-        # 构建请求消息（使用标准协议，Phase 3）
         request_message = MessageProtocol.create_command_message(
             command=command,
             params=params,
@@ -132,41 +124,33 @@ class WebSocketTools(Tools):
         )
         
         try:
-            # 记录发送时间戳和开始时间
             send_start_time = time.time()
             send_timestamp = time.strftime("%H:%M:%S", time.localtime())
-            # 只记录非 get_state 操作的日志
             if command != "get_state":
                 LoggingUtils.log_info("WebSocketTools", "📤 发送操作到移动端: {cmd} at {time}", 
                                     cmd=command, time=send_timestamp)
             
-            # 发送请求
             success = await self.session_manager.send_to_device(self.device_id, request_message)
             if not success:
                 async with self._request_lock:
                     self.pending_requests.pop(request_id, None)
                 raise ValueError(f"Failed to send request to device {self.device_id}")
             
-            # 微让步：高优命令发送后立即让出事件循环，尽快调度 sender_loop 出队发送
             try:
                 if command in {"tap_by_index", "tap", "scroll", "input_text", "swipe", "press_key", "start_app", "drag"}:
                     await asyncio.sleep(0)
             except Exception:
                 pass
             
-            # 等待响应（带超时）
             try:
                 response = await asyncio.wait_for(future, timeout=timeout)
                 
-                # 计算操作执行耗时
                 execution_time = time.time() - send_start_time
                 receive_timestamp = time.strftime("%H:%M:%S", time.localtime())
-                # 只记录非 get_state 操作的日志
                 if command != "get_state":
                     LoggingUtils.log_info("WebSocketTools", "✅ 移动端完成操作: {cmd} at {time}, 耗时: {duration:.2f}s", 
                                         cmd=command, time=receive_timestamp, duration=execution_time)
                 
-                # response 是完整响应，提取 data 部分（如果存在）
                 if isinstance(response, dict) and "data" in response:
                     return response["data"]
                 return response
@@ -199,41 +183,30 @@ class WebSocketTools(Tools):
             LoggingUtils.log_warning("WebSocketTools", "Response missing request_id, ignoring")
             return
         
-        
-        
-        # 直接同步处理，避免异步调度问题
         try:
             future = self.pending_requests.get(request_id)
             if future and not future.done():
-                # 获取 future 关联的事件循环
                 future_loop = getattr(future, '_loop', None)
                 
-                # 检查是否有错误
                 if response_data.get("status") == "error":
                     error_msg = response_data.get("error", "Unknown error")
-                    # 使用线程安全的方式设置异常
                     if future_loop and future_loop.is_running():
                         future_loop.call_soon_threadsafe(future.set_exception, ValueError(error_msg))
                     else:
                         future.set_exception(ValueError(error_msg))
                 else:
-                    # 使用线程安全的方式设置结果
                     if future_loop and future_loop.is_running():
                         future_loop.call_soon_threadsafe(future.set_result, response_data)
                     else:
                         future.set_result(response_data)
-                # 从待处理请求中移除
                 self.pending_requests.pop(request_id, None)
-            else:
-                pass  # Future not found or already done
         except Exception as e:
             LoggingUtils.log_error("WebSocketTools", "Error handling response for request {rid}: {err}", 
                                  rid=request_id, err=e)
     
     def _sync_wait(self, coro):
         """
-        同步等待异步操作（用于同步方法调用异步实现）
-        使用 run_coroutine_threadsafe 避免阻塞主事件循环
+        同步等待异步操作
         
         Args:
             coro: 协程对象
@@ -244,20 +217,15 @@ class WebSocketTools(Tools):
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # 使用 run_coroutine_threadsafe 在主事件循环中执行协程
-                # 这样不会阻塞事件循环，其他协程可以继续执行
                 import concurrent.futures
                 future = asyncio.run_coroutine_threadsafe(coro, loop)
                 try:
                     return future.result(timeout=self.timeout)
                 except concurrent.futures.TimeoutError:
                     raise TimeoutError(f"Operation timed out after {self.timeout} seconds")
-                    
             else:
-                # 如果循环不在运行，直接运行（理论上不应该发生）
                 return loop.run_until_complete(coro)
         except RuntimeError:
-            # 如果没有事件循环，使用 asyncio.run（回退方案）
             return asyncio.run(coro)
     
     def _export_a11y_tree_to_json(self, a11y_tree: List[Dict[str, Any]]) -> None:
@@ -284,25 +252,21 @@ class WebSocketTools(Tools):
     
     async def get_state_async(self, include_screenshot: bool = True) -> Dict[str, Any]:
         """
-        异步获取设备状态（包含 a11y_tree 和 phone_state）。仅传引用，不回填大对象。
+        异步获取设备状态
         """
         try:
-            # 性能分析：记录 get_state 开始时间
             get_state_start = time.time()
-            # print(f"🔍 [Performance] get_state started")  # 可选：太频繁可以注释
             response = await self._send_request_and_wait("get_state", {"include_screenshot": include_screenshot})
 
             if response.get("status") == "error":
                 error_msg = response.get("error", "Unknown error")
                 return {"error": "Error", "message": error_msg}
 
-            # 验证必需字段（允许仅返回引用）
             if "a11y_tree" not in response and "a11y_ref" not in response:
                 return {"error": "Missing Data", "message": "a11y_tree/a11y_ref not found in response"}
             if "phone_state" not in response:
                 return {"error": "Missing Data", "message": "phone_state not found in response"}
 
-            # 定义过滤函数（去除 type 字段）
             def filter_children_recursive(children):
                 result = []
                 for c in children:
@@ -312,12 +276,10 @@ class WebSocketTools(Tools):
                     result.append(filtered)
                 return result
             
-            # 处理内联 a11y_tree（统一使用 WebSocket 传输）
             elements = response.get("a11y_tree", [])
             filtered_elements = []
             
             if isinstance(elements, list) and elements:
-                # 过滤并处理 a11y_tree
                 for element in elements:
                     filtered_element = {k: v for k, v in element.items() if k != "type"}
                     if "children" in element:
@@ -325,23 +287,18 @@ class WebSocketTools(Tools):
                     filtered_elements.append(filtered_element)
                 self.clickable_elements_cache = filtered_elements
                 
-                # 导出 a11y_tree 到 JSON 文件（如果启用）
                 self._export_a11y_tree_to_json(filtered_elements)
-            else:
-                pass
             
-            # 构建返回结果
+
             result = {
                 "a11y_tree": filtered_elements,
                 "phone_state": response.get("phone_state", {}),
             }
             
-            # 处理截图（如果有 screenshot_base64）
             if "screenshot_base64" in response:
                 result["screenshot_base64"] = response.get("screenshot_base64")
                 self.last_screenshot = response.get("screenshot_base64")
             
-            # 性能分析：记录 get_state 总耗时
             get_state_duration = time.time() - get_state_start
             print(f"⏱️ [Performance] get_state total: {get_state_duration:.2f}s (elements: {len(filtered_elements)})")
             LoggingUtils.log_info("Performance", "⏱️ get_state total: {duration:.2f}s (elements: {count})", 
@@ -357,7 +314,7 @@ class WebSocketTools(Tools):
 
     async def get_state(self, include_screenshot: bool = True) -> Dict[str, Any]:
         """
-        获取设备状态（包含 a11y_tree 和 phone_state）
+        获取设备状态
         
         Returns:
             包含 'a11y_tree' 和 'phone_state' 的字典
@@ -365,7 +322,6 @@ class WebSocketTools(Tools):
         try:
             LoggingUtils.log_debug("WebSocketTools", "[async] Getting state from device {device_id}", device_id=self.device_id)
             
-            # 直接调用异步实现
             response = await self.get_state_async(include_screenshot=include_screenshot)
             return response
             
@@ -448,24 +404,17 @@ class WebSocketTools(Tools):
             if status == "success":
                 message = response.get("message", f"Tapped element at index {index}")
                 
-                # 发送事件（如果上下文存在）
                 if self._ctx:
                     element = self._find_element_by_index(index)
                     if element:
-                        # 尝试从 LLM 注释中获取更有意义的描述
                         llm_comment = None
                         if hasattr(self, '_action_comments') and self._action_comments:
-                            # 查找匹配的函数调用
                             for func_call, comment in self._action_comments.items():
                                 if f'tap_by_index({index})' in func_call:
                                     llm_comment = comment
                                     break
                         
-                        # 将 LLM 注释插入到移动端返回的 message 中
-                        # 格式: "Tap element at index X: LLM注释 (ClassName) at coordinates (x, y)"
                         if llm_comment and message:
-                            # 解析移动端 message，提取 className 和 coordinates
-                            # message 格式: "Tap element at index 64: 'text' (LinearLayout) at coordinates (205, 191)"
                             import re
                             match = re.search(r'\(([^)]+)\)\s+at\s+coordinates\s+\(([^)]+)\)', message)
                             if match:
@@ -473,15 +422,14 @@ class WebSocketTools(Tools):
                                 coords = match.group(2)
                                 final_description = f"Tap element at index {index}: {llm_comment} ({class_name}) at coordinates ({coords})"
                             else:
-                                # 如果解析失败，使用 LLM 注释 + 原始 message
                                 final_description = f"{llm_comment} - {message}"
                         else:
-                            # 没有 LLM 注释，使用移动端返回的 message
                             final_description = message
                         
                         tap_event = TapActionEvent(
                             action_type="tap",
                             description=final_description,
+                            specific_behavior=llm_comment,
                             x=response.get("x", 0),
                             y=response.get("y", 0),
                             element_index=index,
@@ -489,6 +437,10 @@ class WebSocketTools(Tools):
                             element_bounds=element.get("bounds", ""),
                         )
                         self._ctx.write_event_to_stream(tap_event)
+                        
+                        if (hasattr(self, '_manual_event_recording') and self._manual_event_recording 
+                            and hasattr(self, '_trajectory') and self._trajectory):
+                            self._trajectory.macro.append(tap_event)
                 
                 return message
             else:
@@ -638,39 +590,46 @@ class WebSocketTools(Tools):
             LoggingUtils.log_debug("WebSocketTools", "[async] Inputting text: {text} {index_info}", 
                                  text=text[:50], index_info=f"at index {index}" if index is not None else "")
             
-            # 编码文本（Base64）
             encoded_text = base64.b64encode(text.encode()).decode()
             
             params = {
                 "text": text,
                 "base64_text": encoded_text
             }
-            # 直接将 index 信息传递给移动端，由移动端处理元素定位和输入
             if index is not None:
                 params["index"] = index
                 
             response = await self._send_request_and_wait("input_text", params)
             
-            # 检查响应状态，兼容不同的响应格式
-            status = response.get("status", "success")  # 默认为 success
+            status = response.get("status", "success")
             if status == "success" or not response.get("error"):
                 message = response.get("message", f"Text input completed: {text[:50]}")
                 
-                # input_text 保持原有格式，不使用 LLM 注释
-                final_description = f"Input text: '{text[:50]}{'...' if len(text) > 50 else ''}'" + (f" at index {index}" if index is not None else "")
+                llm_comment = None
+                if hasattr(self, '_action_comments') and self._action_comments:
+                    for func_call, comment in self._action_comments.items():
+                        if 'input_text(' in func_call and f'"{text[:20]}' in func_call:
+                            llm_comment = comment
+                            break
+                        elif 'input_text(' in func_call and index is not None and f'{index}' in func_call:
+                            llm_comment = comment
+                            break
                 
-                # 创建 InputTextActionEvent
+                final_description = f"Input text: '{text[:50]}{'...' if len(text) > 50 else ''}'" + (f" at index {index}" if index is not None else "")
                 input_event = InputTextActionEvent(
                     action_type="input_text",
                     description=final_description,
+                    specific_behavior=llm_comment,
                     text=text,
                     index=index
                 )
                 
                 if self._ctx:
                     self._ctx.write_event_to_stream(input_event)
-                else:
-                    LoggingUtils.log_warning("WebSocketTools", "⚠️ Context is None, InputTextActionEvent not recorded")
+                
+                if (hasattr(self, '_manual_event_recording') and self._manual_event_recording 
+                    and hasattr(self, '_trajectory') and self._trajectory):
+                    self._trajectory.macro.append(input_event)
                 
                 return message
             else:

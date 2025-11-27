@@ -146,7 +146,7 @@
                         android:layout_width="16dp"
                         android:layout_height="16dp"
                         android:src="@drawable/ic_arrow_right"
-                        android:contentDescription="选择" />
+                        android:contentDescription="" />
 
                 </LinearLayout>
 
@@ -210,7 +210,7 @@
                         android:layout_width="16dp"
                         android:layout_height="16dp"
                         android:src="@drawable/ic_arrow_right"
-                        android:contentDescription="选择" />
+                        android:contentDescription="" />
 
                 </LinearLayout>
 
@@ -253,7 +253,7 @@
                     android:layout_width="16dp"
                     android:layout_height="16dp"
                     android:src="@drawable/ic_arrow_right"
-                    android:contentDescription="选择" />
+                    android:contentDescription="" />
 
             </LinearLayout>
 

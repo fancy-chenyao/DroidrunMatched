@@ -68,10 +68,11 @@ def _format_ui_elements(ui_data, level=0) -> str:
         resource_id = element.get('resourceId', '')
         text = element.get('text', '')
         bounds = element.get('bounds', '')
+        clickable = element.get('clickable', False)
         children = element.get('children', [])
         
         
-        # Format the line: index. className: resourceId, text - bounds
+        # Format the line: index. className: resourceId, text, parentIndex, clickable - bounds
         line_parts = []
         if index != '':
             line_parts.append(f"{index}.")
@@ -83,6 +84,8 @@ def _format_ui_elements(ui_data, level=0) -> str:
             details.append(f'"{resource_id}"')
         if text:
             details.append(f'"{text}"')
+        details.append(f"clickable={clickable}")
+        
         if details:
             line_parts.append(", ".join(details))
         
@@ -107,7 +110,16 @@ async def add_ui_text_block(ui_state: str, chat_history: List[ChatMessage], copy
         try:
             ui_data = json.loads(ui_state) if isinstance(ui_state, str) else ui_state
             formatted_ui = _format_ui_elements(ui_data)
-            ui_block = TextBlock(text=f"\nCurrent Clickable UI elements from the device in the schema 'index. className: resourceId, text - bounds(x1,y1,x2,y2)':\n{formatted_ui}\n")
+            ui_block = TextBlock(text=f"""
+Current UI elements from the device in the schema 'index. className: resourceId, text, clickable=true/false - bounds(x1,y1,x2,y2)':
+
+Important Notes:
+- Use tap_by_index(index) to interact with elements
+- Only elements with clickable=true can be directly tapped
+
+Elements:
+{formatted_ui}
+""")
         except (json.JSONDecodeError, TypeError):
             # Fallback to original format if parsing fails
             ui_block = TextBlock(text="\nCurrent Clickable UI elements from the device using the custom TopViewService:\n```json\n" + json.dumps(ui_state) + "\n```\n")

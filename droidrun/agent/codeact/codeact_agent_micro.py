@@ -366,7 +366,7 @@ class CodeActAgentMicro(Workflow):
                         ctx.write_event_to_stream(RecordUIStateEvent(ui_state=a11y_tree))
                         
                         from droidrun.agent.utils import chat_utils
-                        ui_state_message = chat_utils.format_ui_text_block(a11y_tree)
+                        ui_state_message = chat_utils._format_ui_elements(a11y_tree)
                         ui_update_message = ChatMessage(
                             role="user",
                             content=f"Updated UI State (after action):\n{ui_state_message}"

@@ -30,7 +30,21 @@ class TaskExperience:
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
-        return asdict(self)
+        result = asdict(self)
+        
+        # 修复BUG：确保字段名正确，防止出现空字符串键
+        if '' in result:
+            LoggingUtils.log_warning("TaskExperience", "Detected empty string key in experience dict, fixing...")
+            # 将空字符串键的值移动到 action_sequence
+            result['action_sequence'] = result.pop('')
+        
+        # 确保所有必需字段存在
+        required_fields = ['id', 'goal', 'type', 'success', 'timestamp', 'page_sequence', 'action_sequence', 'ui_states', 'metadata']
+        for field in required_fields:
+            if field not in result:
+                LoggingUtils.log_warning("TaskExperience", f"Missing required field: {field}")
+        
+        return result
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'TaskExperience':
@@ -505,15 +519,22 @@ class ExperienceMemory:
             json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
             if json_match:
                 adapted_actions = json.loads(json_match.group())
-                # 保留/回填 description 字段，保证下游 changed_indices 检测可用
+                # 保留/回填 description 和 specific_behavior 字段，保证下游 changed_indices 检测可用
                 try:
                     original_actions = experience.action_sequence or []
                     for i, a in enumerate(adapted_actions or []):
-                        if isinstance(a, dict) and "description" not in a:
+                        if isinstance(a, dict):
                             if 0 <= i < len(original_actions):
-                                desc = (original_actions[i] or {}).get("description")
-                                if desc:
-                                    a["description"] = desc
+                                # 回填 description
+                                if "description" not in a:
+                                    desc = (original_actions[i] or {}).get("description")
+                                    if desc:
+                                        a["description"] = desc
+                                # 回填 specific_behavior
+                                if "specific_behavior" not in a:
+                                    specific_behavior = (original_actions[i] or {}).get("specific_behavior")
+                                    if specific_behavior is not None:  # 允许 None 值
+                                        a["specific_behavior"] = specific_behavior
                 except Exception:
                     pass
                 LoggingUtils.log_progress("ExperienceMemory", "Parameters adapted for new goal: {goal}", goal=new_goal)

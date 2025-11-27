@@ -31,7 +31,7 @@ droidrun:
   agent:
     max_steps: 20
     default_max_steps: 20
-    max_micro_cold_steps: 5
+    max_micro_cold_steps: 10
     micro_cold_timeout: 60
     reasoning: false
     reflection: false
@@ -58,7 +58,7 @@ droidrun:
   # API配置
   api:
     api_key: null  # 从环境变量 ALIYUN_API_KEY 获取
-    model: "qwen-plus"
+    model: "qwen3-max"
     api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
     timeout: 30
     max_retries: 3
