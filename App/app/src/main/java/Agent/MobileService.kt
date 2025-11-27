@@ -102,6 +102,7 @@ class MobileService : Service() {
     private var monitoredWebView: WebView? = null
     private var webViewDrawListener: ViewTreeObserver.OnDrawListener? = null
     private var webViewScrollListener: ViewTreeObserver.OnScrollChangedListener? = null
+    private var pageChangeListenerEnabled: Boolean = false
 
     /**
      * 本地绑定器类
@@ -150,10 +151,10 @@ class MobileService : Service() {
                         }
                         
                     // 初始化页面变化的参数
-                        xmlPending = true
-                        screenNeedUpdate = true
-                        firstScreen = true
-                    WaitScreenUpdate()
+//                        xmlPending = true
+//                        screenNeedUpdate = true
+//                        firstScreen = true
+//                    WaitScreenUpdate()
                     } else {
                         Log.e(TAG, "Received null instruction from intent")
                     }
@@ -306,7 +307,7 @@ class MobileService : Service() {
 
 
 
-        // 初始化页面变化监听
+        // 初始化页面变化监听（默认关闭）
         initPageChangeListener()
 
         
@@ -368,6 +369,11 @@ class MobileService : Service() {
      * 设置Activity变化监听器，当Activity切换时会自动更新ViewTreeObserver监听
      */
     private fun initPageChangeListener() {
+        if (!pageChangeListenerEnabled) {
+            Log.d(TAG, "页面变化监听已关闭")
+            removeViewTreeObserver()
+            return
+        }
         // 设置Activity变化监听器
         ActivityTracker.setActivityChangeListener(object : ActivityTracker.ActivityChangeListener {
             override fun onActivityChanged(newActivity: Activity?, oldActivity: Activity?) {
@@ -416,6 +422,10 @@ class MobileService : Service() {
      * @param activity 要监听的Activity
      */
     private fun setupViewTreeObserver(activity: Activity) {
+        if (!pageChangeListenerEnabled) {
+            Log.d(TAG, "页面变化监听已关闭，跳过设置")
+            return
+        }
         try {
             // 如果已经在监听同一个Activity，不需要重复设置
             if (currentMonitoredActivity == activity && currentViewTreeObserver != null) {
@@ -544,9 +554,28 @@ class MobileService : Service() {
      * @param reason 变化原因
      */
     private fun onPageChanged(reason: String) {
+        if (!pageChangeListenerEnabled) {
+            return
+        }
         val currentTime = System.currentTimeMillis()
         LogDedup.d(TAG, "处理页面变化: $reason")
         WaitScreenUpdate()
+    }
+
+    /**
+     * 启用页面变化监听
+     */
+    fun enablePageChangeListener() {
+        pageChangeListenerEnabled = true
+        initPageChangeListener()
+    }
+
+    /**
+     * 关闭页面变化监听
+     */
+    fun disablePageChangeListener() {
+        pageChangeListenerEnabled = false
+        removeViewTreeObserver()
     }
 
     /**
@@ -804,12 +833,12 @@ class MobileService : Service() {
     private fun executeClickAction(activity: Activity, element: GenericElement) {
         Log.d(TAG, "开始执行点击动作 - 元素: ${element.resourceId}, clickable: ${element.clickable}, enabled: ${element.enabled}")
         
-        // 如果当前页面为 WebView，直接使用坐标点击，提高在网页中的命中率
+        // 如果当前页面为 WebView，先尝试JavaScript点击，失败后使用坐标点击
         try {
             val pageType = PageSniffer.getCurrentPageType(activity)
             if (pageType == PageSniffer.PageType.WEB_VIEW) {
-                Log.d(TAG, "检测到页面类型为 WEB_VIEW，直接使用坐标点击")
-                executeCoordinateClick(activity, element)
+                Log.d(TAG, "检测到页面类型为 WEB_VIEW，先尝试JavaScript点击")
+                executeWebViewClickAction(activity, element)
                 return
             }
         } catch (e: Exception) {
@@ -950,6 +979,58 @@ class MobileService : Service() {
             } else {
                 Log.e(TAG, "坐标点击失败")
                 sendActionError("所有点击方式都失败了")
+            }
+        }
+    }
+
+    /**
+     * 执行WebView页面的点击动作
+     * 先尝试JavaScript点击，失败后使用坐标点击
+     */
+    private fun executeWebViewClickAction(activity: Activity, element: GenericElement) {
+        Log.d(TAG, "开始执行WebView点击动作 - 元素: ${element.resourceId}")
+        
+        // 记录点击前的状态
+        val preClickActivity = ActivityTracker.getCurrentActivity()
+        val preClickActivityName = preClickActivity?.javaClass?.simpleName ?: "null"
+        val preClickMonitoredActivity = currentMonitoredActivity
+        var preClickViewTreeHash: Int? = null
+        
+        // 获取点击前页面元素树的哈希值
+        preClickActivity?.let { clickActivity ->
+            try {
+                val rootView = clickActivity.window?.decorView?.rootView
+                preClickViewTreeHash = if (rootView != null) {
+                    getViewTreeHash(rootView)
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "获取点击前视图树哈希值失败", e)
+            }
+        }
+        
+        Log.d(TAG, "记录WebView点击前状态 - Activity: $preClickActivityName, 监听Activity: ${preClickMonitoredActivity?.javaClass?.simpleName}, 视图树哈希: $preClickViewTreeHash")
+        
+        // 先尝试JavaScript点击
+        Log.d(TAG, "尝试JavaScript点击")
+        ElementController.clickElement(activity, element.resourceId) { success ->
+            if (success) {
+                Log.d(TAG, "JavaScript点击操作返回成功，等待页面变化验证...")
+                screenNeedUpdate = true
+                xmlPending = true
+                // 验证点击效果
+                verifyClickSuccessWithPageChange(preClickActivity, preClickMonitoredActivity, preClickViewTreeHash) { verified ->
+                    if (verified) {
+                        Log.d(TAG, "JavaScript点击成功且已验证生效")
+                    } else {
+                        Log.w(TAG, "JavaScript点击操作成功但未生效，回退到坐标点击")
+                        executeCoordinateClick(activity, element)
+                    }
+                }
+            } else {
+                Log.w(TAG, "JavaScript点击失败，回退到坐标点击")
+                executeCoordinateClick(activity, element)
             }
         }
     }

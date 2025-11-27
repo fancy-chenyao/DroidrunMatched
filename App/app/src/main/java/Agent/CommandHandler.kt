@@ -15,14 +15,20 @@ import android.view.View
 import android.view.ViewTreeObserver
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.TextView
+import android.view.ViewGroup
+import android.webkit.WebView
 import Agent.ActivityTracker
 import controller.ElementController
 import controller.GenericElement
 import controller.NativeController
+import controller.PageSniffer
+import controller.WebViewController
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import utlis.PageChangeVerifier
+import utlis.PageStableVerifier
 
 /**
  * 命令处理器
@@ -140,10 +146,24 @@ object CommandHandler {
                         Log.e(TAG, "处理截图命令异常", e)
                         protectedCallback(createErrorResponse("Exception: ${e.message}"))
                     }
-                }
+        }
             }
             "get_state" -> {
-                handleGetState(requestId, params, activity, protectedCallback)
+                val handler = Handler(Looper.getMainLooper())
+                val stabilizeTimeout = params.optLong("stabilize_timeout_ms", 5000L)
+                val stableWindow = params.optLong("stable_window_ms", 500L)
+                val waitStart = System.currentTimeMillis()
+                PageStableVerifier.waitUntilStable(
+                    handler = handler,
+                    getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                    timeoutMs = stabilizeTimeout,
+                    minStableMs = stableWindow,
+                    intervalMs = 100L
+                ) {
+                    val waitedMs = System.currentTimeMillis() - waitStart
+                    Log.d(TAG, "页面稳定等待耗时: ${waitedMs}ms (timeout=${stabilizeTimeout}ms, stable_window=${stableWindow}ms)")
+                    handleGetState(requestId, params, activity, protectedCallback)
+                }
             }
             "tap" -> {
                 handleTap(requestId, params, activity, protectedCallback)
@@ -548,104 +568,169 @@ object CommandHandler {
         
         Handler(Looper.getMainLooper()).post {
             try {
-                // 根据页面类型分发坐标点击（dp单位）
-                ElementController.clickByCoordinateDp(activity, centerX, centerY) { success ->
+                // 检测页面类型并选择合适的点击方式
+                val pageType = try {
+                    PageSniffer.getCurrentPageType(activity)
+                } catch (e: Exception) {
+                    Log.w(TAG, "页面类型检测失败: ${e.message}")
+                    PageSniffer.PageType.UNKNOWN
+                }
+                
+                Log.d(TAG, "tap_by_index检测到页面类型: $pageType, 元素: ${targetElement.resourceId}")
+                
+                if (pageType == PageSniffer.PageType.WEB_VIEW) {
+                    // WebView页面：先尝试JavaScript点击，失败后使用坐标点击
+                    Log.d(TAG, "WebView页面，先尝试JavaScript点击元素: ${targetElement.resourceId}")
                     
-                    if (!success) {
-                        Log.w(TAG, "tap_by_index命令执行失败: 点击操作返回false")
-                        callback(createErrorResponse("Tap by index action failed"))
-                        return@clickByCoordinateDp
-                    }
-                    
-                    val observerStartTime = System.currentTimeMillis()
-                    // 使用 ViewTreeObserver 监听 UI 变化
-                    val layoutChanged = AtomicBoolean(false)
-                    val layoutChangeTime = AtomicLong(0L)
-                    val activityChanged = AtomicBoolean(false)
-                    val hasReturned = AtomicBoolean(false)  // 防止重复返回
-                    val initialActivity = ActivityTracker.getCurrentActivity()
-                    
-                    // 声明 listener 变量（稍后初始化）
-                    var listener: ViewTreeObserver.OnGlobalLayoutListener? = null
-                    
-                    // 返回结果的通用方法
-                    val returnResult = {
-                        if (!hasReturned.getAndSet(true)) {
-                            try {
-                                listener?.let { activity.window?.decorView?.viewTreeObserver?.removeOnGlobalLayoutListener(it) }
-                            } catch (e: Exception) {
-                                Log.w(TAG, "移除 ViewTreeObserver 失败: ${e.message}")
-                            }
+                    // 尝试JavaScript点击
+                    ElementController.clickElement(activity, targetElement.resourceId) { jsSuccess ->
+                        Log.d(TAG, "JavaScript点击结果: $jsSuccess")
+                        
+                        if (jsSuccess) {
+                            Log.d(TAG, "JavaScript点击成功，等待UI变化验证...")
+                            // JavaScript点击成功，继续后续的UI变化检测逻辑
+                            proceedWithUIChangeDetection(activity, targetElement, index, callback, tapStartTime)
+                        } else {
+                            Log.w(TAG, "JavaScript点击失败，原因可能是:")
+                            Log.w(TAG, "  1. 元素ID '${targetElement.resourceId}' 不存在")
+                            Log.w(TAG, "  2. 元素不可见或被禁用")
+                            Log.w(TAG, "  3. 元素没有click方法")
+                            Log.w(TAG, "  4. JavaScript执行异常")
+                            Log.w(TAG, "回退到坐标点击")
                             
-                            // 检查 Activity 是否变化
-                            val currentActivity = ActivityTracker.getCurrentActivity()
-                            if (currentActivity != initialActivity) {
-                                activityChanged.set(true)
-                            }
-                            
-                            // 总是清理缓存
-                            clearCache()
-                            
-                            // 构建详细的描述信息
-                            val elementDesc = buildElementDescription(targetElement, index)
-                            
-                            val hasChange = layoutChanged.get() || activityChanged.get()
-                            val changeTypes = mutableListOf<String>()
-                            if (activityChanged.get()) changeTypes.add("activity_switch")
-                            if (layoutChanged.get()) changeTypes.add("layout_change")
-                            
-                            val data = JSONObject().apply {
-                                put("message", elementDesc)
-                                put("ui_changed", hasChange)
-                                if (changeTypes.isNotEmpty()) {
-                                    put("change_type", changeTypes.joinToString("_and_"))
+                            // JavaScript点击失败，回退到坐标点击
+                            ElementController.clickByCoordinateDp(activity, centerX, centerY) { coordSuccess ->
+                                Log.d(TAG, "坐标点击结果: $coordSuccess")
+                                
+                                if (!coordSuccess) {
+                                    Log.w(TAG, "tap_by_index命令执行失败: 坐标点击操作也返回false")
+                                    callback(createErrorResponse("Both JavaScript and coordinate tap failed"))
+                                    return@clickByCoordinateDp
                                 }
+                                
+                                Log.d(TAG, "坐标点击成功，等待UI变化验证...")
+                                // 坐标点击成功，继续后续的UI变化检测逻辑
+                                proceedWithUIChangeDetection(activity, targetElement, index, callback, tapStartTime)
                             }
-                            
-                            if (!hasChange) {
-                                Log.w(TAG, "tap_by_index未检测到UI变化: index=$index")
-                            }
-                            
-                            callback(createSuccessResponse(data))
                         }
                     }
-                    
-                    // 初始化 listener
-                    listener = ViewTreeObserver.OnGlobalLayoutListener {
-                        if (!layoutChanged.get()) {
-                            layoutChanged.set(true)
-                            // 检测到变化后，等待 100ms 确认，然后提前返回
-                            Handler(Looper.getMainLooper()).postDelayed({
-                                returnResult()
-                            }, 100L)
+                } else {
+                    // Native页面或其他：直接使用坐标点击
+                    Log.d(TAG, "Native页面，使用坐标点击")
+                    ElementController.clickByCoordinateDp(activity, centerX, centerY) { success ->
+                        Log.d(TAG, "坐标点击结果: $success")
+                        
+                        if (!success) {
+                            Log.w(TAG, "tap_by_index命令执行失败: 点击操作返回false")
+                            callback(createErrorResponse("Tap by index action failed"))
+                            return@clickByCoordinateDp
                         }
+                        
+                        Log.d(TAG, "坐标点击成功，等待UI变化验证...")
+                        // 继续后续的UI变化检测逻辑
+                        proceedWithUIChangeDetection(activity, targetElement, index, callback, tapStartTime)
                     }
-                    
-                    try {
-                        activity.window?.decorView?.viewTreeObserver?.addOnGlobalLayoutListener(listener)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "添加 ViewTreeObserver 失败: ${e.message}")
-                    }
-                    
-                    // 100ms 后检查，如果没有变化则提前返回
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        if (!layoutChanged.get() && !hasReturned.get()) {
-                            returnResult()
-                        }
-                    }, 100L)
-                    
-                    // 最多等待 500ms（兜底保障）
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        if (!hasReturned.get()) {
-                            returnResult()
-                        }
-                    }, 500L)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "tap_by_index命令执行异常: ${e.message}", e)
                 callback(createErrorResponse("Exception: ${e.message}"))
             }
         }
+    }
+    
+    /**
+     * 继续进行UI变化检测的通用方法
+     */
+    private fun proceedWithUIChangeDetection(
+        activity: Activity,
+        targetElement: GenericElement,
+        index: Int,
+        callback: (JSONObject) -> Unit,
+        tapStartTime: Long
+    ) {
+        val observerStartTime = System.currentTimeMillis()
+        // 使用 ViewTreeObserver 监听 UI 变化
+        val layoutChanged = AtomicBoolean(false)
+        val layoutChangeTime = AtomicLong(0L)
+        val activityChanged = AtomicBoolean(false)
+        val hasReturned = AtomicBoolean(false)  // 防止重复返回
+        val initialActivity = ActivityTracker.getCurrentActivity()
+        
+        // 声明 listener 变量（稍后初始化）
+        var listener: ViewTreeObserver.OnGlobalLayoutListener? = null
+        
+        // 返回结果的通用方法
+        val returnResult = {
+            if (!hasReturned.getAndSet(true)) {
+                try {
+                    listener?.let { activity.window?.decorView?.viewTreeObserver?.removeOnGlobalLayoutListener(it) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "移除 ViewTreeObserver 失败: ${e.message}")
+                }
+                
+                // 检查 Activity 是否变化
+                val currentActivity = ActivityTracker.getCurrentActivity()
+                if (currentActivity != initialActivity) {
+                    activityChanged.set(true)
+                }
+                
+                // 总是清理缓存
+                clearCache()
+                
+                // 构建详细的描述信息
+                val elementDesc = buildElementDescription(targetElement, index)
+                
+                val hasChange = layoutChanged.get() || activityChanged.get()
+                val changeTypes = mutableListOf<String>()
+                if (activityChanged.get()) changeTypes.add("activity_switch")
+                if (layoutChanged.get()) changeTypes.add("layout_change")
+                
+                val data = JSONObject().apply {
+                    put("message", elementDesc)
+                    put("ui_changed", hasChange)
+                    if (changeTypes.isNotEmpty()) {
+                        put("change_type", changeTypes.joinToString("_and_"))
+                    }
+                }
+                
+                if (!hasChange) {
+                    Log.w(TAG, "tap_by_index未检测到UI变化: index=$index")
+                }
+                
+                callback(createSuccessResponse(data))
+            }
+        }
+        
+        // 初始化 listener
+        listener = ViewTreeObserver.OnGlobalLayoutListener {
+            if (!layoutChanged.get()) {
+                layoutChanged.set(true)
+                // 检测到变化后，等待 100ms 确认，然后提前返回
+                Handler(Looper.getMainLooper()).postDelayed({
+                    returnResult()
+                }, 100L)
+            }
+        }
+        
+        try {
+            activity.window?.decorView?.viewTreeObserver?.addOnGlobalLayoutListener(listener)
+        } catch (e: Exception) {
+            Log.w(TAG, "添加 ViewTreeObserver 失败: ${e.message}")
+        }
+        
+        // 100ms 后检查，如果没有变化则提前返回
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!layoutChanged.get() && !hasReturned.get()) {
+                returnResult()
+            }
+        }, 100L)
+        
+        // 最多等待 500ms（兜底保障）
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!hasReturned.get()) {
+                returnResult()
+            }
+        }, 500L)
     }
     
     /**
@@ -946,29 +1031,50 @@ object CommandHandler {
                 // 使用ElementController设置输入值
                 ElementController.setInputValue(activity, targetElement.resourceId, text) { success ->
                     if (success) {
-                        // 成功后进行页面变化验证
-                        PageChangeVerifier.verifyActionWithPageChange(
-                            handler = Handler(Looper.getMainLooper()),
-                            getCurrentActivity = { ActivityTracker.getCurrentActivity() },
-                            preActivity = preActivity,
-                            preViewTreeHash = preHash,
-                            preWebViewAggHash = preWebHash
-                        ) { changed, changeType ->
-                            if (changed) {
-                                smartClearCache("input_text")
-                                
-                                // 构建详细的描述信息
-                                val elementDesc = buildInputTextDescription(targetElement, index, text)
-                                
-                                val data = JSONObject().apply { 
-                                    put("page_change_type", changeType)
-                                    put("element_index", index)
-                                    put("message", elementDesc)
-                                }
-                                callback(createSuccessResponse(data))
+                        // 对于input_text，优先使用内容验证而不是页面变化检测
+                        Log.d(TAG, "input_text执行成功，开始验证输入内容")
+                        verifyInputTextContent(activity, targetElement, text, 300L) { contentVerified ->
+                            if (contentVerified) {
+                                // 内容验证成功，额外等待让Accessibility Tree有时间更新
+                                Log.d(TAG, "input_text内容验证成功，等待Accessibility Tree更新")
+                                Handler(Looper.getMainLooper()).postDelayed({
+                                    smartClearCache("input_text")
+                                    Log.d(TAG, "input_text完成，Accessibility Tree应已更新")
+                                    
+                                    val elementDesc = buildInputTextDescription(targetElement, index, text)
+                                    val data = JSONObject().apply { 
+                                        put("page_change_type", "input_content_verified")
+                                        put("element_index", index)
+                                        put("message", elementDesc)
+                                        put("input_text", text)  // 返回输入的文本，让服务端知道输入成功
+                                    }
+                                    callback(createSuccessResponse(data))
+                                }, 300L)  // 额外等待300ms让Accessibility Tree更新
                             } else {
-                                Log.w(TAG, "input_text命令执行后未检测到页面变化")
-                                callback(createErrorResponse("Input text succeeded but page unchanged"))
+                                // 内容验证失败，回退到页面变化检测
+                                Log.d(TAG, "input_text内容验证失败，回退到页面变化检测")
+                                PageChangeVerifier.verifyActionWithPageChange(
+                                    handler = Handler(Looper.getMainLooper()),
+                                    getCurrentActivity = { ActivityTracker.getCurrentActivity() },
+                                    preActivity = preActivity,
+                                    preViewTreeHash = preHash,
+                                    preWebViewAggHash = preWebHash
+                                ) { changed, changeType ->
+                                    if (changed) {
+                                        smartClearCache("input_text")
+                                        
+                                        val elementDesc = buildInputTextDescription(targetElement, index, text)
+                                        val data = JSONObject().apply { 
+                                            put("page_change_type", changeType)
+                                            put("element_index", index)
+                                            put("message", elementDesc)
+                                        }
+                                        callback(createSuccessResponse(data))
+                                    } else {
+                                        Log.w(TAG, "input_text命令执行后未检测到页面变化")
+                                        callback(createErrorResponse("Input text succeeded but page unchanged"))
+                                    }
+                                }
                             }
                         }
                     } else {
@@ -983,6 +1089,153 @@ object CommandHandler {
         }
     }
 
+    
+    /**
+     * 验证输入文本内容是否成功写入
+     * 通过读取目标元素的实际内容来验证输入是否生效
+     * @param activity 当前Activity
+     * @param targetElement 目标元素
+     * @param expectedText 期望的文本内容
+     * @param delayMs 验证前的延迟时间（毫秒），确保输入完成
+     * @param callback 验证结果回调
+     */
+    private fun verifyInputTextContent(
+        activity: Activity,
+        targetElement: GenericElement,
+        expectedText: String,
+        delayMs: Long = 300L,
+        callback: (Boolean) -> Unit
+    ) {
+        // 延迟一小段时间确保输入操作完成
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                val pageType = PageSniffer.getCurrentPageType(activity)
+                Log.d(TAG, "验证输入内容，页面类型: $pageType, 元素ID: ${targetElement.resourceId}")
+                
+                when (pageType) {
+                    PageSniffer.PageType.WEB_VIEW -> {
+                        // WebView页面：通过JavaScript获取输入框的当前值
+                        val webView = findWebView(activity)
+                        if (webView != null) {
+                            val elementId = targetElement.resourceId
+                            // 尝试多种方式获取输入框的值
+                            val jsCode = """
+                                (function() {
+                                    var elem = document.getElementById('$elementId');
+                                    if (elem) {
+                                        return elem.value || elem.textContent || elem.innerText || '';
+                                    }
+                                    return '';
+                                })();
+                            """.trimIndent()
+                            
+                            webView.evaluateJavascript(jsCode) { result ->
+                                val actualValue = result?.trim('"') ?: ""
+                                val verified = actualValue == expectedText
+                                Log.d(TAG, "WebView内容验证: 期望='$expectedText', 实际='$actualValue', 结果=$verified")
+                                callback(verified)
+                            }
+                        } else {
+                            Log.w(TAG, "未找到WebView，内容验证失败")
+                            callback(false)
+                        }
+                    }
+                    PageSniffer.PageType.NATIVE -> {
+                        // Native页面：直接读取View的文本内容
+                        val rootView = activity.findViewById<View>(android.R.id.content)
+                        val targetView = findViewByResourceName(rootView, targetElement.resourceId)
+                        
+                        if (targetView is TextView) {
+                            val actualValue = targetView.text.toString()
+                            val verified = actualValue == expectedText
+                            Log.d(TAG, "Native内容验证: 期望='$expectedText', 实际='$actualValue', 结果=$verified")
+                            callback(verified)
+                        } else {
+                            Log.w(TAG, "目标元素不是TextView，内容验证失败")
+                            callback(false)
+                        }
+                    }
+                    else -> {
+                        Log.w(TAG, "未知页面类型，内容验证失败")
+                        callback(false)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "验证输入内容时发生异常: ${e.message}", e)
+                callback(false)
+            }
+        }, delayMs)
+    }
+    
+    /**
+     * 查找WebView
+     */
+    private fun findWebView(activity: Activity): WebView? {
+        val rootView = activity.window.decorView.findViewById<View>(android.R.id.content)
+        return findWebViewRecursive(rootView)
+    }
+    
+    /**
+     * 递归查找WebView
+     */
+    private fun findWebViewRecursive(view: View): WebView? {
+        if (view is WebView && view.visibility == View.VISIBLE) {
+            return view
+        }
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                val result = findWebViewRecursive(view.getChildAt(i))
+                if (result != null) {
+                    return result
+                }
+            }
+        }
+        return null
+    }
+    
+    /**
+     * 通过resourceId查找View
+     */
+    private fun findViewByResourceName(view: View, resourceName: String): View? {
+        try {
+            val resources = view.resources
+            if (resources != null) {
+                val id = resources.getIdentifier(resourceName, null, null)
+                if (id != 0) {
+                    return view.findViewById(id)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "通过resourceName查找View失败: ${e.message}")
+        }
+        
+        // 如果通过ID查找失败，尝试递归查找
+        return findViewByResourceNameRecursive(view, resourceName)
+    }
+    
+    /**
+     * 递归查找具有指定resourceName的View
+     */
+    private fun findViewByResourceNameRecursive(view: View, resourceName: String): View? {
+        try {
+            val viewResourceName = view.resources?.getResourceEntryName(view.id)
+            if (viewResourceName == resourceName || view.id.toString() == resourceName) {
+                return view
+            }
+        } catch (e: Exception) {
+            // 忽略异常，继续查找
+        }
+        
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                val result = findViewByResourceNameRecursive(view.getChildAt(i), resourceName)
+                if (result != null) {
+                    return result
+                }
+            }
+        }
+        return null
+    }
     
     /**
      * 查找第一个EditText视图

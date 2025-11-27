@@ -601,7 +601,7 @@ class DroidAgent(Workflow):
             #     threshold=self.memory_config.similarity_threshold
             # )
             # 使用合并优化：一次LLM调用同时完成相似度计算和排序
-            use_merged_optimization = self.config_manager.get("memory.use_merged_similarity_ranking", True)
+            use_merged_optimization = self.config_manager.get("memory.use_merged_similarity_ranking", False)
 
             # 性能分析：记录经验检索开始时间
             retrieval_start = time.time()
