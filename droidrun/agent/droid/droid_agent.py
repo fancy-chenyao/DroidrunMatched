@@ -570,9 +570,8 @@ class DroidAgent(Workflow):
         
         # 性能分析：记录任务开始时间
         task_start_time = time.time()
-        self._task_start_time = task_start_time  # 保存以便 finalize 时计算总耗时
+        self._task_start_time = task_start_time
         start_time_str = time.strftime("%H:%M:%S", time.localtime(task_start_time))
-        print(f"⏱️ [Performance] Task started at {start_time_str}")
         LoggingUtils.log_info("Performance", "⏱️ Task started at {time}", time=start_time_str)
 
         # 判断新任务的类型（必须在支持的清单内）
@@ -590,7 +589,6 @@ class DroidAgent(Workflow):
         LoggingUtils.log_info("ExperienceMemory", f"Task determined as type: {task_type}")
         self.current_task_type = task_type
         type_duration = time.time() - type_start
-        print(f"⏱️ [Performance] Task type determination: {type_duration:.2f}s")
         LoggingUtils.log_info("Performance", "⏱️ Task type determination: {duration:.2f}s", duration=type_duration)
 
         # 新增：热启动检查
@@ -622,17 +620,15 @@ class DroidAgent(Workflow):
             
             retrieval_duration = time.time() - retrieval_start
             exp_count = len(similar_experiences) if similar_experiences else 0
-            print(f"⏱️ [Performance] Experience retrieval: {retrieval_duration:.2f}s (found {exp_count} experiences)")
             LoggingUtils.log_info("Performance", "⏱️ Experience retrieval: {duration:.2f}s (found {count} experiences)", 
                                 duration=retrieval_duration, count=exp_count)
 
-            # 打印用户友好的经验检查信息
             if similar_experiences:
-                print(f"🔥 发现 {len(similar_experiences)} 个相似经验，将使用热启动")
                 max_display = self.config_manager.get("memory.max_similar_experiences_display", 3)
+                LoggingUtils.log_info("DroidAgent", "🔥 Found {count} similar experiences, using hot start", count=len(similar_experiences))
                 for i, exp in enumerate(similar_experiences[:max_display]):
-                    print(f"  {i+1}. {exp.goal} (相似度: {exp.similarity_score:.2f})")
-                LoggingUtils.log_info("DroidAgent", "Hot start: Found {count} similar experiences", count=len(similar_experiences))
+                    LoggingUtils.log_info("DroidAgent", "  {num}. {goal} (similarity: {score:.2f})", 
+                                        num=i+1, goal=exp.goal, score=exp.similarity_score)
                 # 打印命中集合的相似度（检索阶段结果）
                 try:
                     for exp in similar_experiences:
@@ -642,8 +638,7 @@ class DroidAgent(Workflow):
                 except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                     ExceptionHandler.handle_data_parsing_error(e, "[SIM] Similarity calculation")
             else:
-                print("❄️ 未发现相似经验，将使用冷启动")
-                LoggingUtils.log_info("DroidAgent", "Cold start: No similar experiences found (threshold={threshold})", 
+                LoggingUtils.log_info("DroidAgent", "❄️ No similar experiences found, using cold start (threshold={threshold})", 
                                     threshold=self.memory_config.similarity_threshold)
             
             # 优化：直接使用已缓存的相似度分数，避免重复计算
@@ -739,7 +734,6 @@ class DroidAgent(Workflow):
                                     self.goal
                                 )
                                 adapt_duration = time.time() - adapt_start
-                                print(f"⏱️ [Performance] Parameter adaptation (LLM): {adapt_duration:.2f}s")
                                 LoggingUtils.log_info("Performance", "⏱️ Parameter adaptation (LLM): {duration:.2f}s", duration=adapt_duration)
                                 LoggingUtils.log_progress("DroidAgent", "Parameters adapted for hot start")
                         else:
@@ -791,7 +785,6 @@ class DroidAgent(Workflow):
                                         self.pending_hot_actions
                                     )
                                     detect_duration = time.time() - detect_start
-                                    print(f"⏱️ [Performance] Change detection (LLM): {detect_duration:.2f}s")
                                     LoggingUtils.log_info("Performance", "⏱️ Change detection (LLM): {duration:.2f}s", duration=detect_duration)
                                     self.pending_hot_context["changed_indices"] = det.get("changed_indices", [])
                                     # 保存 index->reason，用于更具体的微冷启动子目标
@@ -845,10 +838,8 @@ class DroidAgent(Workflow):
     async def finalize(self, ctx: Context, ev: FinalizeEvent) -> StopEvent:
         ctx.write_event_to_stream(ev)
         
-        # 性能分析：计算任务总耗时
         if hasattr(self, '_task_start_time'):
             total_duration = time.time() - self._task_start_time
-            print(f"⏱️ [Performance] ✅ Task completed in {total_duration:.2f}s (success={ev.success}, steps={ev.steps})")
             LoggingUtils.log_info("Performance", "⏱️ ✅ Task completed in {duration:.2f}s (success={success}, steps={steps})", 
                                 duration=total_duration, success=ev.success, steps=ev.steps)
         
@@ -927,9 +918,8 @@ class DroidAgent(Workflow):
         """
         直接执行热启动动作（异步），必要时触发微冷启动子流程。
         """
-        # 性能分析：记录热启动执行开始时间
         hot_start_begin = time.time()
-        print(f"\n🔥 [Performance] Hot start execution begins with {len(actions)} actions")
+        LoggingUtils.log_info("Performance", "🔥 Hot start execution begins with {count} actions", count=len(actions))
         
         try:
             tools = self.tools_instance
@@ -948,7 +938,7 @@ class DroidAgent(Workflow):
             try:
                 ui_state = await tools.get_state_async(include_screenshot=True)
                 init_ui_duration = time.time() - init_ui_start
-                print(f"⏱️ [Performance] Initial UI state: {init_ui_duration:.2f}s")
+                LoggingUtils.log_info("Performance", "⏱️ Initial UI state: {duration:.2f}s", duration=init_ui_duration)
                 LoggingUtils.log_debug("DroidAgent", "UI state initialized with {count} elements", 
                                      count=len(ui_state.get('elements', [])))
                 
@@ -965,7 +955,7 @@ class DroidAgent(Workflow):
             actions = self._reconstruct_actions_with_changes(actions)
             self.reconstructed_actions_list = actions
             reconstruct_duration = time.time() - reconstruct_start
-            print(f"⏱️ [Performance] Actions reconstruction: {reconstruct_duration:.2f}s")
+            LoggingUtils.log_info("Performance", "⏱️ Actions reconstruction: {duration:.2f}s", duration=reconstruct_duration)
             if not hasattr(tools, '_action_comments'):
                 tools._action_comments = {}
             else:
@@ -1008,15 +998,15 @@ class DroidAgent(Workflow):
             # 基于 changed_indices 的微冷启动触发记录，避免重复触发同一索引
             triggered_changed_steps: Dict[int, bool] = {}
             
-            # 性能分析：记录动作执行开始时间
             actions_loop_start = time.time()
-            print(f"\n🔄 [Performance] Starting actions loop ({len(actions)} actions)")
+            LoggingUtils.log_info("Performance", "🔄 Starting actions loop ({count} actions)", count=len(actions))
             
             for idx_action, act in enumerate(actions):
                 action_start = time.time()
                 name = (act or {}).get("action") or (act or {}).get("name")
                 params = (act or {}).get("params", {}) or (act or {}).get("parameters", {})
-                print(f"  ➡️ [Performance] Action {idx_action+1}/{len(actions)}: {name}")
+                LoggingUtils.log_info("Performance", "➡️ Action {current}/{total}: {name}", 
+                                     current=idx_action+1, total=len(actions), name=name)
                 LoggingUtils.log_debug("DroidAgent", "Executing action {current}/{total}: {name} params={params}", 
                                      current=idx_action+1, total=len(actions), name=name, params=params)
                 try:
@@ -1063,8 +1053,9 @@ class DroidAgent(Workflow):
                                     # 成功后继续到下一步（不再执行原点击）
                                     continue
                                 else:
-                                    LoggingUtils.log_warning("DroidAgent", "Micro-coldstart failed for step {step}, fallback to direct tap", 
+                                    LoggingUtils.log_warning("DroidAgent", "❄️ Micro-coldstart failed for step {step}, falling back to cold start", 
                                                            step=idx_action)
+                                    return False, f"Micro-coldstart failed at step {idx_action}, fallback to cold start"
                             
                             tap_start = time.time()
                             await tools.tap_by_index(idx)
@@ -1079,8 +1070,6 @@ class DroidAgent(Workflow):
                             await self._capture_ui_state_and_screenshot("tap")
                             capture_duration = time.time() - capture_start
                             
-                            print(f"    ├─ tap: {tap_duration:.2f}s, wait: {wait_duration:.2f}s, capture: {capture_duration:.2f}s")
-                            
                             step_count += 1
                             executed_actions.append({
                                 "action": "tap_by_index",
@@ -1089,9 +1078,6 @@ class DroidAgent(Workflow):
                                 "timestamp": time.time()
                             })
                             
-                            # 性能分析：记录单个动作总耗时
-                            action_duration = time.time() - action_start
-                            print(f"    └─ Total action time: {action_duration:.2f}s")
                     elif name in ("input_text", "type", "input"):
                         text = params.get("text", params.get("value", ""))
                         text = str(text) if text is not None else ""
@@ -1113,8 +1099,6 @@ class DroidAgent(Workflow):
                             await self._capture_ui_state_and_screenshot("input")
                             capture_duration = time.time() - capture_start
                             
-                            print(f"    ├─ input: {input_duration:.2f}s, wait: {wait_duration:.2f}s, capture: {capture_duration:.2f}s")
-                            
                             step_count += 1
                             executed_actions.append({
                                 "action": "input_text",
@@ -1123,9 +1107,6 @@ class DroidAgent(Workflow):
                                 "timestamp": time.time()
                             })
                             
-                            # 性能分析：记录单个动作总耗时
-                            action_duration = time.time() - action_start
-                            print(f"    └─ Total action time: {action_duration:.2f}s")
                     elif name == "swipe":
                         start = params.get("start") or params.get("from") or {}
                         end = params.get("end") or params.get("to") or {}
@@ -1246,13 +1227,12 @@ class DroidAgent(Workflow):
                         self.trajectory.events.append(event)
                 except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                     ExceptionHandler.handle_data_parsing_error(e, "[HOT] Trajectory event creation")
-            # 性能分析：计算动作循环总耗时
-            actions_loop_duration = time.time() - actions_loop_start
-            print(f"\n⏱️ [Performance] Actions loop completed: {actions_loop_duration:.2f}s")
             
-            # 性能分析：计算热启动总耗时
+            actions_loop_duration = time.time() - actions_loop_start
+            LoggingUtils.log_info("Performance", "⏱️ Actions loop completed: {duration:.2f}s", duration=actions_loop_duration)
+            
             hot_start_total = time.time() - hot_start_begin
-            print(f"🔥 [Performance] Hot start total time: {hot_start_total:.2f}s\n")
+            LoggingUtils.log_info("Performance", "🔥 Hot start total time: {duration:.2f}s", duration=hot_start_total)
             
             if step_count == 0:
                 return False, "No hot-start actions were executed (unrecognized schema)."
@@ -1544,21 +1524,27 @@ class DroidAgent(Workflow):
                     macro_length_after = len(self.trajectory.macro)
                     new_actions_count = macro_length_after - macro_length_before
                     
-                    print(f"    🔍 [Debug] Macro length before: {macro_length_before}, after: {macro_length_after}, new: {new_actions_count}")
+                    LoggingUtils.log_debug("DroidAgent", "Macro length before: {before}, after: {after}, new: {new}",
+                                         before=macro_length_before, after=macro_length_after, new=new_actions_count)
                     
                     if new_actions_count > 0:
                         LoggingUtils.log_info("DroidAgent", "✅ Merged {count} actions from micro-coldstart to main trajectory", 
                                             count=new_actions_count)
                         for i in range(macro_length_before, macro_length_after):
                             action = self.trajectory.macro[i]
-                            print(f"      - Action {i}: {type(action).__name__}")
+                            LoggingUtils.log_debug("DroidAgent", "  - Action {idx}: {type}", 
+                                                 idx=i, type=type(action).__name__)
                     else:
                         LoggingUtils.log_warning("DroidAgent", "⚠️ No new actions found in micro-coldstart!")
-                        print(f"    ⚠️ [Warning] Micro-coldstart actions not captured in main trajectory")
             else:
                 LoggingUtils.log_warning("DroidAgent", "Micro cold start failed for step {step}", step=step_index)
             
             return success
+        
+        except asyncio.TimeoutError:
+            LoggingUtils.log_warning("DroidAgent", "⏱️ Micro-coldstart timeout for step {step} (limit: {timeout}s)", 
+                                   step=step_index, timeout=self.config_manager.get("agent.micro_cold_timeout", 150))
+            return False
             
         except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
             ExceptionHandler.handle_runtime_error(e, f"[MicroColdStart] Step {step_index}", reraise=False)
