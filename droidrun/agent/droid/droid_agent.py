@@ -20,7 +20,6 @@ DroidAgent - Android设备任务执行代理
     )
     result = await agent.run()
 """
-# 标准库导入
 import asyncio
 import glob
 import json
@@ -32,12 +31,10 @@ import uuid
 import traceback
 from typing import Dict, List, Optional
 
-# 第三方库导入
 from llama_index.core.llms.llm import LLM
 from llama_index.core.workflow import Context, StartEvent, StopEvent, Workflow, step, Event
 from llama_index.core.workflow.handler import WorkflowHandler
 
-# 本地模块导入 - droidrun.agent
 from droidrun.agent.codeact import CodeActAgent
 from droidrun.agent.codeact.events import EpisodicMemoryEvent, TaskEndEvent, TaskExecutionEvent
 from droidrun.agent.common.events import (
@@ -69,7 +66,6 @@ from droidrun.agent.oneflows.reflector import Reflector
 from droidrun.agent.planner import PlannerAgent
 from droidrun.agent.utils.trajectory import Trajectory
 
-# 本地模块导入 - droidrun其他
 from droidrun.config import get_config_manager, UnifiedConfigManager, ExceptionConstants
 from droidrun.agent.utils.exception_handler import ExceptionHandler, log_error
 from droidrun.agent.utils.logging_utils import LoggingUtils
@@ -82,7 +78,6 @@ from droidrun.telemetry import (
 from droidrun.tools import Tools, describe_tools
 from droidrun.tools.adb import AdbTools
 
-# 初始化日志
 logger = logging.getLogger("droidrun")
 
 
@@ -98,12 +93,9 @@ class DroidAgent(Workflow):
         Configure default logging for DroidAgent if no handlers are present.
         This ensures logs are visible when using DroidAgent directly.
         """
-        # Only configure if no handlers exist (avoid duplicate configuration)
         if not logger.handlers:
-            # Create a console handler
             handler = logging.StreamHandler()
 
-            # Set format
             if debug:
                 formatter = logging.Formatter("%(asctime)s %(levelname)s: %(message)s", "%H:%M:%S")
             else:
@@ -114,7 +106,6 @@ class DroidAgent(Workflow):
             logger.setLevel(logging.DEBUG if debug else logging.INFO)
             logger.propagate = False
         
-        # 为特定模块设置更高的日志级别，减少调试输出
         if not debug:
             logging.getLogger("droidrun.tools.adb").setLevel(logging.INFO)
             logging.getLogger("droidrun.agent.codeact").setLevel(logging.INFO)
@@ -166,10 +157,7 @@ class DroidAgent(Workflow):
         """
         self.user_id = kwargs.pop("user_id", None)
         
-        # 初始化统一配置管理器
         self.config_manager = config_manager or get_config_manager()
-        
-        # 从配置管理器获取配置值，参数优先于配置
         self.max_steps = max_steps if max_steps is not None else self.config_manager.get("agent.max_steps", 20)
         self.timeout = timeout if timeout is not None else self.config_manager.get("system.timeout", 300)
         self.vision = vision if vision is not None else self.config_manager.get("agent.vision", False)
@@ -180,26 +168,19 @@ class DroidAgent(Workflow):
         
         super().__init__(timeout=self.timeout, *args, **kwargs)
         
-        # Configure default logging if not already configured
         self._configure_default_logging(debug=self.debug)
-        
-        # 初始化记忆系统（向后兼容）
         memory_enabled = enable_memory if enable_memory is not None else self.config_manager.get("memory.enabled", True)
         self.memory_enabled = memory_enabled
         
         if self.memory_enabled:
-            # 使用统一配置管理器获取记忆配置
             if memory_config is None:
-                # 从统一配置管理器获取记忆配置
                 unified_memory_config = self.config_manager.get_memory_config()
-                
-                # 创建记忆配置字典（只包含旧的MemoryConfig类支持的字段）
                 memory_config_dict = {
                     "enabled": unified_memory_config.enabled,
                     "similarity_threshold": unified_memory_config.similarity_threshold,
                     "storage_dir": unified_memory_config.storage_dir,
                     "max_experiences": unified_memory_config.max_experiences,
-                    "llm_model": None,  # 旧类支持但新类没有，设为None
+                    "llm_model": None,
                     "experience_quality_threshold": unified_memory_config.experience_quality_threshold,
                     "fallback_enabled": unified_memory_config.fallback_enabled,
                     "monitoring_enabled": unified_memory_config.monitoring_enabled,
@@ -210,7 +191,6 @@ class DroidAgent(Workflow):
                     "max_steps_before_fallback": unified_memory_config.max_steps_before_fallback,
                 }
                 
-                # 如果提供了参数，覆盖配置值
                 if memory_similarity_threshold is not None:
                     memory_config_dict["similarity_threshold"] = memory_similarity_threshold
                 if memory_storage_dir is not None:
@@ -220,14 +200,12 @@ class DroidAgent(Workflow):
             else:
                 self.memory_config = memory_config
             
-            # 初始化记忆组件
             self.memory_manager = ExperienceMemory(
                 storage_dir=self.memory_config.storage_dir,
                 llm=llm
             )
             self.execution_monitor = ExecutionMonitor(llm=llm)
             self.llm_services = LLMServices(llm)
-            # 热启动直执动作队列与上下文
             self.pending_hot_actions: List[Dict] = []
             self.pending_hot_context: Dict = {}
             
@@ -256,8 +234,6 @@ class DroidAgent(Workflow):
         self.max_codeact_steps = self.max_steps
 
         self.event_counter = 0
-        
-        # 生成共享的experience_id，用于experiences和trajectories的一致性
         self.experience_id = str(uuid.uuid4())
         
         self.trajectory = Trajectory(goal=goal, experience_id=self.experience_id)
@@ -348,17 +324,13 @@ class DroidAgent(Workflow):
             })
 
         try:
-            # 热启动直执分支：若有待执行动作，直接绕过 CodeAct
             if self.memory_enabled and getattr(self, 'pending_hot_actions', None):
                 LoggingUtils.log_progress("DroidAgent", "Directly executing {count} hot-start actions", count=len(self.pending_hot_actions))
-                # 设置热启动标志，用于后续判断（finalize阶段）
                 self.is_hot_start_execution = True
                 success, reason = await self._direct_execute_actions_async(ctx, self.pending_hot_actions)
-                # 记录热启动执行结果
                 if hasattr(self, 'trajectory') and self.trajectory:
                     self.trajectory.events.append(TaskEndEvent(success=success, reason=reason, task=task))
                     LoggingUtils.log_info("DroidAgent", "Hot start execution recorded in trajectory")
-                # 用完即清空（但保留is_hot_start_execution标志）
                 self.pending_hot_actions = []
                 return CodeActResultEvent(success=success, reason=reason, task=task, steps=self.step_counter)
 
@@ -607,7 +579,14 @@ class DroidAgent(Workflow):
         type_start = time.time()
         task_type = self.memory_manager.determine_task_type(self.goal)
         if not task_type:
-            return "暂不支持该功能"  # 这里需要对接一下，后续不执行，且返回前端
+            # 返回错误 Event，而不是字符串
+            LoggingUtils.log_error("DroidAgent", "Task type determination failed or unsupported task type")
+            return FinalizeEvent(
+                success=False,
+                steps=0,
+                output="",
+                reason="暂不支持该功能，或任务类型判断失败"
+            )
         LoggingUtils.log_info("ExperienceMemory", f"Task determined as type: {task_type}")
         self.current_task_type = task_type
         type_duration = time.time() - type_start
@@ -730,19 +709,33 @@ class DroidAgent(Workflow):
                             best_exp_obj is not None and best_exp_obj.similarity_score >= 0.999
                         )
                         
+                        # 优先从 macro.json 加载原始动作（最准确）
+                        macro_actions = self._load_macro_actions(experience_id)
+                        if macro_actions:
+                            LoggingUtils.log_success("DroidAgent", "✅ Loaded {count} actions from macro.json (most accurate source)", 
+                                                   count=len(macro_actions))
+                            original_actions = macro_actions
+                        else:
+                            # 回退到经验文件的 action_sequence
+                            LoggingUtils.log_warning("DroidAgent", "Macro.json not found, fallback to experience action_sequence")
+                            original_actions = best_experience.get("action_sequence", [])
+                        
                         # 参数自适应
                         if self.memory_config.parameter_adaptation_enabled:
                             # 优化：完美匹配时跳过LLM参数适配
                             if is_perfect_match:
                                 LoggingUtils.log_success("DroidAgent", "Perfect match detected, skipping parameter adaptation")
                                 self.skip_persist_for_perfect_match = True
-                                adapted_actions = best_experience.get("action_sequence", [])
+                                adapted_actions = original_actions
                             else:
                                 LoggingUtils.log_progress("DroidAgent", "Adapting parameters for similar goal (similarity < 1.0)")
                                 # 性能分析：记录参数适配耗时
                                 adapt_start = time.time()
+                                # 创建临时经验对象，使用 macro.json 的动作
+                                temp_exp_dict = best_experience.copy()
+                                temp_exp_dict["action_sequence"] = original_actions
                                 adapted_actions = self.memory_manager.adapt_parameters(
-                                    TaskExperience.from_dict(best_experience), 
+                                    TaskExperience.from_dict(temp_exp_dict), 
                                     self.goal
                                 )
                                 adapt_duration = time.time() - adapt_start
@@ -750,15 +743,7 @@ class DroidAgent(Workflow):
                                 LoggingUtils.log_info("Performance", "⏱️ Parameter adaptation (LLM): {duration:.2f}s", duration=adapt_duration)
                                 LoggingUtils.log_progress("DroidAgent", "Parameters adapted for hot start")
                         else:
-                            # 优先从对应的trajectories子文件夹加载macro.json
-                            macro_actions = self._load_macro_actions(experience_id)
-                            if macro_actions:
-                                LoggingUtils.log_info("DroidAgent", "Using macro actions from trajectories/{id}/macro.json", id=experience_id)
-                                adapted_actions = macro_actions
-                            else:
-                                # 回退到使用experience中的action_sequence
-                                LoggingUtils.log_info("DroidAgent", "Fallback to using action_sequence from experience")
-                                adapted_actions = best_experience.get("action_sequence", [])
+                            adapted_actions = original_actions
                         
                         # 直执：将动作放入队列，并用 LLM 预判哪些索引是"变更点击步"
                         self.pending_hot_actions = adapted_actions or []
@@ -952,12 +937,12 @@ class DroidAgent(Workflow):
             # 为工具设置上下文，确保 MacroEvent 能够正确创建
             if tools and hasattr(tools, '_set_context'):
                 tools._set_context(ctx)
-
-            # 注意：热启动直接执行时，事件由 WebSocketTools 通过 ctx.write_event_to_stream() 写入
-            # 这些事件会在主 workflow 的事件循环中被 handle_stream_event 处理
-            # 不需要在这里单独监听事件流（ctx 没有 stream_events 方法）
+            
+            if tools:
+                tools._trajectory = self.trajectory
+                tools._manual_event_recording = True
+            
             step_count = 0
-            # 初始化UI
             init_ui_start = time.time()
             LoggingUtils.log_debug("DroidAgent", "Initializing UI state cache...")
             try:
@@ -975,11 +960,49 @@ class DroidAgent(Workflow):
             except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
                 LoggingUtils.log_warning("DroidAgent", "Failed to initialize UI state: {error}", error=e)
                 return False, f"Failed to initialize UI state: {e}"
-            # 重构 actions 列表：处理 Added 和 Removed 动作
+            
             reconstruct_start = time.time()
             actions = self._reconstruct_actions_with_changes(actions)
+            self.reconstructed_actions_list = actions
             reconstruct_duration = time.time() - reconstruct_start
             print(f"⏱️ [Performance] Actions reconstruction: {reconstruct_duration:.2f}s")
+            if not hasattr(tools, '_action_comments'):
+                tools._action_comments = {}
+            else:
+                tools._action_comments = {}
+            total_actions = 0
+            skipped_no_behavior = 0
+            skipped_micro_coldstart = 0
+            
+            for action in actions:
+                total_actions += 1
+                action_name = action.get('action', '')
+                params = action.get('params', {})
+                specific_behavior = action.get('specific_behavior')
+                
+                if action_name == 'micro_coldstart':
+                    skipped_micro_coldstart += 1
+                    continue
+                
+                if specific_behavior:
+                    if action_name in ['tap_by_index', 'tap', 'tap_index']:
+                        index = params.get('index', -1)
+                        func_call = f'tap_by_index({index})'
+                        tools._action_comments[func_call] = specific_behavior
+                    elif action_name in ['input_text', 'type', 'input']:
+                        text = params.get('text', params.get('value', ''))
+                        index = params.get('index', None)
+                        if index is not None:
+                            func_call = f'input_text("{text[:20]}", {index})'
+                        else:
+                            func_call = f'input_text("{text[:20]}")'
+                        tools._action_comments[func_call] = specific_behavior
+                else:
+                    skipped_no_behavior += 1
+            
+            LoggingUtils.log_info("DroidAgent", "Hot start: loaded {count} specific_behavior from {total} actions (skipped {no_behavior} without behavior, {micro} micro_coldstart)", 
+                                count=len(tools._action_comments), total=total_actions, 
+                                no_behavior=skipped_no_behavior, micro=skipped_micro_coldstart)
 
             executed_actions = []
             # 基于 changed_indices 的微冷启动触发记录，避免重复触发同一索引
@@ -993,7 +1016,6 @@ class DroidAgent(Workflow):
                 action_start = time.time()
                 name = (act or {}).get("action") or (act or {}).get("name")
                 params = (act or {}).get("params", {}) or (act or {}).get("parameters", {})
-                desc = str((act or {}).get("description", ""))
                 print(f"  ➡️ [Performance] Action {idx_action+1}/{len(actions)}: {name}")
                 LoggingUtils.log_debug("DroidAgent", "Executing action {current}/{total}: {name} params={params}", 
                                      current=idx_action+1, total=len(actions), name=name, params=params)
@@ -1015,7 +1037,6 @@ class DroidAgent(Workflow):
                         continue
 
                     if name in ("tap_by_index", "tap", "tap_index"):
-                        LoggingUtils.log_debug("DroidAgent", "[DEBUG] Processing tap_by_index action {idx_action}/{total}", idx_action=idx_action, total=len(actions))
                         idx_val = params.get("index", params.get("idx"))
                         try:
                             default_idx = self.config_manager.get("tools.default_index", -1)
@@ -1023,12 +1044,8 @@ class DroidAgent(Workflow):
                         except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
                             ExceptionHandler.handle_data_parsing_error(e, "[HOT] Index parsing")
                             idx = self.config_manager.get("tools.default_index", -1)
-                        LoggingUtils.log_debug("DroidAgent", "[DEBUG] Parsed index: {idx}", idx=idx)
                         if idx >= 0:
-                            # 变化参数且为点击 → 基于 changed_indices 直接触发微冷启动（无窗口 gating）
                             is_changed = self._is_changed_param_click_step(idx_action, act)
-                            LoggingUtils.log_debug("DroidAgent", "[DEBUG] Is changed param click: {is_changed}, changed_indices={changed}",
-                                                 is_changed=is_changed, changed=(self.pending_hot_context or {}).get("changed_indices", []))
                             if is_changed and not triggered_changed_steps.get(idx_action):
                                 LoggingUtils.log_info("DroidAgent", "🎯 Triggering micro-coldstart for step {step} (action: {action})",
                                                      step=idx_action, action=name)
@@ -1042,42 +1059,27 @@ class DroidAgent(Workflow):
                                     if idx_action < len(actions) - 1:
                                         wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                                         time.sleep(wait_time)
+                                    # 微冷启动的 MacroEvent 已经在 _micro_coldstart_handle_click_step 中捕获
                                     # 成功后继续到下一步（不再执行原点击）
                                     continue
                                 else:
                                     LoggingUtils.log_warning("DroidAgent", "Micro-coldstart failed for step {step}, fallback to direct tap", 
                                                            step=idx_action)
-                            LoggingUtils.log_info("DroidAgent", "[DEBUG] Executing direct tap_by_index for index {idx}", idx=idx)
                             
-                            # 性能分析：记录 tap 操作耗时
                             tap_start = time.time()
                             await tools.tap_by_index(idx)
                             tap_duration = time.time() - tap_start
                             
-                            # 性能分析：记录等待时间
                             screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                             wait_start = time.time()
                             time.sleep(screenshot_wait)
                             wait_duration = time.time() - wait_start
                             
-                            # 性能分析：记录 UI 捕捉耗时
                             capture_start = time.time()
                             await self._capture_ui_state_and_screenshot("tap")
                             capture_duration = time.time() - capture_start
                             
                             print(f"    ├─ tap: {tap_duration:.2f}s, wait: {wait_duration:.2f}s, capture: {capture_duration:.2f}s")
-                            
-                            # 创建TapActionEvent并添加到macro
-                            default_x = self.config_manager.get("tools.default_x_coordinate", 0)
-                            default_y = self.config_manager.get("tools.default_y_coordinate", 0)
-                            tap_event = TapActionEvent(
-                                action_type="tap",
-                                description=f"Tap element at index {idx}",
-                                x=default_x,  # 热启动时没有具体坐标信息
-                                y=default_y,
-                                element_index=idx
-                            )
-                            self.trajectory.macro.append(tap_event)
                             
                             step_count += 1
                             executed_actions.append({
@@ -1094,9 +1096,7 @@ class DroidAgent(Workflow):
                         text = params.get("text", params.get("value", ""))
                         text = str(text) if text is not None else ""
                         index = params.get("index", None)
-                        # 不再在直执中做就地文本适配，保持经验参数或上层已适配结果
                         if text:
-                            # 性能分析：记录 input 操作耗时
                             input_start = time.time()
                             if index is not None:
                                 await tools.input_text(text, index)
@@ -1104,28 +1104,16 @@ class DroidAgent(Workflow):
                                 await tools.input_text(text)
                             input_duration = time.time() - input_start
                             
-                            # 性能分析：记录等待时间
                             wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
                             wait_start = time.time()
                             time.sleep(wait_time)
                             wait_duration = time.time() - wait_start
                             
-                            # 性能分析：记录 UI 捕捉耗时
                             capture_start = time.time()
                             await self._capture_ui_state_and_screenshot("input")
                             capture_duration = time.time() - capture_start
                             
                             print(f"    ├─ input: {input_duration:.2f}s, wait: {wait_duration:.2f}s, capture: {capture_duration:.2f}s")
-                            
-                            # 创建InputTextActionEvent并添加到macro
-                            
-                            input_event = InputTextActionEvent(
-                                action_type="input_text",
-                                description=f"Input text: '{text}'" + (f" at index {index}" if index is not None else ""),
-                                text=text,
-                                index=index
-                            )
-                            self.trajectory.macro.append(input_event)
                             
                             step_count += 1
                             executed_actions.append({
@@ -1152,10 +1140,7 @@ class DroidAgent(Workflow):
                         await tools.swipe(sx, sy, ex, ey, dur)
                         screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                         time.sleep(screenshot_wait)
-                        # 使用通用方法捕获UI状态和截图
                         await self._capture_ui_state_and_screenshot("swipe")
-                        
-                        # 创建SwipeActionEvent并添加到macro
                         
                         swipe_event = SwipeActionEvent(
                             action_type="swipe",
@@ -1177,15 +1162,12 @@ class DroidAgent(Workflow):
                             long_wait = self.config_manager.get("tools.long_wait_time", 2.0)
                             time.sleep(long_wait)
                             try:
-                                # 在启动应用后捕获UI状态
                                 ui_state = await tools.get_state_async(include_screenshot=True)
                                 if ui_state and 'a11y_tree' in ui_state:
                                     ui_state_event = RecordUIStateEvent(ui_state=ui_state['a11y_tree'])
                                     self.trajectory.ui_states.append(ui_state_event.ui_state)
                             except ExceptionConstants.FILE_OPERATION_EXCEPTIONS as e:
                                 LoggingUtils.log_warning("DroidAgent", "Failed to capture state after start_app: {error}", error=e)
-                            
-                            # 创建StartAppEvent并添加到macro
                             
                             start_app_event = StartAppEvent(
                                 action_type="start_app",
@@ -1278,6 +1260,12 @@ class DroidAgent(Workflow):
         except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
             ExceptionHandler.handle_runtime_error(e, "[HOT] Direct execution", reraise=False)
             return False, f"Direct execution failed: {e}"
+        finally:
+            # 清理手动事件记录标志，避免影响后续的冷启动
+            if tools and hasattr(tools, '_manual_event_recording'):
+                tools._manual_event_recording = False
+            if tools and hasattr(tools, '_trajectory'):
+                tools._trajectory = None
 
     async def _capture_ui_state_and_screenshot(self, context: str) -> bool:
         """
@@ -1501,28 +1489,72 @@ class DroidAgent(Workflow):
             self.tools_instance.finished = False
             self.tools_instance.success = None
             self.tools_instance.reason = None
-
-            from droidrun.agent.codeact.codeact_agent_micro import CodeActAgentMicro
-            agent = CodeActAgentMicro(
-                llm=self.llm,
-                persona=self.cim.get_persona("Default"),
-                vision=self.vision,
-                max_steps=max_micro_steps,
-                all_tools_list=self.tool_list,
-                tools_instance=self.tools_instance,
-                debug=self.debug,
-                timeout=min(self.timeout, self.config_manager.get("agent.micro_cold_timeout", 60)),
-            )
             
-            # 执行聚焦的微冷启动
-            handler = agent.run(input=micro_goal, remembered_info=self.tools_instance.memory, reflection=None)
-            async for _ in handler.stream_events():
-                pass
-            result = await handler
+            macro_length_before = len(self.trajectory.macro) if self.trajectory else 0
+            original_ctx = getattr(self.tools_instance, '_ctx', None)
+            original_manual_recording = getattr(self.tools_instance, '_manual_event_recording', False)
+            self.tools_instance._manual_event_recording = False
+            
+            from droidrun.agent.codeact.codeact_agent_micro import CodeActAgentMicro
+            
+            try:
+                agent = CodeActAgentMicro(
+                    llm=self.llm,
+                    persona=self.cim.get_persona("Default"),
+                    vision=self.vision,
+                    max_steps=max_micro_steps,
+                    all_tools_list=self.tool_list,
+                    tools_instance=self.tools_instance,
+                    debug=self.debug,
+                    timeout=min(self.timeout, self.config_manager.get("agent.micro_cold_timeout", 60)),
+                )
+                
+                handler = agent.run(input=micro_goal, remembered_info=self.tools_instance.memory, reflection=None)
+                from droidrun.agent.common.events import MacroEvent, RecordUIStateEvent
+                micro_macro_events = []
+                micro_ui_states = []
+                async for event in handler.stream_events():
+                    if isinstance(event, MacroEvent):
+                        micro_macro_events.append(event)
+                        LoggingUtils.log_debug("DroidAgent", "Captured micro-coldstart MacroEvent: {type}", 
+                                             type=type(event).__name__)
+                    elif isinstance(event, RecordUIStateEvent):
+                        micro_ui_states.append(event.ui_state)
+                
+                micro_timeout = self.config_manager.get("agent.micro_cold_timeout", 150)
+                result = await asyncio.wait_for(handler, timeout=micro_timeout)
+                if micro_macro_events:
+                    self.trajectory.macro.extend(micro_macro_events)
+                    LoggingUtils.log_info("DroidAgent", "Merged {count} MacroEvents from micro-coldstart", 
+                                        count=len(micro_macro_events))
+                if micro_ui_states:
+                    self.trajectory.ui_states.extend(micro_ui_states)
+                    LoggingUtils.log_debug("DroidAgent", "Merged {count} UI states from micro-coldstart", 
+                                         count=len(micro_ui_states))
+            finally:
+                if original_ctx:
+                    self.tools_instance._set_context(original_ctx)
+                self.tools_instance._manual_event_recording = original_manual_recording
             
             success = bool(result.get("success", False))
             if success:
                 LoggingUtils.log_success("DroidAgent", "Micro cold start completed for step {step}", step=step_index)
+                
+                if self.trajectory:
+                    macro_length_after = len(self.trajectory.macro)
+                    new_actions_count = macro_length_after - macro_length_before
+                    
+                    print(f"    🔍 [Debug] Macro length before: {macro_length_before}, after: {macro_length_after}, new: {new_actions_count}")
+                    
+                    if new_actions_count > 0:
+                        LoggingUtils.log_info("DroidAgent", "✅ Merged {count} actions from micro-coldstart to main trajectory", 
+                                            count=new_actions_count)
+                        for i in range(macro_length_before, macro_length_after):
+                            action = self.trajectory.macro[i]
+                            print(f"      - Action {i}: {type(action).__name__}")
+                    else:
+                        LoggingUtils.log_warning("DroidAgent", "⚠️ No new actions found in micro-coldstart!")
+                        print(f"    ⚠️ [Warning] Micro-coldstart actions not captured in main trajectory")
             else:
                 LoggingUtils.log_warning("DroidAgent", "Micro cold start failed for step {step}", step=step_index)
             
@@ -1531,9 +1563,6 @@ class DroidAgent(Workflow):
         except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
             ExceptionHandler.handle_runtime_error(e, f"[MicroColdStart] Step {step_index}", reraise=False)
             return False
-
-    # 按你的要求移除不通用的就地适配辅助方法（保留占位以避免误调用）。
-    # 如后续需要从更上层适配参数，可在 LLMServices 中集中处理。
     
     def _handle_fallback(self, monitor_result: MonitorResult, task: Task) -> CodeActResultEvent:
         """处理回退逻辑"""
@@ -1593,7 +1622,37 @@ class DroidAgent(Workflow):
         # 提取动作序列
         action_sequence = []
         if self.trajectory and self.trajectory.events:
+            # 优先使用 macro.json 中的动作描述
             action_sequence = self._extract_actions_from_trajectory_with_descriptions()
+            
+            # 热启动且有重构后的动作列表时，验证新增动作
+            is_hot_start = getattr(self, 'is_hot_start_execution', False)
+            reconstructed_actions = getattr(self, 'reconstructed_actions_list', None)
+            
+            if is_hot_start and reconstructed_actions:
+                # 提取所有新增动作（action == "micro_coldstart"）的信息
+                added_actions = [a for a in reconstructed_actions if a.get('_is_added')]
+                if added_actions:
+                    LoggingUtils.log_info("DroidAgent", "Found {count} added actions in reconstructed list", 
+                                        count=len(added_actions))
+                    
+                    # 微冷启动执行的实际动作已经通过 tools_instance 记录到 self.trajectory.macro 中
+                    # _extract_actions_from_trajectory_with_descriptions 会从 macro.json 中提取所有动作
+                    # 所以这里只需要验证 action_sequence 的数量是否合理
+                    macro_actions_count = len(self.trajectory.macro) if self.trajectory else 0
+                    original_actions_count = len([a for a in reconstructed_actions if not a.get('_is_added')])
+                    
+                    LoggingUtils.log_info("DroidAgent", 
+                                        "Action counts: macro={macro}, original={original}, action_sequence={seq}", 
+                                        macro=macro_actions_count, 
+                                        original=original_actions_count,
+                                        seq=len(action_sequence))
+                    
+                    # 如果 action_sequence 的数量明显少于 macro，说明有问题
+                    if len(action_sequence) < macro_actions_count - 2:
+                        LoggingUtils.log_warning("DroidAgent", 
+                                               "⚠️ Action sequence count mismatch! Expected around {macro}, got {seq}",
+                                               macro=macro_actions_count, seq=len(action_sequence))
         
         # 构建经验
         experience = TaskExperience(
@@ -1664,27 +1723,28 @@ class DroidAgent(Workflow):
 
     def _extract_simple_page_sequence(self) -> List[Dict]:
         """
-        热启动专用：快速提取简化的页面序列，不调用LLM
+        热启动专用：快速提取简化但有意义的页面序列，不调用LLM
         
-        基于UI状态变化来简单划分页面，避免昂贵的LLM调用
+        基于UI状态变化来简单划分页面，提取关键UI元素作为页面特征
         """
         try:
             page_sequence = []
             if not self.trajectory or not self.trajectory.ui_states:
                 return page_sequence
             
-            # 简化策略：每个UI状态记录一个页面
-            # 对于热启动，页面序列主要用于记录执行路径，不需要详细的语义分析
+            # 简化策略：每个UI状态记录一个页面，并提取关键特征
             ui_states = self.trajectory.ui_states
+            macro_actions = self._load_macro_actions() or []
             
             for i, ui_state in enumerate(ui_states):
                 try:
-                    # 提取基本页面信息
+                    # 提取页面标识信息
                     page_name = f"Page_{i+1}"
+                    activity = ""
+                    package = ""
                     
-                    # 尝试从UI状态中提取页面标识信息
+                    # 从UI状态中提取activity和package
                     if isinstance(ui_state, dict):
-                        # 尝试提取活动窗口名称或包名
                         activity = ui_state.get('activity_name', '')
                         package = ui_state.get('package_name', '')
                         
@@ -1693,13 +1753,31 @@ class DroidAgent(Workflow):
                         elif package:
                             page_name = package.split('.')[-1] if '.' in package else package
                     
-                    # 构建简化的页面信息
+                    # 提取页面特征：从UI状态中提取关键元素的text属性
+                    page_features = self._extract_key_ui_features(ui_state)
+                    
+                    # 获取触发此页面的动作描述
+                    transition_action = "Initial state"
+                    if i > 0 and i - 1 < len(macro_actions):
+                        action = macro_actions[i - 1]
+                        action_desc = action.get('description', '')
+                        if action_desc:
+                            # 提取描述中的关键信息
+                            transition_action = self._simplify_action_description(action_desc)
+                        else:
+                            transition_action = f"Action {i-1}: {action.get('type', 'unknown')}"
+                    elif i > 0:
+                        transition_action = f"Action {i-1}"
+                    
+                    # 构建页面信息
                     page_info = {
                         "page_name": page_name,
                         "page_index": i,
-                        "page_features": f"UI state at step {i+1}",
-                        "transition_action": f"Action {i}" if i > 0 else "Initial state",
-                        "ui_elements": []  # 热启动不需要详细的UI元素列表
+                        "page_features": page_features,
+                        "transition_action": transition_action,
+                        "ui_elements": [],  # 热启动不需要完整的UI元素列表
+                        "activity": activity,
+                        "package": package
                     }
                     
                     page_sequence.append(page_info)
@@ -1714,6 +1792,94 @@ class DroidAgent(Workflow):
         except ExceptionConstants.DATA_PARSING_EXCEPTIONS as e:
             ExceptionHandler.handle_data_parsing_error(e, "[PageSequence] Extract simple page sequence")
             return []
+    
+    def _extract_key_ui_features(self, ui_state) -> str:
+        """从UI状态中提取关键特征
+        
+        ui_state 可能是：
+        1. 列表（直接就是 a11y_tree）
+        2. 字典（包含 elements 键）
+        """
+        try:
+            features = []
+            
+            # 提取页面标题
+            if isinstance(ui_state, list):
+                # UI state是元素列表
+                elements = ui_state
+            elif isinstance(ui_state, dict):
+                if 'elements' in ui_state:
+                    elements = ui_state.get('elements', [])
+                else:
+                    # 如果没有 elements 键，可能整个 ui_state 就是根元素
+                    elements = [ui_state]
+            else:
+                return "UI state"
+            
+            # 递归提取所有元素的文本（包括子元素）
+            def extract_texts_recursive(elem_list):
+                texts = []
+                for elem in elem_list:
+                    if not isinstance(elem, dict):
+                        continue
+                    
+                    text = elem.get('text', '')
+                    # 提取有意义的文本
+                    if text and len(text) > 0 and len(text) < 30:
+                        # 排除通用的类名
+                        if text not in ['android.widget.LinearLayout', 'android.widget.FrameLayout', 
+                                       'android.view.View', 'androidx.appcompat.widget.ContentFrameLayout']:
+                            texts.append(text)
+                    
+                    # 递归处理子元素
+                    children = elem.get('children', [])
+                    if children:
+                        texts.extend(extract_texts_recursive(children))
+                
+                return texts
+            
+            # 提取关键元素（按钮、标题、输入框等）
+            all_texts = extract_texts_recursive(elements)
+            
+            # 过滤关键词
+            keywords = ['请', '休假', '差旅', '提交', '确认', '取消', '保存', '年休', '事假', '病假', '日期', '开始', '结束']
+            for text in all_texts:
+                if any(keyword in text for keyword in keywords):
+                    features.append(text)
+                    if len(features) >= 5:  # 最多5个特征
+                        break
+            
+            if features:
+                return f"包含: {', '.join(features[:5])}"
+            else:
+                # 如果没有找到关键特征，至少返回前几个文本
+                if all_texts:
+                    return f"页面元素: {', '.join(all_texts[:3])}"
+                return "UI state"
+                
+        except Exception as e:
+            LoggingUtils.log_debug("DroidAgent", "Extract UI features failed: {error}", error=e)
+            return "UI state"
+    
+    def _simplify_action_description(self, description: str) -> str:
+        """简化动作描述，提取关键信息"""
+        try:
+            # 提取描述中的关键部分
+            # 格式通常是: "Tap element at index XX: 点击"XXX" (ClassName) at coordinates (...)"
+            if ':' in description:
+                parts = description.split(':', 1)
+                if len(parts) > 1:
+                    # 提取冒号后的关键信息
+                    key_info = parts[1].strip()
+                    # 移除坐标信息
+                    if ' at coordinates ' in key_info:
+                        key_info = key_info.split(' at coordinates ')[0]
+                    return key_info[:100]  # 限制长度
+            
+            # 如果格式不匹配，返回原描述的前100个字符
+            return description[:100]
+        except Exception:
+            return description[:100]
 
     def _load_macro_actions(self, experience_id: str = None) -> List[Dict]:
         """
@@ -1749,15 +1915,18 @@ class DroidAgent(Workflow):
                         converted_actions = []
                         for i, action in enumerate(actions):
                             description = action.get('description', '')
-                            LoggingUtils.log_debug("DroidAgent", "Action {index}: type={type}, description='{desc}...'", 
-                                                 index=i, type=action.get('type'), desc=description[:50])
+                            specific_behavior = action.get('specific_behavior', None)  # 保留 specific_behavior ✅
+                            LoggingUtils.log_debug("DroidAgent", "Action {index}: type={type}, description='{desc}...', specific_behavior='{behavior}'", 
+                                                 index=i, type=action.get('type'), desc=description[:50], 
+                                                 behavior=specific_behavior[:30] if specific_behavior else "None")
                             
                             converted_action = {
                                 "action": self._convert_action_type(action.get('type', '')),
                                 "params": self._convert_action_params(action),
                                 "success": True,  # macro.json 中的动作都是成功的
                                 "timestamp": action.get('timestamp', time.time()),
-                                "description": description  # 直接使用macro.json中的description
+                                "description": description,  # 完整描述
+                                "specific_behavior": specific_behavior  # ✅ 语义描述（用于热启动设置 _action_comments）
                             }
                             converted_actions.append(converted_action)
                         
@@ -1791,15 +1960,18 @@ class DroidAgent(Workflow):
                     converted_actions = []
                     for i, action in enumerate(actions):
                         description = action.get('description', '')
-                        LoggingUtils.log_debug("DroidAgent", "Action {index}: type={type}, description='{desc}...'", 
-                                             index=i, type=action.get('type'), desc=description[:50])
+                        specific_behavior = action.get('specific_behavior', None)  # 保留 specific_behavior ✅
+                        LoggingUtils.log_debug("DroidAgent", "Action {index}: type={type}, description='{desc}...', specific_behavior='{behavior}'", 
+                                             index=i, type=action.get('type'), desc=description[:50],
+                                             behavior=specific_behavior[:30] if specific_behavior else "None")
                         
                         converted_action = {
                             "action": self._convert_action_type(action.get('type', '')),
                             "params": self._convert_action_params(action),
                             "success": True,  # macro.json 中的动作都是成功的
                             "timestamp": action.get('timestamp', time.time()),
-                            "description": description  # 直接使用macro.json中的description
+                            "description": description,  # 完整描述
+                            "specific_behavior": specific_behavior  # ✅ 语义描述（用于热启动设置 _action_comments）
                         }
                         converted_actions.append(converted_action)
                     
