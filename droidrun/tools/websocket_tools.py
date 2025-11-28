@@ -607,12 +607,22 @@ class WebSocketTools(Tools):
                 
                 llm_comment = None
                 if hasattr(self, '_action_comments') and self._action_comments:
+                    # 调试：输出所有 input_text 相关的注释
+                    input_text_comments = {k: v for k, v in self._action_comments.items() if 'input_text(' in k}
+                    if input_text_comments:
+                        LoggingUtils.log_debug("WebSocketTools", "Available input_text comments: {comments}", 
+                                             comments=list(input_text_comments.keys()))
+                        LoggingUtils.log_debug("WebSocketTools", "Searching for: text[:20]=\"{text}\", index={idx}", 
+                                             text=text[:20], idx=index)
+                    
                     for func_call, comment in self._action_comments.items():
                         if 'input_text(' in func_call and f'"{text[:20]}' in func_call:
                             llm_comment = comment
+                            LoggingUtils.log_debug("WebSocketTools", "✅ Matched by text: {func_call}", func_call=func_call)
                             break
                         elif 'input_text(' in func_call and index is not None and f'{index}' in func_call:
                             llm_comment = comment
+                            LoggingUtils.log_debug("WebSocketTools", "✅ Matched by index: {func_call}", func_call=func_call)
                             break
                 
                 final_description = f"Input text: '{text[:50]}{'...' if len(text) > 50 else ''}'" + (f" at index {index}" if index is not None else "")

@@ -123,6 +123,24 @@ class SimpleCodeExecutor:
                 **{k: v for k, v in self.globals.items() if k not in self.locals},
             }
 
+    def _normalize_func_call(self, func_call: str) -> str:
+        """
+        标准化函数调用格式，将关键字参数转换为位置参数
+        
+        例如：
+        - input_text("text", index=14) → input_text("text", 14)
+        - tap_by_index(index=64) → tap_by_index(64)
+        """
+        import re
+        
+        # 处理 input_text 的 index= 参数
+        func_call = re.sub(r'input_text\(([^,]+),\s*index=(\d+)\)', r'input_text(\1, \2)', func_call)
+        
+        # 处理 tap_by_index 的 index= 参数
+        func_call = re.sub(r'tap_by_index\(index=(\d+)\)', r'tap_by_index(\1)', func_call)
+        
+        return func_call
+    
     def _extract_action_comments(self, code: str) -> Dict[str, str]:
         """
         提取代码中动作函数调用前的注释
@@ -151,6 +169,11 @@ class SimpleCodeExecutor:
                             func_call = stripped.split('=', 1)[1].strip()
                         else:
                             func_call = stripped
+                        
+                        # 标准化：将关键字参数格式转换为位置参数格式，保证与热启动加载的格式一致
+                        # 例如：input_text("text", index=14) → input_text("text", 14)
+                        func_call = self._normalize_func_call(func_call)
+                        
                         action_comments[func_call] = last_comment
                 last_comment = None  # 重置注释
         
@@ -183,8 +206,13 @@ class SimpleCodeExecutor:
         if self.tools_instance:
             if isinstance(self.tools_instance, (AdbTools, WebSocketTools)):
                 self.tools_instance._set_context(ctx)
-                # 传递动作注释信息
-                self.tools_instance._action_comments = action_comments
+                # 传递动作注释信息（合并而不是覆盖，避免丢失热启动预加载的注释）
+                if hasattr(self.tools_instance, '_action_comments') and self.tools_instance._action_comments:
+                    # 保留原有注释（来自热启动），添加新注释（来自当前代码）
+                    self.tools_instance._action_comments.update(action_comments)
+                else:
+                    # 首次设置
+                    self.tools_instance._action_comments = action_comments
 
         # Capture stdout and stderr
         stdout = io.StringIO()

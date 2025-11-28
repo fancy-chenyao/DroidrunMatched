@@ -1,9 +1,9 @@
 {
-  "id": "97f21170-5763-443b-b21b-3e3aaa375a34",
-  "goal": "帮我在请休假系统里面请2025年11月25到2025年11月26这两天的年休假，请假事由是计划休息和恢复精力，拟前往地区是上海。",
+  "id": "d94df643-8804-49d4-912e-804cc90f31d1",
+  "goal": "帮我在请休假系统里面请2025年11月28到2025年11月29这两天的年休假，请假事由是准备计划休息和恢复精力，拟前往地区是上海市梅赛德斯奔驰文化中心。",
   "type": "请休假",
   "success": true,
-  "timestamp": 1764147485.5898907,
+  "timestamp": 1764316322.3322792,
   "page_sequence": [],
   "action_sequence": [
     {
@@ -12,9 +12,9 @@
         "index": 29
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Tap element at index 29: 进入请休假系统 (AppCompatImageView) at coordinates (129, 301)",
-      "specific_behavior": "进入请休假系统"
+      "timestamp": 1764316322.3322792,
+      "description": "Tap element at index 29: Tap on the \"请休假\" (Leave Request) icon to enter the leave application form (AppCompatImageView) at coordinates (129, 301)",
+      "specific_behavior": "Tap on the \"请休假\" (Leave Request) icon to enter the leave application form"
     },
     {
       "action": "tap_by_index",
@@ -22,29 +22,29 @@
         "index": 12
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Tap element at index 12: 选择“年休假”类别 (LinearLayout) at coordinates (205, 191)",
-      "specific_behavior": "选择“年休假”类别"
+      "timestamp": 1764316322.3322792,
+      "description": "Tap element at index 12: Select \"年休假\" (Annual Leave) by tapping on its parent container (LinearLayout) at coordinates (205, 191)",
+      "specific_behavior": "Select \"年休假\" (Annual Leave) by tapping on its parent container"
     },
     {
       "action": "tap_by_index",
       "params": {
-        "index": 11
+        "index": 19
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Tap element at index 11: 修改开始时间 (LinearLayout) at coordinates (205, 203)",
-      "specific_behavior": "修改开始时间"
+      "timestamp": 1764316322.3322792,
+      "description": "Tap element at index 19: Tap on the end date field to modify it from 2025-11-28 to 2025-11-29 (LinearLayout) at coordinates (205, 275)",
+      "specific_behavior": "Tap on the end date field to modify it from 2025-11-28 to 2025-11-29"
     },
     {
       "action": "tap_by_index",
       "params": {
-        "index": 82
+        "index": 86
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Tap element at index 82: 选择2025年11月25日作为开始时间 (TextView) at coordinates (155, 660)",
-      "specific_behavior": "选择2025年11月25日作为开始时间"
+      "timestamp": 1764316322.3322792,
+      "description": "Tap element at index 86: Select November 29, 2025 in the date picker (TextView) at coordinates (354, 660)",
+      "specific_behavior": "Select November 29, 2025 in the date picker"
     },
     {
       "action": "tap_by_index",
@@ -52,30 +52,30 @@
         "index": 35
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Tap element at index 35: 进入下一步填写详情 (MaterialButton) at coordinates (205, 850)",
-      "specific_behavior": "进入下一步填写详情"
+      "timestamp": 1764316322.3322792,
+      "description": "Tap element at index 35: Confirm the selected dates to proceed to the next step (entering reason and destination) (MaterialButton) at coordinates (205, 850)",
+      "specific_behavior": "Confirm the selected dates to proceed to the next step (entering reason and destination)"
     },
     {
       "action": "input_text",
       "params": {
-        "text": "计划休息和恢复精力",
+        "text": "准备计划休息和恢复精力",
         "index": 14
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Input text: '计划休息和恢复精力' at index 14",
+      "timestamp": 1764316322.3322792,
+      "description": "Input text: '准备计划休息和恢复精力' at index 14",
       "specific_behavior": null
     },
     {
       "action": "input_text",
       "params": {
-        "text": "上海",
+        "text": "上海市梅赛德斯奔驰文化中心",
         "index": 20
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Input text: '上海' at index 20",
+      "timestamp": 1764316322.3322792,
+      "description": "Input text: '上海市梅赛德斯奔驰文化中心' at index 20",
       "specific_behavior": null
     },
     {
@@ -84,9 +84,9 @@
         "index": 31
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Tap element at index 31: 提交申请 (MaterialButton) at coordinates (304, 850)",
-      "specific_behavior": "提交申请"
+      "timestamp": 1764316322.3322792,
+      "description": "Tap element at index 31: Submit the completed leave request (MaterialButton) at coordinates (304, 850)",
+      "specific_behavior": "Submit the completed leave request"
     },
     {
       "action": "tap_by_index",
@@ -94,9 +94,9 @@
         "index": 39
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Tap element at index 39: 确认提交请假申请 (MaterialButton) at coordinates (323, 509)",
-      "specific_behavior": "确认提交请假申请"
+      "timestamp": 1764316322.3322792,
+      "description": "Tap element at index 39: Confirm the submission in the dialog box (MaterialButton) at coordinates (323, 509)",
+      "specific_behavior": "Confirm the submission in the dialog box"
     },
     {
       "action": "tap_by_index",
@@ -104,9 +104,9 @@
         "index": 39
       },
       "success": true,
-      "timestamp": 1764147485.5898907,
-      "description": "Tap element at index 39: 完成任务，关闭成功提示 (MaterialButton) at coordinates (323, 509)",
-      "specific_behavior": "完成任务，关闭成功提示"
+      "timestamp": 1764316322.3322792,
+      "description": "Tap element at index 39: Dismiss the success confirmation dialog (MaterialButton) at coordinates (323, 509)",
+      "specific_behavior": "Dismiss the success confirmation dialog"
     }
   ],
   "ui_states": [
@@ -127,7 +127,7 @@
         "children": [
           {
             "index": 1,
-            "resourceId": "view_166061704",
+            "resourceId": "view_27646214",
             "className": "android.widget.LinearLayout",
             "text": "android.widget.LinearLayout",
             "bounds": "0, 48, 411, 890",
@@ -141,7 +141,7 @@
             "children": [
               {
                 "index": 2,
-                "resourceId": "view_118649387",
+                "resourceId": "view_175425505",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 48, 411, 128",
@@ -202,7 +202,7 @@
               },
               {
                 "index": 6,
-                "resourceId": "view_202439587",
+                "resourceId": "view_210080281",
                 "className": "android.widget.ScrollView",
                 "text": "android.widget.ScrollView",
                 "bounds": "0, 128, 411, 803",
@@ -216,7 +216,7 @@
                 "children": [
                   {
                     "index": 7,
-                    "resourceId": "view_2993919",
+                    "resourceId": "view_156514005",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 128, 411, 803",
@@ -230,7 +230,7 @@
                     "children": [
                       {
                         "index": 8,
-                        "resourceId": "view_107529758",
+                        "resourceId": "view_250859404",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 144, 395, 247",
@@ -244,7 +244,7 @@
                         "children": [
                           {
                             "index": 9,
-                            "resourceId": "view_22633049",
+                            "resourceId": "view_106564799",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 144, 91, 247",
@@ -273,7 +273,7 @@
                               },
                               {
                                 "index": 11,
-                                "resourceId": "view_117400780",
+                                "resourceId": "view_256798442",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "事务待办",
                                 "bounds": "29, 220, 78, 239",
@@ -290,7 +290,7 @@
                           },
                           {
                             "index": 12,
-                            "resourceId": "view_106374698",
+                            "resourceId": "view_232020088",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "91, 144, 167, 247",
@@ -319,7 +319,7 @@
                               },
                               {
                                 "index": 14,
-                                "resourceId": "view_255343643",
+                                "resourceId": "view_187591505",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "日程管理",
                                 "bounds": "105, 220, 153, 239",
@@ -336,7 +336,7 @@
                           },
                           {
                             "index": 15,
-                            "resourceId": "view_86702993",
+                            "resourceId": "view_28759223",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "167, 144, 243, 247",
@@ -365,7 +365,7 @@
                               },
                               {
                                 "index": 17,
-                                "resourceId": "view_253328118",
+                                "resourceId": "view_204637220",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "建行学习",
                                 "bounds": "180, 220, 229, 239",
@@ -382,7 +382,7 @@
                           },
                           {
                             "index": 18,
-                            "resourceId": "view_83067236",
+                            "resourceId": "view_249164098",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "243, 144, 319, 247",
@@ -411,7 +411,7 @@
                               },
                               {
                                 "index": 20,
-                                "resourceId": "view_74629069",
+                                "resourceId": "view_89785683",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "知识百科",
                                 "bounds": "256, 220, 305, 239",
@@ -428,7 +428,7 @@
                           },
                           {
                             "index": 21,
-                            "resourceId": "view_134747027",
+                            "resourceId": "view_25310089",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "319, 144, 395, 247",
@@ -457,7 +457,7 @@
                               },
                               {
                                 "index": 23,
-                                "resourceId": "view_135876560",
+                                "resourceId": "view_85581710",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "员工福利",
                                 "bounds": "332, 220, 381, 239",
@@ -476,7 +476,7 @@
                       },
                       {
                         "index": 24,
-                        "resourceId": "view_1463791",
+                        "resourceId": "view_181501765",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 263, 395, 365",
@@ -490,7 +490,7 @@
                         "children": [
                           {
                             "index": 25,
-                            "resourceId": "view_31519438",
+                            "resourceId": "view_265302972",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 263, 91, 365",
@@ -519,7 +519,7 @@
                               },
                               {
                                 "index": 27,
-                                "resourceId": "view_227252476",
+                                "resourceId": "view_72902298",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "员工差旅",
                                 "bounds": "29, 339, 78, 357",
@@ -536,7 +536,7 @@
                           },
                           {
                             "index": 28,
-                            "resourceId": "view_60648922",
+                            "resourceId": "view_189452200",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "91, 263, 167, 365",
@@ -565,7 +565,7 @@
                               },
                               {
                                 "index": 30,
-                                "resourceId": "view_35414539",
+                                "resourceId": "view_235915969",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "请休假",
                                 "bounds": "111, 339, 147, 357",
@@ -582,7 +582,7 @@
                           },
                           {
                             "index": 31,
-                            "resourceId": "view_91286273",
+                            "resourceId": "view_141580711",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "167, 263, 243, 365",
@@ -611,7 +611,7 @@
                               },
                               {
                                 "index": 33,
-                                "resourceId": "view_208965030",
+                                "resourceId": "view_22101588",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "产品服务",
                                 "bounds": "180, 339, 229, 357",
@@ -628,7 +628,7 @@
                           },
                           {
                             "index": 34,
-                            "resourceId": "view_200018836",
+                            "resourceId": "view_114634482",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "243, 263, 319, 365",
@@ -657,7 +657,7 @@
                               },
                               {
                                 "index": 36,
-                                "resourceId": "view_125843005",
+                                "resourceId": "view_239003971",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "人力资源",
                                 "bounds": "256, 339, 305, 357",
@@ -674,7 +674,7 @@
                           },
                           {
                             "index": 37,
-                            "resourceId": "view_78448515",
+                            "resourceId": "view_107090169",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "319, 263, 395, 365",
@@ -703,7 +703,7 @@
                               },
                               {
                                 "index": 39,
-                                "resourceId": "view_138956032",
+                                "resourceId": "view_42158142",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "更多功能",
                                 "bounds": "332, 339, 381, 357",
@@ -726,7 +726,7 @@
               },
               {
                 "index": 40,
-                "resourceId": "view_30780286",
+                "resourceId": "view_140903404",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 803, 411, 890",
@@ -946,7 +946,7 @@
         "children": [
           {
             "index": 1,
-            "resourceId": "view_44176017",
+            "resourceId": "view_35530910",
             "className": "android.widget.LinearLayout",
             "text": "android.widget.LinearLayout",
             "bounds": "0, 48, 411, 890",
@@ -960,7 +960,7 @@
             "children": [
               {
                 "index": 2,
-                "resourceId": "view_104666296",
+                "resourceId": "view_265598681",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 48, 411, 107",
@@ -989,7 +989,7 @@
                   },
                   {
                     "index": 4,
-                    "resourceId": "view_196266882",
+                    "resourceId": "view_262452379",
                     "className": "com.google.android.material.textview.MaterialTextView",
                     "text": "请休假申请 (第1步)",
                     "bounds": "56, 64, 371, 91",
@@ -1004,7 +1004,7 @@
                   },
                   {
                     "index": 5,
-                    "resourceId": "view_229536403",
+                    "resourceId": "view_51007544",
                     "className": "android.view.View",
                     "text": "android.view.View",
                     "bounds": "371, 65, 395, 89",
@@ -1021,7 +1021,7 @@
               },
               {
                 "index": 6,
-                "resourceId": "view_182567632",
+                "resourceId": "view_52783121",
                 "className": "android.view.View",
                 "text": "android.view.View",
                 "bounds": "0, 107, 411, 108",
@@ -1036,7 +1036,7 @@
               },
               {
                 "index": 7,
-                "resourceId": "view_54764783",
+                "resourceId": "view_154154980",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 108, 411, 890",
@@ -1050,7 +1050,7 @@
                 "children": [
                   {
                     "index": 8,
-                    "resourceId": "view_21372366",
+                    "resourceId": "view_193986423",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "16, 124, 395, 147",
@@ -1064,7 +1064,7 @@
                     "children": [
                       {
                         "index": 9,
-                        "resourceId": "view_140214985",
+                        "resourceId": "view_180923766",
                         "className": "android.view.View",
                         "text": "android.view.View",
                         "bounds": "16, 131, 24, 139",
@@ -1079,7 +1079,7 @@
                       },
                       {
                         "index": 10,
-                        "resourceId": "view_266877948",
+                        "resourceId": "view_149386317",
                         "className": "com.google.android.material.textview.MaterialTextView",
                         "text": "请选择拟请假类别",
                         "bounds": "32, 124, 160, 147",
@@ -1110,7 +1110,7 @@
                     "children": [
                       {
                         "index": 12,
-                        "resourceId": "view_175840232",
+                        "resourceId": "view_4458569",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 163, 395, 219",
@@ -1139,7 +1139,7 @@
                           },
                           {
                             "index": 14,
-                            "resourceId": "view_133437606",
+                            "resourceId": "view_217146991",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 183, 379, 199",
@@ -1156,7 +1156,7 @@
                       },
                       {
                         "index": 15,
-                        "resourceId": "view_148194023",
+                        "resourceId": "view_148414332",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 220, 395, 276",
@@ -1185,7 +1185,7 @@
                           },
                           {
                             "index": 17,
-                            "resourceId": "view_29457725",
+                            "resourceId": "view_152967258",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 240, 379, 256",
@@ -1202,7 +1202,7 @@
                       },
                       {
                         "index": 18,
-                        "resourceId": "view_230234418",
+                        "resourceId": "view_215480971",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 277, 395, 332",
@@ -1231,7 +1231,7 @@
                           },
                           {
                             "index": 20,
-                            "resourceId": "view_59998208",
+                            "resourceId": "view_119502721",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 297, 379, 313",
@@ -1248,7 +1248,7 @@
                       },
                       {
                         "index": 21,
-                        "resourceId": "view_114143289",
+                        "resourceId": "view_227893286",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 334, 395, 389",
@@ -1277,7 +1277,7 @@
                           },
                           {
                             "index": 23,
-                            "resourceId": "view_5089247",
+                            "resourceId": "view_100885012",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 353, 379, 369",
@@ -1294,7 +1294,7 @@
                       },
                       {
                         "index": 24,
-                        "resourceId": "view_263232556",
+                        "resourceId": "view_113969853",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 390, 395, 446",
@@ -1323,7 +1323,7 @@
                           },
                           {
                             "index": 26,
-                            "resourceId": "view_219585674",
+                            "resourceId": "view_120795139",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 410, 379, 426",
@@ -1340,7 +1340,7 @@
                       },
                       {
                         "index": 27,
-                        "resourceId": "view_51307259",
+                        "resourceId": "view_247368576",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 447, 395, 503",
@@ -1369,7 +1369,7 @@
                           },
                           {
                             "index": 29,
-                            "resourceId": "view_39333233",
+                            "resourceId": "view_116280830",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 467, 379, 483",
@@ -1386,7 +1386,7 @@
                       },
                       {
                         "index": 30,
-                        "resourceId": "view_63567702",
+                        "resourceId": "view_263113055",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 504, 395, 560",
@@ -1415,7 +1415,7 @@
                           },
                           {
                             "index": 32,
-                            "resourceId": "view_15221956",
+                            "resourceId": "view_63820917",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 524, 379, 540",
@@ -1432,7 +1432,7 @@
                       },
                       {
                         "index": 33,
-                        "resourceId": "view_191967149",
+                        "resourceId": "view_215829514",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 561, 395, 616",
@@ -1461,7 +1461,7 @@
                           },
                           {
                             "index": 35,
-                            "resourceId": "view_24163955",
+                            "resourceId": "view_213011096",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 580, 379, 596",
@@ -1478,7 +1478,7 @@
                       },
                       {
                         "index": 36,
-                        "resourceId": "view_75950384",
+                        "resourceId": "view_70533873",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 617, 395, 673",
@@ -1507,7 +1507,7 @@
                           },
                           {
                             "index": 38,
-                            "resourceId": "view_131636014",
+                            "resourceId": "view_202540375",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 637, 379, 653",
@@ -1524,7 +1524,7 @@
                       },
                       {
                         "index": 39,
-                        "resourceId": "view_169232079",
+                        "resourceId": "view_13465668",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 674, 395, 730",
@@ -1553,7 +1553,7 @@
                           },
                           {
                             "index": 41,
-                            "resourceId": "view_177579877",
+                            "resourceId": "view_92492386",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "进入",
                             "bounds": "363, 694, 379, 710",
@@ -1594,7 +1594,7 @@
         "children": [
           {
             "index": 1,
-            "resourceId": "view_231451944",
+            "resourceId": "view_36960154",
             "className": "android.widget.LinearLayout",
             "text": "android.widget.LinearLayout",
             "bounds": "0, 48, 411, 890",
@@ -1608,7 +1608,7 @@
             "children": [
               {
                 "index": 2,
-                "resourceId": "view_128888651",
+                "resourceId": "view_160216133",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 48, 411, 107",
@@ -1637,7 +1637,7 @@
                   },
                   {
                     "index": 4,
-                    "resourceId": "view_235805053",
+                    "resourceId": "view_126477991",
                     "className": "com.google.android.material.textview.MaterialTextView",
                     "text": "关闭",
                     "bounds": "48, 65, 80, 89",
@@ -1652,7 +1652,7 @@
                   },
                   {
                     "index": 5,
-                    "resourceId": "view_192094322",
+                    "resourceId": "view_103302996",
                     "className": "com.google.android.material.textview.MaterialTextView",
                     "text": "拟请假时间",
                     "bounds": "80, 64, 335, 91",
@@ -1667,7 +1667,7 @@
                   },
                   {
                     "index": 6,
-                    "resourceId": "view_236174531",
+                    "resourceId": "view_64628477",
                     "className": "android.view.View",
                     "text": "android.view.View",
                     "bounds": "335, 65, 395, 89",
@@ -1684,7 +1684,7 @@
               },
               {
                 "index": 7,
-                "resourceId": "view_62716224",
+                "resourceId": "view_7462898",
                 "className": "android.view.View",
                 "text": "android.view.View",
                 "bounds": "0, 107, 411, 108",
@@ -1699,7 +1699,7 @@
               },
               {
                 "index": 8,
-                "resourceId": "view_48746617",
+                "resourceId": "view_165955139",
                 "className": "android.widget.ScrollView",
                 "text": "android.widget.ScrollView",
                 "bounds": "0, 108, 411, 810",
@@ -1713,7 +1713,7 @@
                 "children": [
                   {
                     "index": 9,
-                    "resourceId": "view_116089375",
+                    "resourceId": "view_19346937",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 108, 411, 810",
@@ -1727,7 +1727,7 @@
                     "children": [
                       {
                         "index": 10,
-                        "resourceId": "view_80662974",
+                        "resourceId": "view_241992896",
                         "className": "com.google.android.material.textview.MaterialTextView",
                         "text": "年休假 (工作日)",
                         "bounds": "16, 124, 395, 147",
@@ -1756,7 +1756,7 @@
                         "children": [
                           {
                             "index": 12,
-                            "resourceId": "view_151780149",
+                            "resourceId": "view_217777055",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "必填",
                             "bounds": "32, 193, 52, 213",
@@ -1771,7 +1771,7 @@
                           },
                           {
                             "index": 13,
-                            "resourceId": "view_10636234",
+                            "resourceId": "view_234171628",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "开始时间",
                             "bounds": "64, 192, 128, 215",
@@ -1786,7 +1786,7 @@
                           },
                           {
                             "index": 14,
-                            "resourceId": "view_7209275",
+                            "resourceId": "view_261896373",
                             "className": "android.view.View",
                             "text": "android.view.View",
                             "bounds": "128, 203, 189, 204",
@@ -1803,7 +1803,7 @@
                             "index": 15,
                             "resourceId": "com.example.emplab:id/tvStartDate",
                             "className": "com.google.android.material.textview.MaterialTextView",
-                            "text": "2025年11月26日",
+                            "text": "2025年11月28日",
                             "bounds": "189, 192, 310, 215",
                             "clickable": false,
                             "enabled": true,
@@ -1845,9 +1845,9 @@
                               },
                               {
                                 "index": 18,
-                                "resourceId": "view_28407319",
+                                "resourceId": "view_170175281",
                                 "className": "androidx.appcompat.widget.AppCompatImageView",
-                                "text": "选择",
+                                "text": "androidx.appcompat.widget.AppCompatImageView",
                                 "bounds": "359, 195, 375, 211",
                                 "clickable": false,
                                 "enabled": true,
@@ -1878,7 +1878,7 @@
                         "children": [
                           {
                             "index": 20,
-                            "resourceId": "view_255679469",
+                            "resourceId": "view_48482199",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "结束时间",
                             "bounds": "32, 264, 96, 287",
@@ -1893,7 +1893,7 @@
                           },
                           {
                             "index": 21,
-                            "resourceId": "view_91261474",
+                            "resourceId": "view_127282564",
                             "className": "android.view.View",
                             "text": "android.view.View",
                             "bounds": "96, 275, 189, 276",
@@ -1910,7 +1910,7 @@
                             "index": 22,
                             "resourceId": "com.example.emplab:id/tvEndDate",
                             "className": "com.google.android.material.textview.MaterialTextView",
-                            "text": "2025年11月26日",
+                            "text": "2025年11月28日",
                             "bounds": "189, 264, 310, 287",
                             "clickable": false,
                             "enabled": true,
@@ -1952,9 +1952,9 @@
                               },
                               {
                                 "index": 25,
-                                "resourceId": "view_3221102",
+                                "resourceId": "view_17473008",
                                 "className": "androidx.appcompat.widget.AppCompatImageView",
-                                "text": "选择",
+                                "text": "androidx.appcompat.widget.AppCompatImageView",
                                 "bounds": "359, 267, 375, 283",
                                 "clickable": false,
                                 "enabled": true,
@@ -1971,7 +1971,7 @@
                       },
                       {
                         "index": 26,
-                        "resourceId": "view_113182108",
+                        "resourceId": "view_102317550",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 315, 395, 371",
@@ -1985,7 +1985,7 @@
                         "children": [
                           {
                             "index": 27,
-                            "resourceId": "view_95883535",
+                            "resourceId": "view_88379241",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "年休假对应年份",
                             "bounds": "32, 331, 144, 355",
@@ -2000,7 +2000,7 @@
                           },
                           {
                             "index": 28,
-                            "resourceId": "view_95624101",
+                            "resourceId": "view_229773967",
                             "className": "android.view.View",
                             "text": "android.view.View",
                             "bounds": "144, 342, 270, 344",
@@ -2015,7 +2015,7 @@
                           },
                           {
                             "index": 29,
-                            "resourceId": "view_105724794",
+                            "resourceId": "view_1288476",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "2025年年假",
                             "bounds": "270, 331, 355, 355",
@@ -2030,9 +2030,9 @@
                           },
                           {
                             "index": 30,
-                            "resourceId": "view_22916907",
+                            "resourceId": "view_227391781",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
-                            "text": "选择",
+                            "text": "androidx.appcompat.widget.AppCompatImageView",
                             "bounds": "363, 335, 379, 351",
                             "clickable": false,
                             "enabled": true,
@@ -2081,7 +2081,7 @@
               },
               {
                 "index": 33,
-                "resourceId": "view_232705313",
+                "resourceId": "view_130500779",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 810, 411, 890",
@@ -2132,7 +2132,7 @@
         "children": [
           {
             "index": 1,
-            "resourceId": "view_231451944",
+            "resourceId": "view_36960154",
             "className": "android.widget.LinearLayout",
             "text": "android.widget.LinearLayout",
             "bounds": "0, 48, 411, 890",
@@ -2146,7 +2146,7 @@
             "children": [
               {
                 "index": 2,
-                "resourceId": "view_128888651",
+                "resourceId": "view_160216133",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 48, 411, 107",
@@ -2175,7 +2175,7 @@
                   },
                   {
                     "index": 4,
-                    "resourceId": "view_235805053",
+                    "resourceId": "view_126477991",
                     "className": "com.google.android.material.textview.MaterialTextView",
                     "text": "关闭",
                     "bounds": "48, 65, 80, 89",
@@ -2190,7 +2190,7 @@
                   },
                   {
                     "index": 5,
-                    "resourceId": "view_192094322",
+                    "resourceId": "view_103302996",
                     "className": "com.google.android.material.textview.MaterialTextView",
                     "text": "拟请假时间",
                     "bounds": "80, 64, 335, 91",
@@ -2205,7 +2205,7 @@
                   },
                   {
                     "index": 6,
-                    "resourceId": "view_236174531",
+                    "resourceId": "view_64628477",
                     "className": "android.view.View",
                     "text": "android.view.View",
                     "bounds": "335, 65, 395, 89",
@@ -2222,7 +2222,7 @@
               },
               {
                 "index": 7,
-                "resourceId": "view_62716224",
+                "resourceId": "view_7462898",
                 "className": "android.view.View",
                 "text": "android.view.View",
                 "bounds": "0, 107, 411, 108",
@@ -2237,7 +2237,7 @@
               },
               {
                 "index": 8,
-                "resourceId": "view_48746617",
+                "resourceId": "view_165955139",
                 "className": "android.widget.ScrollView",
                 "text": "android.widget.ScrollView",
                 "bounds": "0, 108, 411, 272",
@@ -2251,7 +2251,7 @@
                 "children": [
                   {
                     "index": 9,
-                    "resourceId": "view_116089375",
+                    "resourceId": "view_19346937",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 108, 411, 387",
@@ -2265,7 +2265,7 @@
                     "children": [
                       {
                         "index": 10,
-                        "resourceId": "view_80662974",
+                        "resourceId": "view_241992896",
                         "className": "com.google.android.material.textview.MaterialTextView",
                         "text": "年休假 (工作日)",
                         "bounds": "16, 124, 395, 147",
@@ -2294,7 +2294,7 @@
                         "children": [
                           {
                             "index": 12,
-                            "resourceId": "view_151780149",
+                            "resourceId": "view_217777055",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "必填",
                             "bounds": "32, 193, 52, 213",
@@ -2309,7 +2309,7 @@
                           },
                           {
                             "index": 13,
-                            "resourceId": "view_10636234",
+                            "resourceId": "view_234171628",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "开始时间",
                             "bounds": "64, 192, 128, 215",
@@ -2324,7 +2324,7 @@
                           },
                           {
                             "index": 14,
-                            "resourceId": "view_7209275",
+                            "resourceId": "view_261896373",
                             "className": "android.view.View",
                             "text": "android.view.View",
                             "bounds": "128, 203, 189, 204",
@@ -2341,7 +2341,7 @@
                             "index": 15,
                             "resourceId": "com.example.emplab:id/tvStartDate",
                             "className": "com.google.android.material.textview.MaterialTextView",
-                            "text": "2025年11月26日",
+                            "text": "2025年11月28日",
                             "bounds": "189, 192, 310, 215",
                             "clickable": false,
                             "enabled": true,
@@ -2383,9 +2383,9 @@
                               },
                               {
                                 "index": 18,
-                                "resourceId": "view_28407319",
+                                "resourceId": "view_170175281",
                                 "className": "androidx.appcompat.widget.AppCompatImageView",
-                                "text": "选择",
+                                "text": "androidx.appcompat.widget.AppCompatImageView",
                                 "bounds": "359, 195, 375, 211",
                                 "clickable": false,
                                 "enabled": true,
@@ -2416,7 +2416,7 @@
                         "children": [
                           {
                             "index": 20,
-                            "resourceId": "view_255679469",
+                            "resourceId": "view_48482199",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "结束时间",
                             "bounds": "32, 264, 96, 287",
@@ -2431,7 +2431,7 @@
                           },
                           {
                             "index": 21,
-                            "resourceId": "view_91261474",
+                            "resourceId": "view_127282564",
                             "className": "android.view.View",
                             "text": "android.view.View",
                             "bounds": "96, 275, 189, 276",
@@ -2448,7 +2448,7 @@
                             "index": 22,
                             "resourceId": "com.example.emplab:id/tvEndDate",
                             "className": "com.google.android.material.textview.MaterialTextView",
-                            "text": "2025年11月26日",
+                            "text": "2025年11月28日",
                             "bounds": "189, 264, 310, 287",
                             "clickable": false,
                             "enabled": true,
@@ -2490,9 +2490,9 @@
                               },
                               {
                                 "index": 25,
-                                "resourceId": "view_3221102",
+                                "resourceId": "view_17473008",
                                 "className": "androidx.appcompat.widget.AppCompatImageView",
-                                "text": "选择",
+                                "text": "androidx.appcompat.widget.AppCompatImageView",
                                 "bounds": "359, 267, 375, 283",
                                 "clickable": false,
                                 "enabled": true,
@@ -2509,7 +2509,7 @@
                       },
                       {
                         "index": 26,
-                        "resourceId": "view_113182108",
+                        "resourceId": "view_102317550",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 315, 395, 371",
@@ -2523,7 +2523,7 @@
                         "children": [
                           {
                             "index": 27,
-                            "resourceId": "view_95883535",
+                            "resourceId": "view_88379241",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "年休假对应年份",
                             "bounds": "32, 331, 144, 355",
@@ -2538,7 +2538,7 @@
                           },
                           {
                             "index": 28,
-                            "resourceId": "view_95624101",
+                            "resourceId": "view_229773967",
                             "className": "android.view.View",
                             "text": "android.view.View",
                             "bounds": "144, 342, 270, 344",
@@ -2553,7 +2553,7 @@
                           },
                           {
                             "index": 29,
-                            "resourceId": "view_105724794",
+                            "resourceId": "view_1288476",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "2025年年假",
                             "bounds": "270, 331, 355, 355",
@@ -2568,9 +2568,9 @@
                           },
                           {
                             "index": 30,
-                            "resourceId": "view_22916907",
+                            "resourceId": "view_227391781",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
-                            "text": "选择",
+                            "text": "androidx.appcompat.widget.AppCompatImageView",
                             "bounds": "363, 335, 379, 351",
                             "clickable": false,
                             "enabled": true,
@@ -2603,7 +2603,7 @@
                 "children": [
                   {
                     "index": 32,
-                    "resourceId": "view_159937651",
+                    "resourceId": "view_84392624",
                     "className": "com.example.emplab.CustomDatePickerView",
                     "text": "com.example.emplab.CustomDatePickerView",
                     "bounds": "0, 272, 411, 810",
@@ -2631,7 +2631,7 @@
                         "children": [
                           {
                             "index": 34,
-                            "resourceId": "view_19348909",
+                            "resourceId": "view_27740258",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "32, 304, 379, 392",
@@ -2645,7 +2645,7 @@
                             "children": [
                               {
                                 "index": 35,
-                                "resourceId": "view_244697796",
+                                "resourceId": "view_230370093",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "48, 320, 339, 376",
@@ -2676,7 +2676,7 @@
                                     "index": 37,
                                     "resourceId": "com.example.emplab:id/tvSelectedDate",
                                     "className": "com.google.android.material.textview.MaterialTextView",
-                                    "text": "周三, 11月 26",
+                                    "text": "周五, 11月 28",
                                     "bounds": "48, 353, 144, 376",
                                     "clickable": false,
                                     "enabled": true,
@@ -2708,7 +2708,7 @@
                           },
                           {
                             "index": 39,
-                            "resourceId": "view_54490469",
+                            "resourceId": "view_264968299",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "32, 408, 379, 451",
@@ -2769,7 +2769,7 @@
                           },
                           {
                             "index": 43,
-                            "resourceId": "view_255263457",
+                            "resourceId": "view_8441927",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "32, 467, 379, 486",
@@ -2783,7 +2783,7 @@
                             "children": [
                               {
                                 "index": 44,
-                                "resourceId": "view_258561096",
+                                "resourceId": "view_63569798",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "S",
                                 "bounds": "32, 467, 81, 486",
@@ -2798,7 +2798,7 @@
                               },
                               {
                                 "index": 45,
-                                "resourceId": "view_139655174",
+                                "resourceId": "view_70811764",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "M",
                                 "bounds": "81, 467, 131, 486",
@@ -2813,7 +2813,7 @@
                               },
                               {
                                 "index": 46,
-                                "resourceId": "view_227122887",
+                                "resourceId": "view_15350173",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "T",
                                 "bounds": "131, 467, 180, 486",
@@ -2828,7 +2828,7 @@
                               },
                               {
                                 "index": 47,
-                                "resourceId": "view_115567860",
+                                "resourceId": "view_230067730",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "W",
                                 "bounds": "180, 467, 230, 486",
@@ -2843,7 +2843,7 @@
                               },
                               {
                                 "index": 48,
-                                "resourceId": "view_46132253",
+                                "resourceId": "view_166734307",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "T",
                                 "bounds": "230, 467, 279, 486",
@@ -2858,7 +2858,7 @@
                               },
                               {
                                 "index": 49,
-                                "resourceId": "view_18255506",
+                                "resourceId": "view_9908192",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "F",
                                 "bounds": "279, 467, 329, 486",
@@ -2873,7 +2873,7 @@
                               },
                               {
                                 "index": 50,
-                                "resourceId": "view_217538659",
+                                "resourceId": "view_137745049",
                                 "className": "com.google.android.material.textview.MaterialTextView",
                                 "text": "S",
                                 "bounds": "329, 467, 379, 486",
@@ -2904,7 +2904,7 @@
                             "children": [
                               {
                                 "index": 52,
-                                "resourceId": "view_71591008",
+                                "resourceId": "view_7043422",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "33, 496, 80, 529",
@@ -2919,7 +2919,7 @@
                               },
                               {
                                 "index": 53,
-                                "resourceId": "view_218825182",
+                                "resourceId": "view_7301644",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "83, 496, 129, 529",
@@ -2934,7 +2934,7 @@
                               },
                               {
                                 "index": 54,
-                                "resourceId": "view_133537727",
+                                "resourceId": "view_50855765",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "132, 496, 179, 529",
@@ -2949,7 +2949,7 @@
                               },
                               {
                                 "index": 55,
-                                "resourceId": "view_117139084",
+                                "resourceId": "view_183618922",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "182, 496, 228, 529",
@@ -2964,7 +2964,7 @@
                               },
                               {
                                 "index": 56,
-                                "resourceId": "view_244416981",
+                                "resourceId": "view_260502107",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "232, 496, 278, 529",
@@ -2979,7 +2979,7 @@
                               },
                               {
                                 "index": 57,
-                                "resourceId": "view_155278826",
+                                "resourceId": "view_128916216",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "281, 496, 328, 529",
@@ -2994,7 +2994,7 @@
                               },
                               {
                                 "index": 58,
-                                "resourceId": "view_141457627",
+                                "resourceId": "view_60177361",
                                 "className": "android.widget.TextView",
                                 "text": "1",
                                 "bounds": "331, 496, 377, 529",
@@ -3009,7 +3009,7 @@
                               },
                               {
                                 "index": 59,
-                                "resourceId": "view_71196536",
+                                "resourceId": "view_30889526",
                                 "className": "android.widget.TextView",
                                 "text": "2",
                                 "bounds": "33, 532, 80, 566",
@@ -3024,7 +3024,7 @@
                               },
                               {
                                 "index": 60,
-                                "resourceId": "view_242574929",
+                                "resourceId": "view_146299191",
                                 "className": "android.widget.TextView",
                                 "text": "3",
                                 "bounds": "83, 532, 129, 566",
@@ -3039,7 +3039,7 @@
                               },
                               {
                                 "index": 61,
-                                "resourceId": "view_13594294",
+                                "resourceId": "view_154594980",
                                 "className": "android.widget.TextView",
                                 "text": "4",
                                 "bounds": "132, 532, 179, 566",
@@ -3054,7 +3054,7 @@
                               },
                               {
                                 "index": 62,
-                                "resourceId": "view_47302583",
+                                "resourceId": "view_267502605",
                                 "className": "android.widget.TextView",
                                 "text": "5",
                                 "bounds": "182, 532, 228, 566",
@@ -3069,7 +3069,7 @@
                               },
                               {
                                 "index": 63,
-                                "resourceId": "view_213252900",
+                                "resourceId": "view_45785026",
                                 "className": "android.widget.TextView",
                                 "text": "6",
                                 "bounds": "232, 532, 278, 566",
@@ -3084,7 +3084,7 @@
                               },
                               {
                                 "index": 64,
-                                "resourceId": "view_232330893",
+                                "resourceId": "view_137318867",
                                 "className": "android.widget.TextView",
                                 "text": "7",
                                 "bounds": "281, 532, 328, 566",
@@ -3099,7 +3099,7 @@
                               },
                               {
                                 "index": 65,
-                                "resourceId": "view_140230722",
+                                "resourceId": "view_54939920",
                                 "className": "android.widget.TextView",
                                 "text": "8",
                                 "bounds": "331, 532, 377, 566",
@@ -3114,7 +3114,7 @@
                               },
                               {
                                 "index": 66,
-                                "resourceId": "view_145827923",
+                                "resourceId": "view_67343369",
                                 "className": "android.widget.TextView",
                                 "text": "9",
                                 "bounds": "33, 569, 80, 603",
@@ -3129,7 +3129,7 @@
                               },
                               {
                                 "index": 67,
-                                "resourceId": "view_15312272",
+                                "resourceId": "view_77002254",
                                 "className": "android.widget.TextView",
                                 "text": "10",
                                 "bounds": "83, 569, 129, 603",
@@ -3144,7 +3144,7 @@
                               },
                               {
                                 "index": 68,
-                                "resourceId": "view_21859977",
+                                "resourceId": "view_1259567",
                                 "className": "android.widget.TextView",
                                 "text": "11",
                                 "bounds": "132, 569, 179, 603",
@@ -3159,7 +3159,7 @@
                               },
                               {
                                 "index": 69,
-                                "resourceId": "view_107585166",
+                                "resourceId": "view_111636028",
                                 "className": "android.widget.TextView",
                                 "text": "12",
                                 "bounds": "182, 569, 228, 603",
@@ -3174,7 +3174,7 @@
                               },
                               {
                                 "index": 70,
-                                "resourceId": "view_152827567",
+                                "resourceId": "view_122185669",
                                 "className": "android.widget.TextView",
                                 "text": "13",
                                 "bounds": "232, 569, 278, 603",
@@ -3189,7 +3189,7 @@
                               },
                               {
                                 "index": 71,
-                                "resourceId": "view_7047868",
+                                "resourceId": "view_13657370",
                                 "className": "android.widget.TextView",
                                 "text": "14",
                                 "bounds": "281, 569, 328, 603",
@@ -3204,7 +3204,7 @@
                               },
                               {
                                 "index": 72,
-                                "resourceId": "view_192383557",
+                                "resourceId": "view_61155403",
                                 "className": "android.widget.TextView",
                                 "text": "15",
                                 "bounds": "331, 569, 377, 603",
@@ -3219,7 +3219,7 @@
                               },
                               {
                                 "index": 73,
-                                "resourceId": "view_73733530",
+                                "resourceId": "view_77279784",
                                 "className": "android.widget.TextView",
                                 "text": "16",
                                 "bounds": "33, 606, 80, 640",
@@ -3234,7 +3234,7 @@
                               },
                               {
                                 "index": 74,
-                                "resourceId": "view_180047563",
+                                "resourceId": "view_38583105",
                                 "className": "android.widget.TextView",
                                 "text": "17",
                                 "bounds": "83, 606, 129, 640",
@@ -3249,7 +3249,7 @@
                               },
                               {
                                 "index": 75,
-                                "resourceId": "view_264541864",
+                                "resourceId": "view_16759014",
                                 "className": "android.widget.TextView",
                                 "text": "18",
                                 "bounds": "132, 606, 179, 640",
@@ -3264,7 +3264,7 @@
                               },
                               {
                                 "index": 76,
-                                "resourceId": "view_176915905",
+                                "resourceId": "view_253492775",
                                 "className": "android.widget.TextView",
                                 "text": "19",
                                 "bounds": "182, 606, 228, 640",
@@ -3279,7 +3279,7 @@
                               },
                               {
                                 "index": 77,
-                                "resourceId": "view_74379622",
+                                "resourceId": "view_260393172",
                                 "className": "android.widget.TextView",
                                 "text": "20",
                                 "bounds": "232, 606, 278, 640",
@@ -3294,7 +3294,7 @@
                               },
                               {
                                 "index": 78,
-                                "resourceId": "view_195955879",
+                                "resourceId": "view_266914429",
                                 "className": "android.widget.TextView",
                                 "text": "21",
                                 "bounds": "281, 606, 328, 640",
@@ -3309,7 +3309,7 @@
                               },
                               {
                                 "index": 79,
-                                "resourceId": "view_18904404",
+                                "resourceId": "view_226393458",
                                 "className": "android.widget.TextView",
                                 "text": "22",
                                 "bounds": "331, 606, 377, 640",
@@ -3324,7 +3324,7 @@
                               },
                               {
                                 "index": 80,
-                                "resourceId": "view_25804029",
+                                "resourceId": "view_20993475",
                                 "className": "android.widget.TextView",
                                 "text": "23",
                                 "bounds": "33, 643, 80, 677",
@@ -3339,7 +3339,7 @@
                               },
                               {
                                 "index": 81,
-                                "resourceId": "view_132693490",
+                                "resourceId": "view_173547072",
                                 "className": "android.widget.TextView",
                                 "text": "24",
                                 "bounds": "83, 643, 129, 677",
@@ -3354,7 +3354,7 @@
                               },
                               {
                                 "index": 82,
-                                "resourceId": "view_52743235",
+                                "resourceId": "view_104632697",
                                 "className": "android.widget.TextView",
                                 "text": "25",
                                 "bounds": "132, 643, 179, 677",
@@ -3369,7 +3369,7 @@
                               },
                               {
                                 "index": 83,
-                                "resourceId": "view_196711104",
+                                "resourceId": "view_145948350",
                                 "className": "android.widget.TextView",
                                 "text": "26",
                                 "bounds": "182, 643, 228, 677",
@@ -3379,12 +3379,12 @@
                                 "checked": false,
                                 "scrollable": false,
                                 "longClickable": false,
-                                "selected": true,
+                                "selected": false,
                                 "children": []
                               },
                               {
                                 "index": 84,
-                                "resourceId": "view_154807289",
+                                "resourceId": "view_46697247",
                                 "className": "android.widget.TextView",
                                 "text": "27",
                                 "bounds": "232, 643, 278, 677",
@@ -3399,7 +3399,7 @@
                               },
                               {
                                 "index": 85,
-                                "resourceId": "view_46188350",
+                                "resourceId": "view_46194284",
                                 "className": "android.widget.TextView",
                                 "text": "28",
                                 "bounds": "281, 643, 328, 677",
@@ -3409,12 +3409,12 @@
                                 "checked": false,
                                 "scrollable": false,
                                 "longClickable": false,
-                                "selected": false,
+                                "selected": true,
                                 "children": []
                               },
                               {
                                 "index": 86,
-                                "resourceId": "view_12446111",
+                                "resourceId": "view_57396277",
                                 "className": "android.widget.TextView",
                                 "text": "29",
                                 "bounds": "331, 643, 377, 677",
@@ -3429,7 +3429,7 @@
                               },
                               {
                                 "index": 87,
-                                "resourceId": "view_235215596",
+                                "resourceId": "view_52185290",
                                 "className": "android.widget.TextView",
                                 "text": "30",
                                 "bounds": "33, 680, 80, 714",
@@ -3444,7 +3444,7 @@
                               },
                               {
                                 "index": 88,
-                                "resourceId": "view_82349749",
+                                "resourceId": "view_125090363",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "83, 680, 129, 714",
@@ -3459,7 +3459,7 @@
                               },
                               {
                                 "index": 89,
-                                "resourceId": "view_125704522",
+                                "resourceId": "view_34829656",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "132, 680, 179, 714",
@@ -3474,7 +3474,7 @@
                               },
                               {
                                 "index": 90,
-                                "resourceId": "view_94470331",
+                                "resourceId": "view_169473713",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "182, 680, 228, 714",
@@ -3489,7 +3489,7 @@
                               },
                               {
                                 "index": 91,
-                                "resourceId": "view_111081944",
+                                "resourceId": "view_69085078",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "232, 680, 278, 714",
@@ -3504,7 +3504,7 @@
                               },
                               {
                                 "index": 92,
-                                "resourceId": "view_115368241",
+                                "resourceId": "view_82493207",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "281, 680, 328, 714",
@@ -3519,7 +3519,7 @@
                               },
                               {
                                 "index": 93,
-                                "resourceId": "view_135036950",
+                                "resourceId": "view_16158468",
                                 "className": "android.widget.TextView",
                                 "text": "android.widget.TextView",
                                 "bounds": "331, 680, 377, 714",
@@ -3536,7 +3536,7 @@
                           },
                           {
                             "index": 94,
-                            "resourceId": "view_267770756",
+                            "resourceId": "view_59582242",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "32, 732, 379, 778",
@@ -3603,7 +3603,7 @@
               },
               {
                 "index": 98,
-                "resourceId": "view_232705313",
+                "resourceId": "view_130500779",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 810, 411, 890",
@@ -3636,10 +3636,10 @@
           },
           {
             "index": 100,
-            "resourceId": "view_48139606",
+            "resourceId": "view_49701719",
             "className": "android.view.View",
             "text": "android.view.View",
-            "bounds": "193, 191, 233, 231",
+            "bounds": "188, 258, 228, 298",
             "clickable": false,
             "enabled": true,
             "checkable": false,
@@ -3669,7 +3669,7 @@
         "children": [
           {
             "index": 1,
-            "resourceId": "view_231451944",
+            "resourceId": "view_36960154",
             "className": "android.widget.LinearLayout",
             "text": "android.widget.LinearLayout",
             "bounds": "0, 48, 411, 890",
@@ -3683,7 +3683,7 @@
             "children": [
               {
                 "index": 2,
-                "resourceId": "view_128888651",
+                "resourceId": "view_160216133",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 48, 411, 107",
@@ -3712,7 +3712,7 @@
                   },
                   {
                     "index": 4,
-                    "resourceId": "view_235805053",
+                    "resourceId": "view_126477991",
                     "className": "com.google.android.material.textview.MaterialTextView",
                     "text": "关闭",
                     "bounds": "48, 65, 80, 89",
@@ -3727,7 +3727,7 @@
                   },
                   {
                     "index": 5,
-                    "resourceId": "view_192094322",
+                    "resourceId": "view_103302996",
                     "className": "com.google.android.material.textview.MaterialTextView",
                     "text": "拟请假时间",
                     "bounds": "80, 64, 335, 91",
@@ -3742,7 +3742,7 @@
                   },
                   {
                     "index": 6,
-                    "resourceId": "view_236174531",
+                    "resourceId": "view_64628477",
                     "className": "android.view.View",
                     "text": "android.view.View",
                     "bounds": "335, 65, 395, 89",
@@ -3759,7 +3759,7 @@
               },
               {
                 "index": 7,
-                "resourceId": "view_62716224",
+                "resourceId": "view_7462898",
                 "className": "android.view.View",
                 "text": "android.view.View",
                 "bounds": "0, 107, 411, 108",
@@ -3774,7 +3774,7 @@
               },
               {
                 "index": 8,
-                "resourceId": "view_48746617",
+                "resourceId": "view_165955139",
                 "className": "android.widget.ScrollView",
                 "text": "android.widget.ScrollView",
                 "bounds": "0, 108, 411, 810",
@@ -3788,7 +3788,7 @@
                 "children": [
                   {
                     "index": 9,
-                    "resourceId": "view_116089375",
+                    "resourceId": "view_19346937",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 108, 411, 810",
@@ -3802,7 +3802,7 @@
                     "children": [
                       {
                         "index": 10,
-                        "resourceId": "view_80662974",
+                        "resourceId": "view_241992896",
                         "className": "com.google.android.material.textview.MaterialTextView",
                         "text": "年休假 (工作日)",
                         "bounds": "16, 124, 395, 147",
@@ -3831,7 +3831,7 @@
                         "children": [
                           {
                             "index": 12,
-                            "resourceId": "view_151780149",
+                            "resourceId": "view_217777055",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
                             "text": "必填",
                             "bounds": "32, 193, 52, 213",
@@ -3846,7 +3846,7 @@
                           },
                           {
                             "index": 13,
-                            "resourceId": "view_10636234",
+                            "resourceId": "view_234171628",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "开始时间",
                             "bounds": "64, 192, 128, 215",
@@ -3861,7 +3861,7 @@
                           },
                           {
                             "index": 14,
-                            "resourceId": "view_7209275",
+                            "resourceId": "view_261896373",
                             "className": "android.view.View",
                             "text": "android.view.View",
                             "bounds": "128, 203, 189, 204",
@@ -3878,7 +3878,7 @@
                             "index": 15,
                             "resourceId": "com.example.emplab:id/tvStartDate",
                             "className": "com.google.android.material.textview.MaterialTextView",
-                            "text": "2025年11月25日",
+                            "text": "2025年11月28日",
                             "bounds": "189, 192, 310, 215",
                             "clickable": false,
                             "enabled": true,
@@ -3920,9 +3920,9 @@
                               },
                               {
                                 "index": 18,
-                                "resourceId": "view_28407319",
+                                "resourceId": "view_170175281",
                                 "className": "androidx.appcompat.widget.AppCompatImageView",
-                                "text": "选择",
+                                "text": "androidx.appcompat.widget.AppCompatImageView",
                                 "bounds": "359, 195, 375, 211",
                                 "clickable": false,
                                 "enabled": true,
@@ -3953,7 +3953,7 @@
                         "children": [
                           {
                             "index": 20,
-                            "resourceId": "view_255679469",
+                            "resourceId": "view_48482199",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "结束时间",
                             "bounds": "32, 264, 96, 287",
@@ -3968,7 +3968,7 @@
                           },
                           {
                             "index": 21,
-                            "resourceId": "view_91261474",
+                            "resourceId": "view_127282564",
                             "className": "android.view.View",
                             "text": "android.view.View",
                             "bounds": "96, 275, 189, 276",
@@ -3985,7 +3985,7 @@
                             "index": 22,
                             "resourceId": "com.example.emplab:id/tvEndDate",
                             "className": "com.google.android.material.textview.MaterialTextView",
-                            "text": "2025年11月26日",
+                            "text": "2025年11月29日",
                             "bounds": "189, 264, 310, 287",
                             "clickable": false,
                             "enabled": true,
@@ -4027,9 +4027,9 @@
                               },
                               {
                                 "index": 25,
-                                "resourceId": "view_3221102",
+                                "resourceId": "view_17473008",
                                 "className": "androidx.appcompat.widget.AppCompatImageView",
-                                "text": "选择",
+                                "text": "androidx.appcompat.widget.AppCompatImageView",
                                 "bounds": "359, 267, 375, 283",
                                 "clickable": false,
                                 "enabled": true,
@@ -4046,7 +4046,7 @@
                       },
                       {
                         "index": 26,
-                        "resourceId": "view_113182108",
+                        "resourceId": "view_102317550",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "16, 315, 395, 371",
@@ -4060,7 +4060,7 @@
                         "children": [
                           {
                             "index": 27,
-                            "resourceId": "view_95883535",
+                            "resourceId": "view_88379241",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "年休假对应年份",
                             "bounds": "32, 331, 144, 355",
@@ -4075,7 +4075,7 @@
                           },
                           {
                             "index": 28,
-                            "resourceId": "view_95624101",
+                            "resourceId": "view_229773967",
                             "className": "android.view.View",
                             "text": "android.view.View",
                             "bounds": "144, 342, 270, 344",
@@ -4090,7 +4090,7 @@
                           },
                           {
                             "index": 29,
-                            "resourceId": "view_105724794",
+                            "resourceId": "view_1288476",
                             "className": "com.google.android.material.textview.MaterialTextView",
                             "text": "2025年年假",
                             "bounds": "270, 331, 355, 355",
@@ -4105,9 +4105,9 @@
                           },
                           {
                             "index": 30,
-                            "resourceId": "view_22916907",
+                            "resourceId": "view_227391781",
                             "className": "androidx.appcompat.widget.AppCompatImageView",
-                            "text": "选择",
+                            "text": "androidx.appcompat.widget.AppCompatImageView",
                             "bounds": "363, 335, 379, 351",
                             "clickable": false,
                             "enabled": true,
@@ -4140,7 +4140,7 @@
                 "children": [
                   {
                     "index": 32,
-                    "resourceId": "view_159937651",
+                    "resourceId": "view_84392624",
                     "className": "com.example.emplab.CustomDatePickerView",
                     "text": "com.example.emplab.CustomDatePickerView",
                     "bounds": "0, 810, 411, 1347",
@@ -4172,7 +4172,7 @@
               },
               {
                 "index": 34,
-                "resourceId": "view_232705313",
+                "resourceId": "view_130500779",
                 "className": "android.widget.LinearLayout",
                 "text": "android.widget.LinearLayout",
                 "bounds": "0, 810, 411, 890",
@@ -4205,10 +4205,10 @@
           },
           {
             "index": 36,
-            "resourceId": "view_113646930",
+            "resourceId": "view_178914559",
             "className": "android.view.View",
             "text": "android.view.View",
-            "bounds": "144, 648, 184, 688",
+            "bounds": "337, 643, 377, 683",
             "clickable": false,
             "enabled": true,
             "checkable": false,
@@ -4238,7 +4238,7 @@
         "children": [
           {
             "index": 1,
-            "resourceId": "view_42004276",
+            "resourceId": "view_68541589",
             "className": "android.widget.FrameLayout",
             "text": "android.widget.FrameLayout",
             "bounds": "0, 48, 411, 890",
@@ -4266,7 +4266,7 @@
                 "children": [
                   {
                     "index": 3,
-                    "resourceId": "view_10854470",
+                    "resourceId": "view_116935807",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 48, 411, 107",
@@ -4295,7 +4295,7 @@
                       },
                       {
                         "index": 5,
-                        "resourceId": "view_90060377",
+                        "resourceId": "view_228527734",
                         "className": "com.google.android.material.textview.MaterialTextView",
                         "text": "请休假申请 (第2步)",
                         "bounds": "40, 64, 371, 91",
@@ -4310,7 +4310,7 @@
                       },
                       {
                         "index": 6,
-                        "resourceId": "view_260207134",
+                        "resourceId": "view_140856439",
                         "className": "android.view.View",
                         "text": "android.view.View",
                         "bounds": "371, 65, 395, 89",
@@ -4327,7 +4327,7 @@
                   },
                   {
                     "index": 7,
-                    "resourceId": "view_176417535",
+                    "resourceId": "view_192413924",
                     "className": "android.view.View",
                     "text": "android.view.View",
                     "bounds": "0, 107, 411, 108",
@@ -4342,7 +4342,7 @@
                   },
                   {
                     "index": 8,
-                    "resourceId": "view_201257164",
+                    "resourceId": "view_112593229",
                     "className": "android.widget.ScrollView",
                     "text": "android.widget.ScrollView",
                     "bounds": "0, 108, 411, 810",
@@ -4356,7 +4356,7 @@
                     "children": [
                       {
                         "index": 9,
-                        "resourceId": "view_143674808",
+                        "resourceId": "view_82242889",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "0, 108, 411, 810",
@@ -4370,7 +4370,7 @@
                         "children": [
                           {
                             "index": 10,
-                            "resourceId": "view_246822939",
+                            "resourceId": "view_254166864",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 124, 395, 298",
@@ -4384,7 +4384,7 @@
                             "children": [
                               {
                                 "index": 11,
-                                "resourceId": "view_90149418",
+                                "resourceId": "view_47724819",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "16, 124, 395, 147",
@@ -4398,7 +4398,7 @@
                                 "children": [
                                   {
                                     "index": 12,
-                                    "resourceId": "view_45276949",
+                                    "resourceId": "view_15047682",
                                     "className": "androidx.appcompat.widget.AppCompatImageView",
                                     "text": "必填",
                                     "bounds": "16, 125, 36, 145",
@@ -4413,7 +4413,7 @@
                                   },
                                   {
                                     "index": 13,
-                                    "resourceId": "view_24074129",
+                                    "resourceId": "view_34960974",
                                     "className": "com.google.android.material.textview.MaterialTextView",
                                     "text": "请假事由",
                                     "bounds": "44, 124, 108, 147",
@@ -4462,7 +4462,7 @@
                           },
                           {
                             "index": 16,
-                            "resourceId": "view_50609282",
+                            "resourceId": "view_119256971",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 322, 395, 496",
@@ -4476,7 +4476,7 @@
                             "children": [
                               {
                                 "index": 17,
-                                "resourceId": "view_111205325",
+                                "resourceId": "view_156674394",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "16, 322, 395, 345",
@@ -4490,7 +4490,7 @@
                                 "children": [
                                   {
                                     "index": 18,
-                                    "resourceId": "view_14191972",
+                                    "resourceId": "view_120067333",
                                     "className": "androidx.appcompat.widget.AppCompatImageView",
                                     "text": "必填",
                                     "bounds": "16, 323, 36, 344",
@@ -4505,7 +4505,7 @@
                                   },
                                   {
                                     "index": 19,
-                                    "resourceId": "view_29986707",
+                                    "resourceId": "view_154906728",
                                     "className": "com.google.android.material.textview.MaterialTextView",
                                     "text": "拟前往地区",
                                     "bounds": "44, 322, 124, 345",
@@ -4554,7 +4554,7 @@
                           },
                           {
                             "index": 22,
-                            "resourceId": "view_126231804",
+                            "resourceId": "view_65593277",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 520, 395, 672",
@@ -4568,7 +4568,7 @@
                             "children": [
                               {
                                 "index": 23,
-                                "resourceId": "view_175346159",
+                                "resourceId": "view_38759188",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "16, 520, 395, 544",
@@ -4582,7 +4582,7 @@
                                 "children": [
                                   {
                                     "index": 24,
-                                    "resourceId": "view_180199118",
+                                    "resourceId": "view_109855079",
                                     "className": "androidx.appcompat.widget.AppCompatImageView",
                                     "text": "必填",
                                     "bounds": "16, 521, 36, 542",
@@ -4597,7 +4597,7 @@
                                   },
                                   {
                                     "index": 25,
-                                    "resourceId": "view_172668805",
+                                    "resourceId": "view_125897138",
                                     "className": "com.google.android.material.textview.MaterialTextView",
                                     "text": "附件 (非必须, 最多一张图片)",
                                     "bounds": "44, 520, 243, 544",
@@ -4666,7 +4666,7 @@
                   },
                   {
                     "index": 29,
-                    "resourceId": "view_159663873",
+                    "resourceId": "view_267521790",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 810, 411, 890",
@@ -4764,7 +4764,7 @@
         "children": [
           {
             "index": 1,
-            "resourceId": "view_42004276",
+            "resourceId": "view_68541589",
             "className": "android.widget.FrameLayout",
             "text": "android.widget.FrameLayout",
             "bounds": "0, 48, 411, 890",
@@ -4792,7 +4792,7 @@
                 "children": [
                   {
                     "index": 3,
-                    "resourceId": "view_10854470",
+                    "resourceId": "view_116935807",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 48, 411, 107",
@@ -4821,7 +4821,7 @@
                       },
                       {
                         "index": 5,
-                        "resourceId": "view_90060377",
+                        "resourceId": "view_228527734",
                         "className": "com.google.android.material.textview.MaterialTextView",
                         "text": "请休假申请 (第2步)",
                         "bounds": "40, 64, 371, 91",
@@ -4836,7 +4836,7 @@
                       },
                       {
                         "index": 6,
-                        "resourceId": "view_260207134",
+                        "resourceId": "view_140856439",
                         "className": "android.view.View",
                         "text": "android.view.View",
                         "bounds": "371, 65, 395, 89",
@@ -4853,7 +4853,7 @@
                   },
                   {
                     "index": 7,
-                    "resourceId": "view_176417535",
+                    "resourceId": "view_192413924",
                     "className": "android.view.View",
                     "text": "android.view.View",
                     "bounds": "0, 107, 411, 108",
@@ -4868,7 +4868,7 @@
                   },
                   {
                     "index": 8,
-                    "resourceId": "view_201257164",
+                    "resourceId": "view_112593229",
                     "className": "android.widget.ScrollView",
                     "text": "android.widget.ScrollView",
                     "bounds": "0, 108, 411, 810",
@@ -4882,7 +4882,7 @@
                     "children": [
                       {
                         "index": 9,
-                        "resourceId": "view_143674808",
+                        "resourceId": "view_82242889",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "0, 108, 411, 810",
@@ -4896,7 +4896,7 @@
                         "children": [
                           {
                             "index": 10,
-                            "resourceId": "view_246822939",
+                            "resourceId": "view_254166864",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 124, 395, 298",
@@ -4910,7 +4910,7 @@
                             "children": [
                               {
                                 "index": 11,
-                                "resourceId": "view_90149418",
+                                "resourceId": "view_47724819",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "16, 124, 395, 147",
@@ -4924,7 +4924,7 @@
                                 "children": [
                                   {
                                     "index": 12,
-                                    "resourceId": "view_45276949",
+                                    "resourceId": "view_15047682",
                                     "className": "androidx.appcompat.widget.AppCompatImageView",
                                     "text": "必填",
                                     "bounds": "16, 125, 36, 145",
@@ -4939,7 +4939,7 @@
                                   },
                                   {
                                     "index": 13,
-                                    "resourceId": "view_24074129",
+                                    "resourceId": "view_34960974",
                                     "className": "com.google.android.material.textview.MaterialTextView",
                                     "text": "请假事由",
                                     "bounds": "44, 124, 108, 147",
@@ -4958,7 +4958,7 @@
                                 "index": 14,
                                 "resourceId": "com.example.emplab:id/etReason",
                                 "className": "androidx.appcompat.widget.AppCompatEditText",
-                                "text": "计划休息和恢复精力",
+                                "text": "准备计划休息和恢复精力",
                                 "bounds": "16, 155, 395, 275",
                                 "clickable": false,
                                 "enabled": true,
@@ -4973,7 +4973,7 @@
                                 "index": 15,
                                 "resourceId": "com.example.emplab:id/tvReasonCount",
                                 "className": "com.google.android.material.textview.MaterialTextView",
-                                "text": "剩余字数 91",
+                                "text": "剩余字数 89",
                                 "bounds": "329, 280, 395, 298",
                                 "clickable": false,
                                 "enabled": true,
@@ -4988,7 +4988,7 @@
                           },
                           {
                             "index": 16,
-                            "resourceId": "view_50609282",
+                            "resourceId": "view_119256971",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 322, 395, 496",
@@ -5002,7 +5002,7 @@
                             "children": [
                               {
                                 "index": 17,
-                                "resourceId": "view_111205325",
+                                "resourceId": "view_156674394",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "16, 322, 395, 345",
@@ -5016,7 +5016,7 @@
                                 "children": [
                                   {
                                     "index": 18,
-                                    "resourceId": "view_14191972",
+                                    "resourceId": "view_120067333",
                                     "className": "androidx.appcompat.widget.AppCompatImageView",
                                     "text": "必填",
                                     "bounds": "16, 323, 36, 344",
@@ -5031,7 +5031,7 @@
                                   },
                                   {
                                     "index": 19,
-                                    "resourceId": "view_29986707",
+                                    "resourceId": "view_154906728",
                                     "className": "com.google.android.material.textview.MaterialTextView",
                                     "text": "拟前往地区",
                                     "bounds": "44, 322, 124, 345",
@@ -5050,7 +5050,7 @@
                                 "index": 20,
                                 "resourceId": "com.example.emplab:id/etDestination",
                                 "className": "androidx.appcompat.widget.AppCompatEditText",
-                                "text": "上海",
+                                "text": "上海市梅赛德斯奔驰文化中心",
                                 "bounds": "16, 353, 395, 473",
                                 "clickable": false,
                                 "enabled": true,
@@ -5065,7 +5065,7 @@
                                 "index": 21,
                                 "resourceId": "com.example.emplab:id/tvDestinationCount",
                                 "className": "com.google.android.material.textview.MaterialTextView",
-                                "text": "剩余字数 98",
+                                "text": "剩余字数 87",
                                 "bounds": "329, 478, 395, 496",
                                 "clickable": false,
                                 "enabled": true,
@@ -5080,7 +5080,7 @@
                           },
                           {
                             "index": 22,
-                            "resourceId": "view_126231804",
+                            "resourceId": "view_65593277",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 520, 395, 672",
@@ -5094,7 +5094,7 @@
                             "children": [
                               {
                                 "index": 23,
-                                "resourceId": "view_175346159",
+                                "resourceId": "view_38759188",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "16, 520, 395, 544",
@@ -5108,7 +5108,7 @@
                                 "children": [
                                   {
                                     "index": 24,
-                                    "resourceId": "view_180199118",
+                                    "resourceId": "view_109855079",
                                     "className": "androidx.appcompat.widget.AppCompatImageView",
                                     "text": "必填",
                                     "bounds": "16, 521, 36, 542",
@@ -5123,7 +5123,7 @@
                                   },
                                   {
                                     "index": 25,
-                                    "resourceId": "view_172668805",
+                                    "resourceId": "view_125897138",
                                     "className": "com.google.android.material.textview.MaterialTextView",
                                     "text": "附件 (非必须, 最多一张图片)",
                                     "bounds": "44, 520, 243, 544",
@@ -5192,7 +5192,533 @@
                   },
                   {
                     "index": 29,
-                    "resourceId": "view_159663873",
+                    "resourceId": "view_267521790",
+                    "className": "android.widget.LinearLayout",
+                    "text": "android.widget.LinearLayout",
+                    "bounds": "0, 810, 411, 890",
+                    "clickable": false,
+                    "enabled": true,
+                    "checkable": false,
+                    "checked": false,
+                    "scrollable": false,
+                    "longClickable": false,
+                    "selected": false,
+                    "children": [
+                      {
+                        "index": 30,
+                        "resourceId": "com.example.emplab:id/btnPrevious",
+                        "className": "com.google.android.material.button.MaterialButton",
+                        "text": "上一步",
+                        "bounds": "16, 826, 197, 874",
+                        "clickable": true,
+                        "enabled": true,
+                        "checkable": false,
+                        "checked": false,
+                        "scrollable": false,
+                        "longClickable": false,
+                        "selected": false,
+                        "children": []
+                      },
+                      {
+                        "index": 31,
+                        "resourceId": "com.example.emplab:id/btnSubmit",
+                        "className": "com.google.android.material.button.MaterialButton",
+                        "text": "提交",
+                        "bounds": "213, 826, 395, 874",
+                        "clickable": true,
+                        "enabled": true,
+                        "checkable": false,
+                        "checked": false,
+                        "scrollable": false,
+                        "longClickable": false,
+                        "selected": false,
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "index": 32,
+                "resourceId": "com.example.emplab:id/confirmOverlay",
+                "className": "android.widget.FrameLayout",
+                "text": "android.widget.FrameLayout",
+                "bounds": "0, 48, 0, 48",
+                "clickable": true,
+                "enabled": true,
+                "checkable": false,
+                "checked": false,
+                "scrollable": false,
+                "longClickable": false,
+                "selected": false,
+                "children": []
+              },
+              {
+                "index": 33,
+                "resourceId": "com.example.emplab:id/successOverlay",
+                "className": "android.widget.FrameLayout",
+                "text": "android.widget.FrameLayout",
+                "bounds": "0, 48, 0, 48",
+                "clickable": true,
+                "enabled": true,
+                "checkable": false,
+                "checked": false,
+                "scrollable": false,
+                "longClickable": false,
+                "selected": false,
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "index": 0,
+        "resourceId": "com.example.emplab:id/content",
+        "className": "androidx.appcompat.widget.ContentFrameLayout",
+        "text": "androidx.appcompat.widget.ContentFrameLayout",
+        "bounds": "0, 48, 411, 890",
+        "clickable": false,
+        "enabled": true,
+        "checkable": false,
+        "checked": false,
+        "scrollable": false,
+        "longClickable": false,
+        "selected": false,
+        "children": [
+          {
+            "index": 1,
+            "resourceId": "view_68541589",
+            "className": "android.widget.FrameLayout",
+            "text": "android.widget.FrameLayout",
+            "bounds": "0, 48, 411, 890",
+            "clickable": false,
+            "enabled": true,
+            "checkable": false,
+            "checked": false,
+            "scrollable": false,
+            "longClickable": false,
+            "selected": false,
+            "children": [
+              {
+                "index": 2,
+                "resourceId": "com.example.emplab:id/pageRoot",
+                "className": "android.widget.LinearLayout",
+                "text": "android.widget.LinearLayout",
+                "bounds": "0, 48, 411, 890",
+                "clickable": false,
+                "enabled": true,
+                "checkable": false,
+                "checked": false,
+                "scrollable": false,
+                "longClickable": false,
+                "selected": false,
+                "children": [
+                  {
+                    "index": 3,
+                    "resourceId": "view_116935807",
+                    "className": "android.widget.LinearLayout",
+                    "text": "android.widget.LinearLayout",
+                    "bounds": "0, 48, 411, 107",
+                    "clickable": false,
+                    "enabled": true,
+                    "checkable": false,
+                    "checked": false,
+                    "scrollable": false,
+                    "longClickable": false,
+                    "selected": false,
+                    "children": [
+                      {
+                        "index": 4,
+                        "resourceId": "com.example.emplab:id/iv_back",
+                        "className": "androidx.appcompat.widget.AppCompatImageView",
+                        "text": "返回",
+                        "bounds": "16, 65, 40, 89",
+                        "clickable": true,
+                        "enabled": true,
+                        "checkable": false,
+                        "checked": false,
+                        "scrollable": false,
+                        "longClickable": false,
+                        "selected": false,
+                        "children": []
+                      },
+                      {
+                        "index": 5,
+                        "resourceId": "view_228527734",
+                        "className": "com.google.android.material.textview.MaterialTextView",
+                        "text": "请休假申请 (第2步)",
+                        "bounds": "40, 64, 371, 91",
+                        "clickable": false,
+                        "enabled": true,
+                        "checkable": false,
+                        "checked": false,
+                        "scrollable": false,
+                        "longClickable": false,
+                        "selected": false,
+                        "children": []
+                      },
+                      {
+                        "index": 6,
+                        "resourceId": "view_140856439",
+                        "className": "android.view.View",
+                        "text": "android.view.View",
+                        "bounds": "371, 65, 395, 89",
+                        "clickable": false,
+                        "enabled": true,
+                        "checkable": false,
+                        "checked": false,
+                        "scrollable": false,
+                        "longClickable": false,
+                        "selected": false,
+                        "children": []
+                      }
+                    ]
+                  },
+                  {
+                    "index": 7,
+                    "resourceId": "view_192413924",
+                    "className": "android.view.View",
+                    "text": "android.view.View",
+                    "bounds": "0, 107, 411, 108",
+                    "clickable": false,
+                    "enabled": true,
+                    "checkable": false,
+                    "checked": false,
+                    "scrollable": false,
+                    "longClickable": false,
+                    "selected": false,
+                    "children": []
+                  },
+                  {
+                    "index": 8,
+                    "resourceId": "view_112593229",
+                    "className": "android.widget.ScrollView",
+                    "text": "android.widget.ScrollView",
+                    "bounds": "0, 108, 411, 810",
+                    "clickable": false,
+                    "enabled": true,
+                    "checkable": false,
+                    "checked": false,
+                    "scrollable": true,
+                    "longClickable": false,
+                    "selected": false,
+                    "children": [
+                      {
+                        "index": 9,
+                        "resourceId": "view_82242889",
+                        "className": "android.widget.LinearLayout",
+                        "text": "android.widget.LinearLayout",
+                        "bounds": "0, 108, 411, 810",
+                        "clickable": false,
+                        "enabled": true,
+                        "checkable": false,
+                        "checked": false,
+                        "scrollable": false,
+                        "longClickable": false,
+                        "selected": false,
+                        "children": [
+                          {
+                            "index": 10,
+                            "resourceId": "view_254166864",
+                            "className": "android.widget.LinearLayout",
+                            "text": "android.widget.LinearLayout",
+                            "bounds": "16, 124, 395, 298",
+                            "clickable": false,
+                            "enabled": true,
+                            "checkable": false,
+                            "checked": false,
+                            "scrollable": false,
+                            "longClickable": false,
+                            "selected": false,
+                            "children": [
+                              {
+                                "index": 11,
+                                "resourceId": "view_47724819",
+                                "className": "android.widget.LinearLayout",
+                                "text": "android.widget.LinearLayout",
+                                "bounds": "16, 124, 395, 147",
+                                "clickable": false,
+                                "enabled": true,
+                                "checkable": false,
+                                "checked": false,
+                                "scrollable": false,
+                                "longClickable": false,
+                                "selected": false,
+                                "children": [
+                                  {
+                                    "index": 12,
+                                    "resourceId": "view_15047682",
+                                    "className": "androidx.appcompat.widget.AppCompatImageView",
+                                    "text": "必填",
+                                    "bounds": "16, 125, 36, 145",
+                                    "clickable": false,
+                                    "enabled": true,
+                                    "checkable": false,
+                                    "checked": false,
+                                    "scrollable": false,
+                                    "longClickable": false,
+                                    "selected": false,
+                                    "children": []
+                                  },
+                                  {
+                                    "index": 13,
+                                    "resourceId": "view_34960974",
+                                    "className": "com.google.android.material.textview.MaterialTextView",
+                                    "text": "请假事由",
+                                    "bounds": "44, 124, 108, 147",
+                                    "clickable": false,
+                                    "enabled": true,
+                                    "checkable": false,
+                                    "checked": false,
+                                    "scrollable": false,
+                                    "longClickable": false,
+                                    "selected": false,
+                                    "children": []
+                                  }
+                                ]
+                              },
+                              {
+                                "index": 14,
+                                "resourceId": "com.example.emplab:id/etReason",
+                                "className": "androidx.appcompat.widget.AppCompatEditText",
+                                "text": "准备计划休息和恢复精力",
+                                "bounds": "16, 155, 395, 275",
+                                "clickable": false,
+                                "enabled": true,
+                                "checkable": false,
+                                "checked": false,
+                                "scrollable": false,
+                                "longClickable": true,
+                                "selected": false,
+                                "children": []
+                              },
+                              {
+                                "index": 15,
+                                "resourceId": "com.example.emplab:id/tvReasonCount",
+                                "className": "com.google.android.material.textview.MaterialTextView",
+                                "text": "剩余字数 89",
+                                "bounds": "329, 280, 395, 298",
+                                "clickable": false,
+                                "enabled": true,
+                                "checkable": false,
+                                "checked": false,
+                                "scrollable": false,
+                                "longClickable": false,
+                                "selected": false,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "index": 16,
+                            "resourceId": "view_119256971",
+                            "className": "android.widget.LinearLayout",
+                            "text": "android.widget.LinearLayout",
+                            "bounds": "16, 322, 395, 496",
+                            "clickable": false,
+                            "enabled": true,
+                            "checkable": false,
+                            "checked": false,
+                            "scrollable": false,
+                            "longClickable": false,
+                            "selected": false,
+                            "children": [
+                              {
+                                "index": 17,
+                                "resourceId": "view_156674394",
+                                "className": "android.widget.LinearLayout",
+                                "text": "android.widget.LinearLayout",
+                                "bounds": "16, 322, 395, 345",
+                                "clickable": false,
+                                "enabled": true,
+                                "checkable": false,
+                                "checked": false,
+                                "scrollable": false,
+                                "longClickable": false,
+                                "selected": false,
+                                "children": [
+                                  {
+                                    "index": 18,
+                                    "resourceId": "view_120067333",
+                                    "className": "androidx.appcompat.widget.AppCompatImageView",
+                                    "text": "必填",
+                                    "bounds": "16, 323, 36, 344",
+                                    "clickable": false,
+                                    "enabled": true,
+                                    "checkable": false,
+                                    "checked": false,
+                                    "scrollable": false,
+                                    "longClickable": false,
+                                    "selected": false,
+                                    "children": []
+                                  },
+                                  {
+                                    "index": 19,
+                                    "resourceId": "view_154906728",
+                                    "className": "com.google.android.material.textview.MaterialTextView",
+                                    "text": "拟前往地区",
+                                    "bounds": "44, 322, 124, 345",
+                                    "clickable": false,
+                                    "enabled": true,
+                                    "checkable": false,
+                                    "checked": false,
+                                    "scrollable": false,
+                                    "longClickable": false,
+                                    "selected": false,
+                                    "children": []
+                                  }
+                                ]
+                              },
+                              {
+                                "index": 20,
+                                "resourceId": "com.example.emplab:id/etDestination",
+                                "className": "androidx.appcompat.widget.AppCompatEditText",
+                                "text": "上海市梅赛德斯奔驰文化中心",
+                                "bounds": "16, 353, 395, 473",
+                                "clickable": false,
+                                "enabled": true,
+                                "checkable": false,
+                                "checked": false,
+                                "scrollable": false,
+                                "longClickable": true,
+                                "selected": false,
+                                "children": []
+                              },
+                              {
+                                "index": 21,
+                                "resourceId": "com.example.emplab:id/tvDestinationCount",
+                                "className": "com.google.android.material.textview.MaterialTextView",
+                                "text": "剩余字数 87",
+                                "bounds": "329, 478, 395, 496",
+                                "clickable": false,
+                                "enabled": true,
+                                "checkable": false,
+                                "checked": false,
+                                "scrollable": false,
+                                "longClickable": false,
+                                "selected": false,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "index": 22,
+                            "resourceId": "view_65593277",
+                            "className": "android.widget.LinearLayout",
+                            "text": "android.widget.LinearLayout",
+                            "bounds": "16, 520, 395, 672",
+                            "clickable": false,
+                            "enabled": true,
+                            "checkable": false,
+                            "checked": false,
+                            "scrollable": false,
+                            "longClickable": false,
+                            "selected": false,
+                            "children": [
+                              {
+                                "index": 23,
+                                "resourceId": "view_38759188",
+                                "className": "android.widget.LinearLayout",
+                                "text": "android.widget.LinearLayout",
+                                "bounds": "16, 520, 395, 544",
+                                "clickable": false,
+                                "enabled": true,
+                                "checkable": false,
+                                "checked": false,
+                                "scrollable": false,
+                                "longClickable": false,
+                                "selected": false,
+                                "children": [
+                                  {
+                                    "index": 24,
+                                    "resourceId": "view_109855079",
+                                    "className": "androidx.appcompat.widget.AppCompatImageView",
+                                    "text": "必填",
+                                    "bounds": "16, 521, 36, 542",
+                                    "clickable": false,
+                                    "enabled": true,
+                                    "checkable": false,
+                                    "checked": false,
+                                    "scrollable": false,
+                                    "longClickable": false,
+                                    "selected": false,
+                                    "children": []
+                                  },
+                                  {
+                                    "index": 25,
+                                    "resourceId": "view_125897138",
+                                    "className": "com.google.android.material.textview.MaterialTextView",
+                                    "text": "附件 (非必须, 最多一张图片)",
+                                    "bounds": "44, 520, 243, 544",
+                                    "clickable": false,
+                                    "enabled": true,
+                                    "checkable": false,
+                                    "checked": false,
+                                    "scrollable": false,
+                                    "longClickable": false,
+                                    "selected": false,
+                                    "children": []
+                                  }
+                                ]
+                              },
+                              {
+                                "index": 26,
+                                "resourceId": "com.example.emplab:id/layoutImageUpload",
+                                "className": "android.widget.LinearLayout",
+                                "text": "android.widget.LinearLayout",
+                                "bounds": "16, 552, 136, 672",
+                                "clickable": true,
+                                "enabled": true,
+                                "checkable": false,
+                                "checked": false,
+                                "scrollable": false,
+                                "longClickable": false,
+                                "selected": false,
+                                "children": [
+                                  {
+                                    "index": 27,
+                                    "resourceId": "com.example.emplab:id/ivUploadIcon",
+                                    "className": "androidx.appcompat.widget.AppCompatImageView",
+                                    "text": "添加图片",
+                                    "bounds": "59, 595, 91, 627",
+                                    "clickable": false,
+                                    "enabled": true,
+                                    "checkable": false,
+                                    "checked": false,
+                                    "scrollable": false,
+                                    "longClickable": false,
+                                    "selected": false,
+                                    "children": []
+                                  },
+                                  {
+                                    "index": 28,
+                                    "resourceId": "com.example.emplab:id/ivUploadedImage",
+                                    "className": "androidx.appcompat.widget.AppCompatImageView",
+                                    "text": "androidx.appcompat.widget.AppCompatImageView",
+                                    "bounds": "16, 552, 16, 552",
+                                    "clickable": false,
+                                    "enabled": true,
+                                    "checkable": false,
+                                    "checked": false,
+                                    "scrollable": false,
+                                    "longClickable": false,
+                                    "selected": false,
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "index": 29,
+                    "resourceId": "view_267521790",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 810, 411, 890",
@@ -5254,7 +5780,7 @@
                 "children": [
                   {
                     "index": 33,
-                    "resourceId": "view_234375564",
+                    "resourceId": "view_231474472",
                     "className": "android.view.View",
                     "text": "android.view.View",
                     "bounds": "0, 48, 411, 890",
@@ -5269,7 +5795,7 @@
                   },
                   {
                     "index": 34,
-                    "resourceId": "view_227047658",
+                    "resourceId": "view_183780326",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "24, 384, 387, 553",
@@ -5313,7 +5839,7 @@
                       },
                       {
                         "index": 37,
-                        "resourceId": "view_193953105",
+                        "resourceId": "view_249762173",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "44, 485, 367, 533",
@@ -5380,10 +5906,10 @@
           },
           {
             "index": 41,
-            "resourceId": "view_152841919",
+            "resourceId": "view_10053451",
             "className": "android.view.View",
             "text": "android.view.View",
-            "bounds": "292, 838, 332, 878",
+            "bounds": "287, 833, 327, 873",
             "clickable": false,
             "enabled": true,
             "checkable": false,
@@ -5413,7 +5939,7 @@
         "children": [
           {
             "index": 1,
-            "resourceId": "view_42004276",
+            "resourceId": "view_68541589",
             "className": "android.widget.FrameLayout",
             "text": "android.widget.FrameLayout",
             "bounds": "0, 48, 411, 890",
@@ -5441,7 +5967,7 @@
                 "children": [
                   {
                     "index": 3,
-                    "resourceId": "view_10854470",
+                    "resourceId": "view_116935807",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 48, 411, 107",
@@ -5470,7 +5996,7 @@
                       },
                       {
                         "index": 5,
-                        "resourceId": "view_90060377",
+                        "resourceId": "view_228527734",
                         "className": "com.google.android.material.textview.MaterialTextView",
                         "text": "请休假申请 (第2步)",
                         "bounds": "40, 64, 371, 91",
@@ -5485,7 +6011,7 @@
                       },
                       {
                         "index": 6,
-                        "resourceId": "view_260207134",
+                        "resourceId": "view_140856439",
                         "className": "android.view.View",
                         "text": "android.view.View",
                         "bounds": "371, 65, 395, 89",
@@ -5502,7 +6028,7 @@
                   },
                   {
                     "index": 7,
-                    "resourceId": "view_176417535",
+                    "resourceId": "view_192413924",
                     "className": "android.view.View",
                     "text": "android.view.View",
                     "bounds": "0, 107, 411, 108",
@@ -5517,7 +6043,7 @@
                   },
                   {
                     "index": 8,
-                    "resourceId": "view_201257164",
+                    "resourceId": "view_112593229",
                     "className": "android.widget.ScrollView",
                     "text": "android.widget.ScrollView",
                     "bounds": "0, 108, 411, 810",
@@ -5531,7 +6057,7 @@
                     "children": [
                       {
                         "index": 9,
-                        "resourceId": "view_143674808",
+                        "resourceId": "view_82242889",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "0, 108, 411, 810",
@@ -5545,7 +6071,7 @@
                         "children": [
                           {
                             "index": 10,
-                            "resourceId": "view_246822939",
+                            "resourceId": "view_254166864",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 124, 395, 298",
@@ -5559,7 +6085,7 @@
                             "children": [
                               {
                                 "index": 11,
-                                "resourceId": "view_90149418",
+                                "resourceId": "view_47724819",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "16, 124, 395, 147",
@@ -5573,7 +6099,7 @@
                                 "children": [
                                   {
                                     "index": 12,
-                                    "resourceId": "view_45276949",
+                                    "resourceId": "view_15047682",
                                     "className": "androidx.appcompat.widget.AppCompatImageView",
                                     "text": "必填",
                                     "bounds": "16, 125, 36, 145",
@@ -5588,7 +6114,7 @@
                                   },
                                   {
                                     "index": 13,
-                                    "resourceId": "view_24074129",
+                                    "resourceId": "view_34960974",
                                     "className": "com.google.android.material.textview.MaterialTextView",
                                     "text": "请假事由",
                                     "bounds": "44, 124, 108, 147",
@@ -5607,7 +6133,7 @@
                                 "index": 14,
                                 "resourceId": "com.example.emplab:id/etReason",
                                 "className": "androidx.appcompat.widget.AppCompatEditText",
-                                "text": "计划休息和恢复精力",
+                                "text": "准备计划休息和恢复精力",
                                 "bounds": "16, 155, 395, 275",
                                 "clickable": false,
                                 "enabled": true,
@@ -5622,7 +6148,7 @@
                                 "index": 15,
                                 "resourceId": "com.example.emplab:id/tvReasonCount",
                                 "className": "com.google.android.material.textview.MaterialTextView",
-                                "text": "剩余字数 91",
+                                "text": "剩余字数 89",
                                 "bounds": "329, 280, 395, 298",
                                 "clickable": false,
                                 "enabled": true,
@@ -5637,7 +6163,7 @@
                           },
                           {
                             "index": 16,
-                            "resourceId": "view_50609282",
+                            "resourceId": "view_119256971",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 322, 395, 496",
@@ -5651,7 +6177,7 @@
                             "children": [
                               {
                                 "index": 17,
-                                "resourceId": "view_111205325",
+                                "resourceId": "view_156674394",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "16, 322, 395, 345",
@@ -5665,7 +6191,7 @@
                                 "children": [
                                   {
                                     "index": 18,
-                                    "resourceId": "view_14191972",
+                                    "resourceId": "view_120067333",
                                     "className": "androidx.appcompat.widget.AppCompatImageView",
                                     "text": "必填",
                                     "bounds": "16, 323, 36, 344",
@@ -5680,7 +6206,7 @@
                                   },
                                   {
                                     "index": 19,
-                                    "resourceId": "view_29986707",
+                                    "resourceId": "view_154906728",
                                     "className": "com.google.android.material.textview.MaterialTextView",
                                     "text": "拟前往地区",
                                     "bounds": "44, 322, 124, 345",
@@ -5699,7 +6225,7 @@
                                 "index": 20,
                                 "resourceId": "com.example.emplab:id/etDestination",
                                 "className": "androidx.appcompat.widget.AppCompatEditText",
-                                "text": "上海",
+                                "text": "上海市梅赛德斯奔驰文化中心",
                                 "bounds": "16, 353, 395, 473",
                                 "clickable": false,
                                 "enabled": true,
@@ -5714,7 +6240,7 @@
                                 "index": 21,
                                 "resourceId": "com.example.emplab:id/tvDestinationCount",
                                 "className": "com.google.android.material.textview.MaterialTextView",
-                                "text": "剩余字数 98",
+                                "text": "剩余字数 87",
                                 "bounds": "329, 478, 395, 496",
                                 "clickable": false,
                                 "enabled": true,
@@ -5729,7 +6255,7 @@
                           },
                           {
                             "index": 22,
-                            "resourceId": "view_126231804",
+                            "resourceId": "view_65593277",
                             "className": "android.widget.LinearLayout",
                             "text": "android.widget.LinearLayout",
                             "bounds": "16, 520, 395, 672",
@@ -5743,7 +6269,7 @@
                             "children": [
                               {
                                 "index": 23,
-                                "resourceId": "view_175346159",
+                                "resourceId": "view_38759188",
                                 "className": "android.widget.LinearLayout",
                                 "text": "android.widget.LinearLayout",
                                 "bounds": "16, 520, 395, 544",
@@ -5757,7 +6283,7 @@
                                 "children": [
                                   {
                                     "index": 24,
-                                    "resourceId": "view_180199118",
+                                    "resourceId": "view_109855079",
                                     "className": "androidx.appcompat.widget.AppCompatImageView",
                                     "text": "必填",
                                     "bounds": "16, 521, 36, 542",
@@ -5772,7 +6298,7 @@
                                   },
                                   {
                                     "index": 25,
-                                    "resourceId": "view_172668805",
+                                    "resourceId": "view_125897138",
                                     "className": "com.google.android.material.textview.MaterialTextView",
                                     "text": "附件 (非必须, 最多一张图片)",
                                     "bounds": "44, 520, 243, 544",
@@ -5841,7 +6367,7 @@
                   },
                   {
                     "index": 29,
-                    "resourceId": "view_159663873",
+                    "resourceId": "view_267521790",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "0, 810, 411, 890",
@@ -5918,7 +6444,7 @@
                 "children": [
                   {
                     "index": 34,
-                    "resourceId": "view_66141095",
+                    "resourceId": "view_178667118",
                     "className": "android.view.View",
                     "text": "android.view.View",
                     "bounds": "0, 48, 411, 890",
@@ -5933,7 +6459,7 @@
                   },
                   {
                     "index": 35,
-                    "resourceId": "view_224265213",
+                    "resourceId": "view_20307356",
                     "className": "android.widget.LinearLayout",
                     "text": "android.widget.LinearLayout",
                     "bounds": "24, 384, 387, 553",
@@ -5977,7 +6503,7 @@
                       },
                       {
                         "index": 38,
-                        "resourceId": "view_133416384",
+                        "resourceId": "view_100951851",
                         "className": "android.widget.LinearLayout",
                         "text": "android.widget.LinearLayout",
                         "bounds": "44, 485, 367, 533",
@@ -6014,10 +6540,10 @@
           },
           {
             "index": 40,
-            "resourceId": "view_165240001",
+            "resourceId": "view_64653936",
             "className": "android.view.View",
             "text": "android.view.View",
-            "bounds": "311, 497, 351, 537",
+            "bounds": "307, 493, 347, 533",
             "clickable": false,
             "enabled": true,
             "checkable": false,
@@ -6032,9 +6558,9 @@
     ]
   ],
   "metadata": {
-    "steps": 8,
-    "output": "已成功提交2025年11月25日至26日的年休假申请，事由为‘计划休息和恢复精力’，前往地区为上海。",
-    "reason": "已成功提交2025年11月25日至26日的年休假申请，事由为‘计划休息和恢复精力’，前往地区为上海。",
+    "steps": 9,
+    "output": "Successfully submitted annual leave request for November 28-29, 2025, with the specified reason and destination.",
+    "reason": "Successfully submitted annual leave request for November 28-29, 2025, with the specified reason and destination.",
     "execution_time": 0.0,
     "model": "OpenAILike",
     "is_hot_start": false
