@@ -48,6 +48,7 @@ from droidrun.agent.common.events import (
     TapActionEvent,
 )
 from droidrun.agent.context import ContextInjectionManager
+from droidrun.agent.utils.ui_stability_checker import UIStabilityChecker
 from droidrun.agent.context.agent_persona import AgentPersona
 from droidrun.agent.context.execution_monitor import ExecutionMonitor, MonitorResult
 from droidrun.agent.context.experience_memory import ExperienceMemory, TaskExperience
@@ -250,6 +251,10 @@ class DroidAgent(Workflow):
         self.tools_instance = tools
 
         self.tools_instance.save_trajectories = self.save_trajectories
+        
+        # 初始化 UI 稳定性检测器
+        self.ui_stability_checker = UIStabilityChecker(self.tools_instance)
+        LoggingUtils.log_info("DroidAgent", "UI stability checker initialized")
 
         if self.reasoning:
             LoggingUtils.log_info("DroidAgent", "Initializing Planner Agent...")
@@ -331,8 +336,24 @@ class DroidAgent(Workflow):
                 if hasattr(self, 'trajectory') and self.trajectory:
                     self.trajectory.events.append(TaskEndEvent(success=success, reason=reason, task=task))
                     LoggingUtils.log_info("DroidAgent", "Hot start execution recorded in trajectory")
+                
+                # 清除热启动动作
                 self.pending_hot_actions = []
-                return CodeActResultEvent(success=success, reason=reason, task=task, steps=self.step_counter)
+                
+                # 如果热启动成功，直接返回结果
+                if success:
+                    LoggingUtils.log_success("DroidAgent", "🔥 Hot start completed successfully")
+                    return CodeActResultEvent(success=success, reason=reason, task=task, steps=self.step_counter)
+                else:
+                    # 热启动失败，回退到冷启动
+                    LoggingUtils.log_warning("DroidAgent", "🔥 ❄️ Hot start failed, falling back to cold start")
+
+                    task = Task(
+                        description=self.goal,
+                        status=self.task_manager.STATUS_PENDING,
+                        agent_type="Default",
+                    )
+                    LoggingUtils.log_info("DroidAgent", "🔄 Cold start task created with explicit field requirements")
 
             codeact_agent = CodeActAgent(
                 llm=self.llm,
@@ -1058,13 +1079,28 @@ class DroidAgent(Workflow):
                                     return False, f"Micro-coldstart failed at step {idx_action}, fallback to cold start"
                             
                             tap_start = time.time()
-                            await tools.tap_by_index(idx)
+                            tap_result = await tools.tap_by_index(idx)
                             tap_duration = time.time() - tap_start
                             
-                            screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
-                            wait_start = time.time()
-                            time.sleep(screenshot_wait)
-                            wait_duration = time.time() - wait_start
+                            # 检查动作是否执行成功
+                            if tap_result and "Error" in tap_result:
+                                LoggingUtils.log_warning("DroidAgent", "❄️ Hot start action failed at step {step}: {error}, falling back to cold start", 
+                                                       step=idx_action, error=tap_result)
+                                return False, f"Hot start action failed at step {idx_action}: {tap_result}"
+                            
+                            # 使用动态等待代替固定延迟
+                            use_dynamic_wait = self.config_manager.get("tools.use_dynamic_wait", True)
+                            if use_dynamic_wait:
+                                wait_start = time.time()
+                                fallback_delay = self.config_manager.get("tools.screenshot_wait_time", 1.0)
+                                wait_duration = await self.ui_stability_checker.smart_wait("tap", fallback_delay)
+                                LoggingUtils.log_debug("DroidAgent", "⏱️ Dynamic wait completed in {duration:.2f}s", duration=wait_duration)
+                            else:
+                                # 传统固定延迟
+                                screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
+                                wait_start = time.time()
+                                time.sleep(screenshot_wait)
+                                wait_duration = time.time() - wait_start
                             
                             capture_start = time.time()
                             await self._capture_ui_state_and_screenshot("tap")
@@ -1085,15 +1121,30 @@ class DroidAgent(Workflow):
                         if text:
                             input_start = time.time()
                             if index is not None:
-                                await tools.input_text(text, index)
+                                input_result = await tools.input_text(text, index)
                             else:
-                                await tools.input_text(text)
+                                input_result = await tools.input_text(text)
                             input_duration = time.time() - input_start
                             
-                            wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
-                            wait_start = time.time()
-                            time.sleep(wait_time)
-                            wait_duration = time.time() - wait_start
+                            # 检查动作是否执行成功
+                            if input_result and "Error" in input_result:
+                                LoggingUtils.log_warning("DroidAgent", "❄️ Hot start action failed at step {step}: {error}, falling back to cold start", 
+                                                       step=idx_action, error=input_result)
+                                return False, f"Hot start action failed at step {idx_action}: {input_result}"
+                            
+                            # 使用动态等待代替固定延迟
+                            use_dynamic_wait = self.config_manager.get("tools.use_dynamic_wait", True)
+                            if use_dynamic_wait:
+                                wait_start = time.time()
+                                fallback_delay = self.config_manager.get("tools.action_wait_time", 0.5)
+                                wait_duration = await self.ui_stability_checker.smart_wait("input", fallback_delay)
+                                LoggingUtils.log_debug("DroidAgent", "⏱️ Dynamic wait completed in {duration:.2f}s", duration=wait_duration)
+                            else:
+                                # 传统固定延迟
+                                wait_time = self.config_manager.get("tools.action_wait_time", 0.5)
+                                wait_start = time.time()
+                                time.sleep(wait_time)
+                                wait_duration = time.time() - wait_start
                             
                             capture_start = time.time()
                             await self._capture_ui_state_and_screenshot("input")
@@ -1118,7 +1169,14 @@ class DroidAgent(Workflow):
                         ex = int(params.get("end_x", end[0] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("x", default_x)))
                         ey = int(params.get("end_y", end[1] if isinstance(end, (list, tuple)) and len(end) >= 2 else end.get("y", default_y)))
                         dur = int(params.get("duration_ms", params.get("duration", default_duration)))
-                        await tools.swipe(sx, sy, ex, ey, dur)
+                        swipe_result = await tools.swipe(sx, sy, ex, ey, dur)
+                        
+                        # 检查动作是否执行成功
+                        if swipe_result and "Error" in str(swipe_result):
+                            LoggingUtils.log_warning("DroidAgent", "❄️ Hot start action failed at step {step}: {error}, falling back to cold start", 
+                                                   step=idx_action, error=swipe_result)
+                            return False, f"Hot start action failed at step {idx_action}: {swipe_result}"
+                        
                         screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                         time.sleep(screenshot_wait)
                         await self._capture_ui_state_and_screenshot("swipe")
@@ -1139,7 +1197,14 @@ class DroidAgent(Workflow):
                         pkg = params.get("package", params.get("pkg", ""))
                         pkg = str(pkg) if pkg is not None else ""
                         if pkg:
-                            await tools.start_app(pkg)
+                            start_app_result = await tools.start_app(pkg)
+                            
+                            # 检查动作是否执行成功
+                            if start_app_result and "Error" in str(start_app_result):
+                                LoggingUtils.log_warning("DroidAgent", "❄️ Hot start action failed at step {step}: {error}, falling back to cold start", 
+                                                       step=idx_action, error=start_app_result)
+                                return False, f"Hot start action failed at step {idx_action}: {start_app_result}"
+                            
                             long_wait = self.config_manager.get("tools.long_wait_time", 2.0)
                             time.sleep(long_wait)
                             try:
