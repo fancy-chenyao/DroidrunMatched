@@ -78,6 +78,9 @@ class Trajectory:
         self.macro: List[Event] = []
         self.goal = goal or "DroidRun automation sequence"
         self.experience_id = experience_id
+        
+        # Step 5: 失败反思列表（Memory 系统集成）
+        self.failure_reflections: List[Dict[str, Any]] = []
 
     def set_goal(self, goal: str) -> None:
         """Update the goal/description for this trajectory.
@@ -182,9 +185,20 @@ class Trajectory:
             serializable_events.append(event_dict)
 
 
+        # 准备完整的 trajectory 数据（包含 failure_reflections）
+        trajectory_data = {
+            "events": serializable_events,
+            "goal": self.goal,
+            "experience_id": self.experience_id,
+        }
+        
+        # Step 5: 如果有失败反思，添加到 trajectory 数据
+        if hasattr(self, 'failure_reflections') and self.failure_reflections:
+            trajectory_data["failure_reflections"] = self.failure_reflections
+        
         trajectory_json_path = os.path.join(trajectory_folder, "trajectory.json")
         with open(trajectory_json_path, "w", encoding="utf-8") as f:
-            json.dump(serializable_events, f, indent=2, ensure_ascii=False)
+            json.dump(trajectory_data, f, indent=2, ensure_ascii=False)
 
         # Save macro sequence as a separate file for replay
         if self.macro:
@@ -261,14 +275,23 @@ class Trajectory:
             # Load main trajectory
             trajectory_json_path = os.path.join(trajectory_folder, "trajectory.json")
             if os.path.exists(trajectory_json_path):
-                with open(trajectory_json_path, "r") as f:
-                    result["trajectory_data"] = json.load(f)
+                with open(trajectory_json_path, "r", encoding="utf-8") as f:
+                    loaded_data = json.load(f)
+                    
+                    # Step 5: 兼容旧格式（直接是 events 数组）和新格式（包含 failure_reflections 的对象）
+                    if isinstance(loaded_data, list):
+                        # 旧格式：直接是 events 数组
+                        result["trajectory_data"] = {"events": loaded_data}
+                    else:
+                        # 新格式：包含 events, goal, experience_id, failure_reflections 等
+                        result["trajectory_data"] = loaded_data
+                        
                 LoggingUtils.log_info("Trajectory", "Loaded trajectory data from {path}", path=trajectory_json_path)
 
             # Load macro sequence
             macro_json_path = os.path.join(trajectory_folder, "macro.json")
             if os.path.exists(macro_json_path):
-                with open(macro_json_path, "r") as f:
+                with open(macro_json_path, "r", encoding="utf-8") as f:
                     result["macro_data"] = json.load(f)
                 LoggingUtils.log_info("Trajectory", "Loaded macro data from {path}", path=macro_json_path)
 

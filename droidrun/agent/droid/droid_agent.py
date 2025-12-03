@@ -65,6 +65,8 @@ from droidrun.agent.droid.events import (
 )
 from droidrun.agent.oneflows.reflector import Reflector
 from droidrun.agent.planner import PlannerAgent
+from droidrun.agent.reflection import FailureReflector
+from droidrun.agent.reflection.reflection_types import FailureContext
 from droidrun.agent.utils.trajectory import Trajectory
 
 from droidrun.config import get_config_manager, UnifiedConfigManager, ExceptionConstants
@@ -135,6 +137,8 @@ class DroidAgent(Workflow):
         memory_similarity_threshold: Optional[float] = None,
         memory_storage_dir: Optional[str] = None,
         memory_config: Optional[MemoryConfig] = None,
+        # 新增失败反思参数
+        enable_failure_reflection: Optional[bool] = None,
         # 新增统一配置管理器参数
         config_manager: Optional[UnifiedConfigManager] = None,
         *args,
@@ -255,6 +259,24 @@ class DroidAgent(Workflow):
         # 初始化 UI 稳定性检测器
         self.ui_stability_checker = UIStabilityChecker(self.tools_instance)
         LoggingUtils.log_info("DroidAgent", "UI stability checker initialized")
+        
+        # 初始化失败反思模块
+        self.enable_failure_reflection = (
+            enable_failure_reflection 
+            if enable_failure_reflection is not None 
+            else self.config_manager.get("agent.failure_reflection", False)
+        )
+        
+        if self.enable_failure_reflection:
+            self.failure_reflector = FailureReflector(
+                llm=llm,
+                tools_instance=tools,
+                debug=self.debug
+            )
+            LoggingUtils.log_info("DroidAgent", "✨ Failure reflector initialized")
+        else:
+            self.failure_reflector = None
+            LoggingUtils.log_debug("DroidAgent", "Failure reflection disabled")
 
         if self.reasoning:
             LoggingUtils.log_info("DroidAgent", "Initializing Planner Agent...")
@@ -324,7 +346,7 @@ class DroidAgent(Workflow):
         if self.memory_enabled and self.memory_config.monitoring_enabled:
             self.execution_monitor.start_step_monitoring({
                 "task": task.description,
-                "step": self.step_counter,
+                "step": getattr(self, 'step_counter', 0),  # 使用 getattr 防止 AttributeError
                 "timestamp": time.time()
             })
 
@@ -332,24 +354,106 @@ class DroidAgent(Workflow):
             if self.memory_enabled and getattr(self, 'pending_hot_actions', None):
                 LoggingUtils.log_progress("DroidAgent", "Directly executing {count} hot-start actions", count=len(self.pending_hot_actions))
                 self.is_hot_start_execution = True
+                
+                # ✨ 保存热启动执行前的 UI 快照（用于失败反思）
+                pre_ui_state = None
+                if self.enable_failure_reflection:
+                    try:
+                        pre_ui_state = await self.tools_instance.get_state_async(include_screenshot=False)
+                        LoggingUtils.log_debug("DroidAgent", "Pre-execution UI snapshot saved for reflection")
+                    except Exception as e:
+                        LoggingUtils.log_warning("DroidAgent", "Failed to save pre-execution UI snapshot: {error}", error=str(e))
+                
                 success, reason = await self._direct_execute_actions_async(ctx, self.pending_hot_actions)
                 if hasattr(self, 'trajectory') and self.trajectory:
                     self.trajectory.events.append(TaskEndEvent(success=success, reason=reason, task=task))
                     LoggingUtils.log_info("DroidAgent", "Hot start execution recorded in trajectory")
                 
                 # 清除热启动动作
+                pending_actions_backup = self.pending_hot_actions.copy()  # 备份用于反思
                 self.pending_hot_actions = []
                 
                 # 如果热启动成功，直接返回结果
                 if success:
                     LoggingUtils.log_success("DroidAgent", "🔥 Hot start completed successfully")
-                    return CodeActResultEvent(success=success, reason=reason, task=task, steps=self.step_counter)
+                    return CodeActResultEvent(success=success, reason=reason, task=task, steps=getattr(self, 'step_counter', 0))
                 else:
                     # 热启动失败，回退到冷启动
                     LoggingUtils.log_warning("DroidAgent", "🔥 ❄️ Hot start failed, falling back to cold start")
+                    
+                    # ✨ Step 3: 在热启动失败时调用反思模块
+                    reflection_result = None
+                    enhanced_goal = self.goal
+                    
+                    if self.enable_failure_reflection and self.failure_reflector:
+                        try:
+                            # 保存失败后的 UI 快照
+                            post_ui_state = None
+                            try:
+                                post_ui_state = await self.tools_instance.get_state_async(include_screenshot=False)
+                                LoggingUtils.log_debug("DroidAgent", "Post-failure UI snapshot saved for reflection")
+                            except Exception as e:
+                                LoggingUtils.log_warning("DroidAgent", "Failed to save post-failure UI snapshot: {error}", error=str(e))
+                            
+                            # 构建失败上下文
+                            context_data = FailureContext.from_hot_start_failure(
+                                goal=self.goal,
+                                failed_action=pending_actions_backup[-1] if pending_actions_backup else {},
+                                error_message=reason,
+                                error_step=len(pending_actions_backup) - 1 if pending_actions_backup else 0,
+                                pre_ui_state=pre_ui_state,
+                                post_ui_state=post_ui_state,
+                                recent_actions=pending_actions_backup[-5:] if len(pending_actions_backup) > 5 else pending_actions_backup
+                            )
+                            
+                            LoggingUtils.log_info("DroidAgent", "🤔 Analyzing failure with reflector...")
+                            
+                            # 调用反思分析
+                            reflection_result = await self.failure_reflector.analyze_failure(context_data)
+                            
+                            LoggingUtils.log_info(
+                                "DroidAgent",
+                                "💡 Reflection complete: {type} (confidence: {conf:.2f})",
+                                type=reflection_result.problem_type,
+                                conf=reflection_result.confidence
+                            )
+                            
+                            # Step 5: 保存反思结果到 trajectory（Memory 系统集成）
+                            if hasattr(self.trajectory, 'failure_reflections'):
+                                self.trajectory.failure_reflections.append({
+                                    "problem_type": reflection_result.problem_type,
+                                    "root_cause": reflection_result.root_cause,
+                                    "specific_advice": reflection_result.specific_advice,
+                                    "confidence": reflection_result.confidence,
+                                    "timestamp": time.time(),
+                                    "failed_action": pending_actions_backup[-1] if pending_actions_backup else None,
+                                    "error_step": len(pending_actions_backup) - 1 if pending_actions_backup else 0
+                                })
+                                LoggingUtils.log_debug("DroidAgent", "📝 Failure reflection saved to trajectory")
+                            
+                            # 使用反思增强任务描述
+                            if reflection_result.should_apply_advice():
+                                enhanced_goal = f"{self.goal}\n\n【反思建议】{reflection_result.specific_advice}"
+                                LoggingUtils.log_info("DroidAgent", "✨ Task description enhanced with reflection advice")
+                            else:
+                                LoggingUtils.log_debug(
+                                    "DroidAgent", 
+                                    "Reflection confidence too low ({conf:.2f}), not applying advice",
+                                    conf=reflection_result.confidence
+                                )
+                        
+                        except Exception as reflection_error:
+                            LoggingUtils.log_error(
+                                "DroidAgent",
+                                "Failed to analyze failure: {error}",
+                                error=str(reflection_error)
+                            )
+                            if self.debug:
+                                import traceback
+                                LoggingUtils.log_error("DroidAgent", "{trace}", trace=traceback.format_exc())
 
                     task = Task(
-                        description=self.goal,
+                        description=enhanced_goal,
                         status=self.task_manager.STATUS_PENDING,
                         agent_type="Default",
                     )
@@ -605,7 +709,9 @@ class DroidAgent(Workflow):
                 success=False,
                 steps=0,
                 output="",
-                reason="暂不支持该功能，或任务类型判断失败"
+                reason="暂不支持该功能，或任务类型判断失败",
+                task=[],  # 必需字段（已弃用）
+                tasks=[]  # 必需字段
             )
         LoggingUtils.log_info("ExperienceMemory", f"Task determined as type: {task_type}")
         self.current_task_type = task_type
@@ -1721,7 +1827,9 @@ class DroidAgent(Workflow):
                 "reason": ev.reason,
                 "execution_time": time.time() - getattr(self, 'start_time', time.time()),
                 "model": self.llm.class_name() if hasattr(self.llm, 'class_name') else "unknown",
-                "is_hot_start": getattr(self, 'is_hot_start_execution', False)
+                "is_hot_start": getattr(self, 'is_hot_start_execution', False),
+                # Step 5: 添加失败反思信息（Memory 系统集成）
+                "failure_reflections": self.trajectory.failure_reflections if self.trajectory and hasattr(self.trajectory, 'failure_reflections') else []
             }
         )
         

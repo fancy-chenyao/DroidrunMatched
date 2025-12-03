@@ -44,6 +44,7 @@ class AgentConfig:
     reflection: bool = False
     vision: bool = False
     save_trajectories: str = "step"
+    failure_reflection: bool = True  # Failure Reflection 功能开关
 
 @dataclass
 class ToolsConfig:

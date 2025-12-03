@@ -14,10 +14,14 @@ import asyncio
 import sys
 import signal
 import argparse
+from dotenv import load_dotenv
 from rich.console import Console
 from droidrun.config import get_config_manager
 from droidrun.server import WebSocketServer
 from droidrun.agent.utils.logging_utils import LoggingUtils
+
+# 加载 .env 文件中的环境变量
+load_dotenv()
 
 console = Console()
 

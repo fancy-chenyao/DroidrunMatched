@@ -35,6 +35,7 @@ droidrun:
     micro_cold_timeout: 60
     reasoning: false
     reflection: false
+    failure_reflection: true
     vision: false
     save_trajectories: "step"
   
