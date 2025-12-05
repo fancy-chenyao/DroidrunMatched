@@ -162,6 +162,16 @@ title = "IOSTools"
 name = "ios-tools"
 contents = ["droidrun.tools.ios.IOSTools.*"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+# 使用 anyio 支持异步测试，只使用 asyncio 后端
+markers = [
+    "anyio: mark test to run with anyio",
+]
+
 [dependency-groups]
 dev = [
     "arize-phoenix>=11.32.1",

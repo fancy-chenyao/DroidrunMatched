@@ -34,6 +34,9 @@ object MessageProtocol {
         const val TASK_STATUS = "task_status"
         const val TASK_RESPONSE = "task_response"
         const val ERROR = "error"
+        // 交互式问答相关
+        const val USER_QUESTION = "user_question"
+        const val USER_ANSWER = "user_answer"
     }
     
     /**
@@ -216,7 +219,8 @@ object MessageProtocol {
      * 使用线程安全的方式生成时间戳
      */
     private fun getCurrentTimestamp(): String {
-        return dateFormatter.get().format(Date())
+        // ThreadLocal.withInitial 保证不会返回 null
+        return dateFormatter.get()!!.format(Date())
     }
 }
 

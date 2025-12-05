@@ -81,6 +81,10 @@ class WebSocketTools(Tools):
         self.memory: List[str] = []
         self.screenshots: List[Dict[str, Any]] = []
         self.save_trajectories = "none"
+        
+        # Phase 3: 交互管理器（WebSocket 回调将在后续设置）
+        from droidrun.agent.interaction import InteractionManager
+        self.interaction_manager = InteractionManager(websocket_send_callback=self._send_websocket_message)
     
     def _set_context(self, ctx: Context):
         self._ctx = ctx
@@ -89,6 +93,36 @@ class WebSocketTools(Tools):
         """生成请求ID"""
         self.request_counter += 1
         return f"{self.device_id}_{self.request_counter}_{uuid.uuid4().hex[:8]}"
+    
+    async def _send_websocket_message(self, message: Dict[str, Any]) -> None:
+        """发送 WebSocket 消息（用于 InteractionManager 回调）
+        
+        Args:
+            message: 要发送的消息字典
+        """
+        try:
+            # 通过 session_manager 发送消息到指定设备
+            success = await self.session_manager.send_to_device(self.device_id, message)
+            if success:
+                LoggingUtils.log_debug(
+                    "WebSocketTools",
+                    "Message sent via WebSocket: type={type}",
+                    type=message.get("type")
+                )
+            else:
+                LoggingUtils.log_error(
+                    "WebSocketTools",
+                    "Failed to send message to device {device_id}",
+                    device_id=self.device_id
+                )
+                raise RuntimeError(f"Failed to send message to device {self.device_id}")
+        except Exception as e:
+            LoggingUtils.log_error(
+                "WebSocketTools",
+                "Failed to send WebSocket message: {error}",
+                error=str(e)
+            )
+            raise
     
     async def _send_request_and_wait(self, command: str, params: Dict[str, Any], timeout: Optional[int] = None) -> Dict[str, Any]:
         """
@@ -883,4 +917,201 @@ class WebSocketTools(Tools):
         self.finished = True
         LoggingUtils.log_info("WebSocketTools", "Task completed: success={success}, reason={reason}", 
                             success=success, reason=reason)
+    
+    async def ask_user(
+        self,
+        question: str,
+        question_type: str = "text",
+        options: List[str] = None,
+        default_value: str = None,
+        timeout_seconds: float = 60.0
+    ) -> str:
+        """
+        询问用户问题（Phase 3: 交互式执行）
+        
+        这是 LLM 可以调用的工具方法，用于在执行过程中询问用户。
+        
+        使用场景：
+        - 需要用户确认关键操作
+        - 需要用户提供缺失的信息
+        - 需要用户从多个选项中选择
+        - 需要用户解决歧义
+        
+        Args:
+            question: 要询问的问题（清晰、具体）
+            question_type: 问题类型
+                - "text": 文本输入（默认）
+                - "choice": 从选项中选择
+                - "confirm": 是/否确认
+            options: 选项列表（用于 choice 类型）
+            default_value: 默认值（超时时使用）
+            timeout_seconds: 超时秒数（默认 60 秒）
+        
+        Returns:
+            用户的回答字符串
+        
+        Example:
+            >>> # 询问文本
+            >>> name = await ask_user("请输入您的姓名：", default_value="用户")
+            >>> 
+            >>> # 询问选择
+            >>> choice = await ask_user(
+            ...     "请选择日期格式：",
+            ...     question_type="choice",
+            ...     options=["2025-12-05", "12/05/2025", "05-Dec-2025"],
+            ...     default_value="2025-12-05"
+            ... )
+            >>> 
+            >>> # 询问确认
+            >>> confirmed = await ask_user(
+            ...     "确认要删除此项吗？",
+            ...     question_type="confirm",
+            ...     default_value="no"
+            ... )
+        
+        Note:
+            这是一个非阻塞方法，会立即返回用户答案或超时后的默认值。
+            问题会通过 WebSocket 发送到 Android 端显示对话框。
+        """
+        # 验证参数
+        if not question or not question.strip():
+            raise ValueError("Question cannot be empty")
+        
+        if question_type not in ["text", "choice", "confirm"]:
+            raise ValueError(f"Invalid question_type: {question_type}. Must be 'text', 'choice', or 'confirm'")
+        
+        if question_type == "choice" and not options:
+            raise ValueError("Options are required for 'choice' question type")
+        
+        # 获取或创建任务ID
+        task_id = "current_task"  # TODO: 从 context 获取真实的 task_id
+        
+        # 确保任务已注册
+        from droidrun.agent.interaction import TaskExecutionContext
+        if not self.interaction_manager.get_task(task_id):
+            # 创建临时任务上下文
+            temp_task = TaskExecutionContext(task_id, "临时任务（交互式执行）")
+            self.interaction_manager.register_task(temp_task)
+        
+        try:
+            # 通过 InteractionManager 发送问题
+            question_id = await self.interaction_manager.ask_user_async(
+                task_id=task_id,
+                question_text=question,
+                question_type=question_type,
+                options=options or [],
+                default_value=default_value or "",
+                timeout_seconds=timeout_seconds,
+                resume_context=None,
+                on_answer_callback=None,
+                on_timeout_callback=None
+            )
+            
+            LoggingUtils.log_info(
+                "WebSocketTools",
+                "Question sent via InteractionManager: {question} (id: {id})",
+                question=question[:50],
+                id=question_id
+            )
+            
+            # 获取问题对象并等待 Future
+            pending_question = self.interaction_manager.get_question(question_id)
+            if not pending_question or not pending_question.future:
+                raise RuntimeError(f"Failed to create question: {question_id}")
+            
+            # 等待用户回答（通过 Future）
+            answer = await pending_question.future
+            
+            LoggingUtils.log_info(
+                "WebSocketTools",
+                "User answered: {answer}",
+                answer=answer
+            )
+            
+            return str(answer) if answer is not None else (default_value or "")
+        
+        except asyncio.TimeoutError:
+            # 超时，返回默认值
+            LoggingUtils.log_warning(
+                "WebSocketTools",
+                "Question timeout after {timeout}s, using default: {default}",
+                timeout=timeout_seconds,
+                default=default_value
+            )
+            return default_value or ""
+        
+        except Exception as e:
+            # 其他错误
+            LoggingUtils.log_error(
+                "WebSocketTools",
+                "Error asking user: {error}",
+                error=str(e)
+            )
+            return default_value or ""
+    
+    async def handle_user_answer(self, answer_message: Dict[str, Any]) -> bool:
+        """处理来自 Android 端的用户答案
+        
+        这个方法应该在 WebSocket 消息处理器中被调用，
+        当收到 "user_answer" 类型的消息时。
+        
+        Args:
+            answer_message: 答案消息
+                {
+                    "type": "user_answer",
+                    "question_id": "q-abc123",
+                    "answer": "用户的回答",
+                    "timestamp": 1234567890
+                }
+        
+        Returns:
+            True 如果成功处理，False 如果失败
+        
+        Example:
+            >>> # 在 WebSocket 消息处理器中
+            >>> if message["type"] == "user_answer":
+            >>>     await tools.handle_user_answer(message)
+        """
+        try:
+            question_id = answer_message.get("question_id")
+            answer = answer_message.get("answer")
+            
+            if not question_id:
+                LoggingUtils.log_error(
+                    "WebSocketTools",
+                    "Invalid answer message: missing question_id"
+                )
+                return False
+            
+            # 路由到 InteractionManager
+            success = await self.interaction_manager.provide_answer(
+                question_id=question_id,
+                answer=answer,
+                additional_data=answer_message
+            )
+            
+            if success:
+                LoggingUtils.log_info(
+                    "WebSocketTools",
+                    "User answer processed: question_id={id}, answer={answer}",
+                    id=question_id,
+                    answer=answer
+                )
+            else:
+                LoggingUtils.log_warning(
+                    "WebSocketTools",
+                    "Question not found: {id}",
+                    id=question_id
+                )
+            
+            return success
+        
+        except Exception as e:
+            LoggingUtils.log_error(
+                "WebSocketTools",
+                "Error handling user answer: {error}",
+                error=str(e)
+            )
+            return False
+    
 

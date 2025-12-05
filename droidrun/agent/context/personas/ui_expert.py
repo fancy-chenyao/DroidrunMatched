@@ -15,7 +15,8 @@ UI_EXPERT = AgentPersona(
         Tools.tap_by_index.__name__, 
         Tools.drag.__name__,
         Tools.remember.__name__,
-        Tools.complete.__name__
+        Tools.complete.__name__,
+        Tools.ask_user.__name__,  # Phase 3: Interactive Execution
     ],
     required_context=[
         "ui_state",

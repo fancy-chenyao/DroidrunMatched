@@ -372,6 +372,12 @@ class WebSocketServer:
             self._handle_task_request
         )
         
+        # Phase 5: 注册用户答案处理器（交互式执行）
+        self.message_router.register_handler(
+            "user_answer",  # 使用字符串，因为 MessageType 可能没有这个枚举值
+            self._handle_user_answer
+        )
+        
         # 注册默认处理器（处理未知消息类型）
         self.message_router.register_default_handler(
             self._handle_unknown_message
@@ -839,6 +845,63 @@ class WebSocketServer:
         except Exception as e:
             LoggingUtils.log_error("WebSocketServer", "Failed to start WebSocket server: {error}", error=e)
             raise
+    
+    async def _handle_user_answer(self, device_id: str, message: Dict[str, Any]):
+        """
+        处理用户答案消息（Phase 5: 交互式执行）
+        
+        当 Android 端发送 user_answer 消息时，将其路由到对应设备的 WebSocketTools
+        
+        Args:
+            device_id: 设备ID
+            message: 答案消息
+                {
+                    "type": "user_answer",
+                    "question_id": "q-abc123",
+                    "answer": "用户的回答",
+                    "timestamp": 1234567890
+                }
+        """
+        try:
+            question_id = message.get("question_id")
+            answer = message.get("answer")
+            
+            LoggingUtils.log_info(
+                "WebSocketServer",
+                "Received user answer from device {device_id}: question_id={qid}, answer={answer}",
+                device_id=device_id,
+                qid=question_id,
+                answer=answer
+            )
+            
+            # 找到对应设备的 WebSocketTools 实例
+            tools = self._device_tools_map.get(device_id)
+            if tools:
+                # 调用 WebSocketTools 的答案处理方法
+                success = await tools.handle_user_answer(message)
+                if success:
+                    LoggingUtils.log_success(
+                        "WebSocketServer",
+                        "User answer processed successfully"
+                    )
+                else:
+                    LoggingUtils.log_warning(
+                        "WebSocketServer",
+                        "Failed to process user answer (question not found?)"
+                    )
+            else:
+                LoggingUtils.log_error(
+                    "WebSocketServer",
+                    "No WebSocketTools instance found for device {device_id}",
+                    device_id=device_id
+                )
+        
+        except Exception as e:
+            LoggingUtils.log_error(
+                "WebSocketServer",
+                "Error handling user answer: {error}",
+                error=str(e)
+            )
     
     async def stop(self):
         """停止 WebSocket 服务器"""

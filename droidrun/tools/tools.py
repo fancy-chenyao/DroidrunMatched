@@ -217,6 +217,8 @@ def describe_tools(tools: Tools, exclude_tools: Optional[List[str]] = None) -> D
         # state management
         "remember": tools.remember,
         "complete": tools.complete,
+        # User interaction (Phase 3: Interactive Execution)
+        "ask_user": tools.ask_user,
     }
 
     # Remove excluded tools
