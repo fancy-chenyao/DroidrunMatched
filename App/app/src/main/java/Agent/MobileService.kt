@@ -65,6 +65,7 @@ class MobileService : Service() {
     private lateinit var mSpeech: MobileGPTSpeechRecognizer
     private lateinit var agentFloatingWindow: AgentFloatingWindowManager
     private var mMobileGPTGlobal: MobileGPTGlobal? = null
+    private var questionHandler: InteractionQuestionHandler? = null  // Phase 3: 交互式问答处理器
     private var nodeMap: HashMap<Int, GenericElement>? = null
     private var instruction: String? = null
     private var targetPackageName: String? = null
@@ -2151,6 +2152,11 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
             // 清理其他资源
             unregisterReceiver(stringReceiver)
             
+            // Phase 3: 清理交互式问答处理器
+            questionHandler?.cleanup()
+            questionHandler = null
+            Log.d(TAG, "InteractionQuestionHandler 已清理")
+            
             // 清理WebSocket连接
             stopHeartbeatTask()
             wsClient?.disconnect()
@@ -2242,6 +2248,9 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
             // 2. 如果WebSocket客户端不存在，创建它
             if (wsClient == null) {
                 wsClient = WebSocketClient()
+                // Phase 3: 创建交互式问答处理器
+                questionHandler = InteractionQuestionHandler(this@MobileService, wsClient!!)
+                Log.d(TAG, "InteractionQuestionHandler 已初始化")
             }
             
             // 3. 创建监听器（如果还没有，或者需要更新回调）
@@ -2387,6 +2396,25 @@ ${element.children.joinToString("") { it.toXmlString(1) }}
                 MessageProtocol.MessageType.ERROR -> {
                     val error = message.optString("error", "Unknown error")
                     Log.e(TAG, "收到错误消息: $error")
+                }
+                
+                "user_question" -> {
+                    // Phase 3: 处理交互式问答
+                    Log.d(TAG, "收到用户问题消息")
+                    questionHandler?.handleQuestionMessage(message) ?: run {
+                        Log.e(TAG, "InteractionQuestionHandler 未初始化，无法处理问题")
+                        // 发送默认答案
+                        val questionId = message.optString("question_id", "")
+                        val defaultValue = message.optString("default_value", "")
+                        if (questionId.isNotEmpty()) {
+                            val answerMessage = JSONObject().apply {
+                                put("type", "user_answer")
+                                put("question_id", questionId)
+                                put("answer", defaultValue)
+                            }
+                            wsClient?.sendMessage(answerMessage)
+                        }
+                    }
                 }
                 
                 else -> {

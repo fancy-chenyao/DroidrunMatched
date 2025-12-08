@@ -366,8 +366,8 @@ class SessionManager:
         mtype = message.get("type") if isinstance(message, dict) else None
         if mtype in ["command", "command_response"]:
             return 0  # 最高优先级
-        elif mtype == "task_response":
-            return 1  # 中等优先级
+        elif mtype in ["task_response", "user_question"]:
+            return 1  # 中等优先级（用户问题需要及时显示）
         else:
             return 2  # 低优先级（包括heartbeat_ack）
     
