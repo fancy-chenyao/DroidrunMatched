@@ -189,6 +189,36 @@ class Tools(ABC):
         Complete the tool. This is used to indicate that the tool has completed its task.
         """
         pass
+    
+    async def ask_user(
+        self,
+        question: str,
+        question_type: str = "text",
+        options: Optional[List[str]] = None,
+        default_value: Optional[str] = None,
+        timeout_seconds: float = 60.0,
+    ) -> str:
+        """
+        Ask the user a question and wait for their response.
+        
+        Args:
+            question: The question to ask the user
+            question_type: Type of question - "text", "choice", or "confirm"
+            options: List of options for "choice" type questions
+            default_value: Default value if user doesn't respond
+            timeout_seconds: Timeout in seconds
+        
+        Returns:
+            The user's answer as a string
+        
+        Note:
+            This is a default implementation that raises NotImplementedError.
+            Subclasses like WebSocketTools should override this method to provide actual functionality.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support interactive user questions. "
+            "This feature is only available when using WebSocket-based tools."
+        )
 
 
 def describe_tools(tools: Tools, exclude_tools: Optional[List[str]] = None) -> Dict[str, Callable[..., Any]]:
