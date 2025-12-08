@@ -201,6 +201,18 @@ class Tools(ABC):
         """
         Ask the user a question and wait for their response.
         
+        IMPORTANT: This should be used as a LAST RESORT ONLY!
+        Before calling ask_user(), you must:
+        - Try scrolling to see if missing fields appear
+        - Click "Next", "Confirm", "Continue" buttons to check for additional pages
+        - Explore all tabs, expandable sections, or navigation options
+        - Verify there's no programmatic way to proceed
+        
+        Only use ask_user() when:
+        - You've exhausted ALL UI exploration options
+        - Information is genuinely ambiguous and requires user clarification
+        - The app requires external information not available in the UI
+        
         Args:
             question: The question to ask the user
             question_type: Type of question - "text", "choice", or "confirm"

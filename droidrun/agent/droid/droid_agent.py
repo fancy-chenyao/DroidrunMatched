@@ -1769,9 +1769,10 @@ class DroidAgent(Workflow):
                                     count=len(page_sequence))
             else:
                 # 冷启动：调用LLM提取详细的页面序列（保留完整语义信息）
+                from droidrun.agent.utils.trajectory import make_serializable
                 page_sequence = self.llm_services.extract_page_sequence({
                     "ui_states": self.trajectory.ui_states,
-                    "events": [e.__dict__ for e in self.trajectory.events]
+                    "events": [make_serializable(e) for e in self.trajectory.events]
                 })
                 LoggingUtils.log_info("DroidAgent", "Cold start: Extracted {count} pages using LLM", 
                                     count=len(page_sequence))
