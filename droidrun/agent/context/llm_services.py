@@ -17,85 +17,6 @@ class LLMServices:
         self.llm = llm
         LoggingUtils.log_info("LLMServices", "LLMServices initialized")
     
-    
-#     def analyze_execution_anomaly(self, execution_log: List[Dict]) -> Dict[str, Any]:
-#         """分析执行异常"""
-#         try:
-#             prompt = f"""
-# 分析以下执行日志，检测是否存在异常：
-
-# 执行日志: {json.dumps(execution_log, ensure_ascii=False, indent=2)}
-
-# 请分析并返回JSON格式：
-# {{
-#     "has_anomaly": true/false,
-#     "anomaly_type": "异常类型",
-#     "confidence": 0.0-1.0,
-#     "description": "异常描述",
-#     "suggestion": "建议的回退策略"
-# }}
-# """
-#             response = self.llm.complete(prompt)
-            
-#             # 解析JSON响应
-#             json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-#             if json_match:
-#                 analysis = json.loads(json_match.group())
-#                 logger.info(f"🔍 LLM execution analysis completed")
-#                 return analysis
-#             else:
-#                 logger.warning("Could not parse anomaly analysis from LLM response")
-#                 return {
-#                     "has_anomaly": False,
-#                     "anomaly_type": "unknown",
-#                     "confidence": 0.5,
-#                     "description": "Could not parse LLM response",
-#                     "suggestion": "Continue with current execution"
-#                 }
-                
-#         except Exception as e:
-#             logger.warning(f"LLM anomaly analysis failed: {e}")
-#             return {
-#                 "has_anomaly": False,
-#                 "anomaly_type": "analysis_error",
-#                 "confidence": 0.3,
-#                 "description": f"Analysis failed: {str(e)}",
-#                 "suggestion": "Continue with current execution"
-#             }
-    
-    def extract_page_sequence(self, trajectory: Dict) -> List[Dict]:
-        """从轨迹中提取页面序列"""
-        try:
-            prompt = f"""
-从以下执行轨迹中提取页面转换序列：
-
-轨迹数据: {json.dumps(trajectory, ensure_ascii=False, indent=2)}
-
-请返回页面序列，每个页面包含：
-- page_name: 页面名称
-- page_features: 页面特征描述
-- transition_action: 转换动作
-- ui_elements: 关键UI元素
-
-返回JSON格式的数组：
-"""
-            response = self.llm.complete(prompt)
-            
-            # 解析JSON响应
-            json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
-            if json_match:
-                page_sequence = json.loads(json_match.group())
-                LoggingUtils.log_info("LLMServices", "Extracted {count} pages from trajectory", count=len(page_sequence))
-                return page_sequence
-            else:
-                LoggingUtils.log_warning("LLMServices", "Could not parse page sequence from LLM response")
-                return []
-                
-        except Exception as e:
-            LoggingUtils.log_warning("LLMServices", "Page sequence extraction failed: {error}", error=e)
-            return []
-
-    
     def _create_experience_summary(self, experience: Dict, index: int) -> Dict:
         """
         创建经验的精简摘要，用于LLM选择
@@ -121,7 +42,6 @@ class LLMServices:
             },
             "statistics": {
                 "action_count": len(experience.get("action_sequence", [])),
-                "page_count": len(experience.get("page_sequence", [])),
                 "action_types": action_types,
             }
         }
@@ -421,75 +341,4 @@ class LLMServices:
             return text
         except Exception:
             # 最小兜底：返回动作描述或极泛化短句，保持通用
-            return desc or "完成该窗口的当前子阶段"
-    
-#     def generate_fallback_strategy(self, anomaly_type: str, anomaly_details: Dict) -> str:
-#         """生成回退策略"""
-#         try:
-#             prompt = f"""
-# 基于以下异常信息，生成具体的回退策略：
-
-# 异常类型: {anomaly_type}
-# 异常详情: {json.dumps(anomaly_details, ensure_ascii=False, indent=2)}
-
-# 请提供具体的回退策略，包括：
-# 1. 回退步骤
-# 2. 参数调整
-# 3. 预期结果
-
-# 回退策略：
-# """
-#             response = self.llm.complete(prompt)
-#             strategy = response.text.strip()
-#             logger.info(f"🔄 Generated fallback strategy for {anomaly_type}")
-#             return strategy
-            
-#         except Exception as e:
-#             logger.warning(f"Fallback strategy generation failed: {e}")
-#             return f"Default fallback strategy for {anomaly_type}"
-    
-#     def validate_ui_state(self, ui_state: Dict, expected_elements: List[str]) -> Dict[str, Any]:
-#         """验证UI状态"""
-#         try:
-#             prompt = f"""
-# 验证当前UI状态是否包含期望的元素：
-
-# 当前UI状态: {json.dumps(ui_state, ensure_ascii=False, indent=2)}
-# 期望元素: {expected_elements}
-
-# 请返回JSON格式：
-# {{
-#     "is_valid": true/false,
-#     "found_elements": ["找到的元素"],
-#     "missing_elements": ["缺失的元素"],
-#     "confidence": 0.0-1.0,
-#     "suggestion": "建议"
-# }}
-# """
-#             response = self.llm.complete(prompt)
-            
-#             # 解析JSON响应
-#             json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-#             if json_match:
-#                 validation = json.loads(json_match.group())
-#                 logger.info(f"✅ UI state validation completed")
-#                 return validation
-#             else:
-#                 logger.warning("Could not parse UI validation from LLM response")
-#                 return {
-#                     "is_valid": False,
-#                     "found_elements": [],
-#                     "missing_elements": expected_elements,
-#                     "confidence": 0.3,
-#                     "suggestion": "Could not validate UI state"
-#                 }
-                
-#         except Exception as e:
-#             logger.warning(f"UI state validation failed: {e}")
-#             return {
-#                 "is_valid": False,
-#                 "found_elements": [],
-#                 "missing_elements": expected_elements,
-#                 "confidence": 0.3,
-#                 "suggestion": f"Validation failed: {str(e)}"
-#             }
+            return desc or "完成当前子阶段"
