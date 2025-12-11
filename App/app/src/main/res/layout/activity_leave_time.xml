@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+<!-- 主内容区域 -->
+<LinearLayout
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -60,6 +65,7 @@
 
     <!-- 主内容区域 -->
     <ScrollView
+        android:id="@+id/mainScrollView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -261,20 +267,6 @@
 
     </ScrollView>
 
-    <!-- 自定义日期选择器容器 -->
-    <FrameLayout
-        android:id="@+id/datePickerContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="gone" />
-
-    <!-- 自定义时间选择器容器 -->
-    <FrameLayout
-        android:id="@+id/timePickerContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="gone" />
-
     <!-- 底部确认按钮 -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -296,3 +288,33 @@
     </LinearLayout>
 
 </LinearLayout>
+
+<!-- 日期选择器遮罩层 -->
+<FrameLayout
+    android:id="@+id/datePickerContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#80000000"
+    android:clickable="true"
+    android:focusable="true"
+    android:visibility="gone">
+    
+    <!-- 日期选择器将被添加到这里 -->
+    
+</FrameLayout>
+
+<!-- 时间选择器遮罩层 -->
+<FrameLayout
+    android:id="@+id/timePickerContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#80000000"
+    android:clickable="true"
+    android:focusable="true"
+    android:visibility="gone">
+    
+    <!-- 时间选择器将被添加到这里 -->
+    
+</FrameLayout>
+
+</FrameLayout>
