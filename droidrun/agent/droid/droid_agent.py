@@ -60,10 +60,8 @@ from droidrun.agent.droid.events import (
     CodeActExecuteEvent,
     CodeActResultEvent,
     ReasoningLogicEvent,
-    FinalizeEvent,
-    ReflectionEvent
+    FinalizeEvent
 )
-from droidrun.agent.oneflows.reflector import Reflector
 from droidrun.agent.planner import PlannerAgent
 from droidrun.agent.reflection import FailureReflector
 from droidrun.agent.reflection.reflection_types import FailureContext
@@ -291,9 +289,6 @@ class DroidAgent(Workflow):
                 debug=self.debug,
             )
             self.max_codeact_steps = 5
-
-            if self.reflection:
-                self.reflector = Reflector(llm=llm, debug=self.debug)
 
         else:
             LoggingUtils.log_debug("DroidAgent", "Planning disabled - will execute tasks directly with CodeActAgent")
@@ -530,7 +525,7 @@ class DroidAgent(Workflow):
     @step
     async def handle_codeact_execute(
         self, ctx: Context, ev: CodeActResultEvent
-    ) -> FinalizeEvent | ReflectionEvent | ReasoningLogicEvent:
+    ) -> FinalizeEvent | ReasoningLogicEvent:
         try:
             task = ev.task
             if not self.reasoning:
@@ -543,10 +538,7 @@ class DroidAgent(Workflow):
                     steps=ev.steps,
                 )
 
-            if self.reflection and ev.success:
-                return ReflectionEvent(task=task)
-
-            # Reasoning is enabled but reflection is disabled.
+            # Reasoning is enabled.
             # Success: mark complete and proceed to next step in reasoning loop.
             # Failure: mark failed and trigger planner immediately without advancing to the next queued task.
             if ev.success:
@@ -569,27 +561,6 @@ class DroidAgent(Workflow):
                 tasks=tasks,
                 steps=self.step_counter,
             )
-
-    @step
-    async def reflect(
-        self, ctx: Context, ev: ReflectionEvent
-    ) -> ReasoningLogicEvent | CodeActExecuteEvent:
-        task = ev.task
-        if ev.task.agent_type == "AppStarterExpert":
-            self.task_manager.complete_task(task)
-            return ReasoningLogicEvent()
-
-        reflection = await self.reflector.reflect_on_episodic_memory(
-            episodic_memory=self.current_episodic_memory, goal=task.description
-        )
-
-        if reflection.goal_achieved:
-            self.task_manager.complete_task(task)
-            return ReasoningLogicEvent()
-
-        else:
-            self.task_manager.fail_task(task)
-            return ReasoningLogicEvent(reflection=reflection)
 
     @step
     async def handle_reasoning_logic(

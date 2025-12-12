@@ -347,7 +347,7 @@ if tools:
 
 1. **启动 Python 服务器**
    ```bash
-   python -m droidrun.server.start_server
+   python server.py
    ```
 
 2. **连接 Android 设备**

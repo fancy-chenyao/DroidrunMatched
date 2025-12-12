@@ -132,7 +132,7 @@ async def run_command(
                         "WebSocket 服务器未运行。请先启动服务器：\n"
                         "  droidrun server\n"
                         "或：\n"
-                        "  python -m droidrun.server.start_server"
+                        "  python server.py"
                     )
                 
                 # 查询已连接设备

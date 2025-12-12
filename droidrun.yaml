@@ -59,7 +59,9 @@ droidrun:
   # API配置
   api:
     api_key: null  # 从环境变量 ALIYUN_API_KEY 获取
-    model: "qwen3-max"
-    api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    # model: "qwen3-max"
+    # api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: "autoglm-phone-9b"
+    api_base: "http://192.168.100.230:8005/v1"
     timeout: 30
     max_retries: 3

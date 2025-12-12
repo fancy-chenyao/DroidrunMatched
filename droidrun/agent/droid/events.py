@@ -27,7 +27,3 @@ class FinalizeEvent(Event):
 
 class TaskRunnerEvent(Event):
     pass
-
-class ReflectionEvent(Event):
-    task: Task
-    pass
