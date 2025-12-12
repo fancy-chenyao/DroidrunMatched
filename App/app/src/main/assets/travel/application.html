@@ -392,7 +392,7 @@
             <div class="form-group">
                 <div class="form-item" onclick="selectTraveler()">
                     <div class="form-label">出差人(含同行人)</div>
-                    <div class="form-value" id="traveler-value">张博涛</div>
+                    <div class="form-value" id="traveler-value">范辰尧</div>
                     <div class="form-arrow">></div>
                 </div>
             </div>
@@ -419,7 +419,7 @@
             <div class="form-group">
                 <div class="form-item" onclick="selectCenter()">
                     <div class="form-label">费用责任中心</div>
-                    <div class="form-value" id="center-value">建行集团金融科技创新中心 (金融科技联</div>
+                    <div class="form-value" id="center-value">建行集团金融科技创新中心（金融科技联合创新实验室）</div>
                     <div class="form-arrow">></div>
                 </div>
             </div>
@@ -709,7 +709,7 @@
         
         // 选择出差人
         function selectTraveler() {
-            const travelers = ['张博涛', '李小明', '王小红', '赵大伟', '陈小芳'];
+            const travelers = ['范辰尧', '刘冬', '张博涛', '孟祥龙', '曹佳倩'];
             const currentValue = document.getElementById('traveler-value').textContent;
             
             showSelector('选择出差人', travelers, currentValue, function(selected) {
@@ -757,11 +757,9 @@
         // 选择费用责任中心
         function selectCenter() {
             const centers = [
-                '建行集团金融科技创新中心 (金融科技联)',
-                '建行集团信息技术部',
-                '建行集团人力资源部',
-                '建行集团财务部',
-                '建行集团市场部'
+                '建行集团金融科技创新中心（金融科技联合创新实验室）',
+                '建行运营数据中心',
+                '总行金融科技部'
             ];
             const currentValue = document.getElementById('center-value').textContent;
             

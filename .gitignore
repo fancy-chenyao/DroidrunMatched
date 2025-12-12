@@ -34,3 +34,5 @@ todo.txt
 App/local.properties
 droidrun.yaml
 .gradle/
+a11y_exports/
+experiences/

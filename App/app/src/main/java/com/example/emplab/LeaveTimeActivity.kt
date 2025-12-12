@@ -21,6 +21,13 @@ class LeaveTimeActivity : AppCompatActivity() {
     private lateinit var datePickerContainer: FrameLayout
     private lateinit var timePickerContainer: FrameLayout
     
+    // 底层可交互元素的引用
+    private lateinit var layoutStartDate: LinearLayout
+    private lateinit var layoutEndDate: LinearLayout
+    private lateinit var layoutStartTimeType: LinearLayout
+    private lateinit var layoutEndTimeType: LinearLayout
+    private lateinit var mainScrollView: ScrollView
+    
     private var startDate: Date = Date()
     private var endDate: Date = Date()
     private var startTimeType = "全天"
@@ -50,6 +57,21 @@ class LeaveTimeActivity : AppCompatActivity() {
         btnConfirm = findViewById(R.id.btnConfirm)
         datePickerContainer = findViewById(R.id.datePickerContainer)
         timePickerContainer = findViewById(R.id.timePickerContainer)
+        
+        // 初始化底层可交互元素的引用
+        layoutStartDate = findViewById(R.id.layoutStartDate)
+        layoutEndDate = findViewById(R.id.layoutEndDate)
+        layoutStartTimeType = findViewById(R.id.layoutStartTimeType)
+        layoutEndTimeType = findViewById(R.id.layoutEndTimeType)
+        mainScrollView = findViewById(R.id.mainScrollView)
+        
+        // 设置遮罩层点击事件，点击遮罩层关闭选择器
+        datePickerContainer.setOnClickListener {
+            hideCustomDatePicker()
+        }
+        timePickerContainer.setOnClickListener {
+            hideCustomTimePicker()
+        }
         
         // 初始化自定义日期选择器
         initCustomDatePicker()
@@ -177,6 +199,11 @@ class LeaveTimeActivity : AppCompatActivity() {
         customDatePicker = CustomDatePickerView(this)
         datePickerContainer.addView(customDatePicker)
         
+        // 防止点击选择器本身时触发遮罩层的关闭事件
+        customDatePicker?.setOnClickListener {
+            // 拦截点击事件，不传递给父容器
+        }
+        
         // 设置日期选择监听器
         customDatePicker?.setOnDateSelectedListener { selectedDate ->
             if (isSelectingStartDate) {
@@ -207,6 +234,9 @@ class LeaveTimeActivity : AppCompatActivity() {
     private fun showCustomDatePicker(isStartDate: Boolean) {
         isSelectingStartDate = isStartDate
         
+        // 禁用底层元素的交互
+        disableUnderlyingViews()
+        
         // 设置当前选中的日期
         val currentDate = if (isStartDate) startDate else endDate
         customDatePicker?.setSelectedDate(currentDate)
@@ -225,6 +255,9 @@ class LeaveTimeActivity : AppCompatActivity() {
     private fun hideCustomDatePicker() {
         customDatePicker?.hide()
         datePickerContainer.visibility = View.GONE
+        
+        // 恢复底层元素的交互
+        enableUnderlyingViews()
         
         Log.d("LeaveTimeActivity", "隐藏自定义日期选择器 - 等待ViewTreeObserver自动检测")
         // 不再手动触发，依赖ViewTreeObserver自动检测
@@ -249,6 +282,11 @@ class LeaveTimeActivity : AppCompatActivity() {
         customTimePicker = CustomTimePickerView(this)
         timePickerContainer.addView(customTimePicker)
         
+        // 防止点击选择器本身时触发遮罩层的关闭事件
+        customTimePicker?.setOnClickListener {
+            // 拦截点击事件，不传递给父容器
+        }
+        
         // 设置时间选择监听器
         customTimePicker?.setOnTimeSelectedListener { selectedTimeType ->
             if (isSelectingStartTime) {
@@ -270,6 +308,9 @@ class LeaveTimeActivity : AppCompatActivity() {
      */
     private fun showCustomTimePicker(isStartTime: Boolean) {
         isSelectingStartTime = isStartTime
+        
+        // 禁用底层元素的交互
+        disableUnderlyingViews()
         
         // 设置标题
         val title = if (isStartTime) "选择开始时间" else "选择结束时间"
@@ -294,7 +335,50 @@ class LeaveTimeActivity : AppCompatActivity() {
         customTimePicker?.hide()
         timePickerContainer.visibility = View.GONE
         
+        // 恢复底层元素的交互
+        enableUnderlyingViews()
+        
         Log.d("LeaveTimeActivity", "隐藏自定义时间选择器 - 等待ViewTreeObserver自动检测")
         // 不再手动触发，依赖ViewTreeObserver自动检测
+    }
+    
+    /**
+     * 禁用底层可交互元素，防止在选择器弹出时被程序化操作
+     */
+    private fun disableUnderlyingViews() {
+        layoutStartDate.isEnabled = false
+        layoutEndDate.isEnabled = false
+        layoutStartTimeType.isEnabled = false
+        layoutEndTimeType.isEnabled = false
+        btnConfirm.isEnabled = false
+        mainScrollView.isEnabled = false
+        
+        // 同时禁用子元素
+        tvStartDate.isEnabled = false
+        tvEndDate.isEnabled = false
+        tvStartTimeType.isEnabled = false
+        tvEndTimeType.isEnabled = false
+        
+        Log.d("LeaveTimeActivity", "已禁用底层可交互元素")
+    }
+    
+    /**
+     * 启用底层可交互元素
+     */
+    private fun enableUnderlyingViews() {
+        layoutStartDate.isEnabled = true
+        layoutEndDate.isEnabled = true
+        layoutStartTimeType.isEnabled = true
+        layoutEndTimeType.isEnabled = true
+        btnConfirm.isEnabled = true
+        mainScrollView.isEnabled = true
+        
+        // 同时启用子元素
+        tvStartDate.isEnabled = true
+        tvEndDate.isEnabled = true
+        tvStartTimeType.isEnabled = true
+        tvEndTimeType.isEnabled = true
+        
+        Log.d("LeaveTimeActivity", "已启用底层可交互元素")
     }
 }

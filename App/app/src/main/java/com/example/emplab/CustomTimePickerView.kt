@@ -89,13 +89,14 @@ class CustomTimePickerView @JvmOverloads constructor(
         // 取消按钮
         tvCancel.setOnClickListener {
             onCancelListener?.invoke()
-            hide()
+            // 不再调用hide()，让Activity执行完整的隐藏逻辑
         }
 
         // 确认按钮
         tvOk.setOnClickListener {
             onTimeSelectedListener?.invoke(selectedTimeType)
-            hide()
+            // 调用取消监听器，让Activity执行完整的隐藏逻辑
+            onCancelListener?.invoke()
         }
     }
 

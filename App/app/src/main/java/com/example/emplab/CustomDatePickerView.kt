@@ -257,7 +257,8 @@ class CustomDatePickerView @JvmOverloads constructor(
          selectedDate?.let { date ->
              onDateSelectedListener?.invoke(date)
          }
-         hide()
+         // 调用取消监听器，让Activity执行完整的隐藏逻辑（包括隐藏遮罩层和启用底层元素）
+         onCancelListener?.invoke()
     }
 
     /**
