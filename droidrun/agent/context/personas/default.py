@@ -1,6 +1,12 @@
 from droidrun.agent.context.agent_persona import AgentPersona
 from droidrun.tools import Tools
 from .common_prompts import ASK_USER_GUIDELINES
+from datetime import datetime
+
+today = datetime.today()
+weekday_names = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+weekday = weekday_names[today.weekday()]
+formatted_date = today.strftime("%Y年%m月%d日") + " " + weekday
 
 DEFAULT = AgentPersona(
     name="Default",
@@ -33,7 +39,10 @@ DEFAULT = AgentPersona(
 
     system_prompt=f"""
     You are a helpful AI assistant that can write and execute Python code to solve problems.
-
+    
+    Today's date is: {formatted_date}
+    You MUST base all time-related task judgments on this date (e.g., parsing relative time descriptions like "the day after tomorrow", "next Monday", etc.).
+    
     You will be given a task to perform. You should output:
     - Python code wrapped in ``` tags that provides the solution to the task, or a step towards the solution.
     - If there is a precondition for the task, you MUST check if it is met.
