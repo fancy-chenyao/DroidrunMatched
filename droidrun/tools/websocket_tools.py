@@ -82,6 +82,9 @@ class WebSocketTools(Tools):
         self.screenshots: List[Dict[str, Any]] = []
         self.save_trajectories = "none"
         
+        # Phase 4: 当前任务ID（由 DroidAgent 注入，用于 ask_user）
+        self._current_task_id: Optional[str] = None
+        
         # Phase 3: 交互管理器（WebSocket 回调将在后续设置）
         from droidrun.agent.interaction import InteractionManager
         self.interaction_manager = InteractionManager(websocket_send_callback=self._send_websocket_message)
@@ -983,15 +986,20 @@ class WebSocketTools(Tools):
         if question_type == "choice" and not options:
             raise ValueError("Options are required for 'choice' question type")
         
-        # 获取或创建任务ID
-        task_id = "current_task"  # TODO: 从 context 获取真实的 task_id
+        # 获取任务ID（优先使用 DroidAgent 注入的 task_id）
+        task_id = getattr(self, '_current_task_id', None) or f"task_{self.device_id}_{uuid.uuid4().hex[:8]}"
         
         # 确保任务已注册
         from droidrun.agent.interaction import TaskExecutionContext
         if not self.interaction_manager.get_task(task_id):
-            # 创建临时任务上下文
-            temp_task = TaskExecutionContext(task_id, "临时任务（交互式执行）")
+            # 创建任务上下文（如果 DroidAgent 没有注入，则创建临时任务）
+            temp_task = TaskExecutionContext(task_id, f"交互式任务 (device: {self.device_id})")
             self.interaction_manager.register_task(temp_task)
+            LoggingUtils.log_debug(
+                "WebSocketTools",
+                "Created temporary task context: {task_id}",
+                task_id=task_id
+            )
         
         try:
             # 通过 InteractionManager 发送问题

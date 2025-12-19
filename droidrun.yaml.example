@@ -37,6 +37,11 @@ droidrun:
     reflection: false
     vision: false
     save_trajectories: "step"
+    
+    # 微冷启动优化配置
+    use_micro_persona: true  # 使用微冷启动专用提示词（减少 40% tokens，节省 20% 时间）
+    disable_vision_for_simple_tasks: true  # 简单任务禁用 Vision（节省 30% 时间，推荐启用）
+    micro_auto_complete: false  # 自动 complete（已废弃，不推荐使用）
   
   # 工具配置
   tools:

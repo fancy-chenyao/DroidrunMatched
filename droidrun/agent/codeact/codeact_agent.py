@@ -86,8 +86,16 @@ class CodeActAgent(Workflow):
 
         self.tool_descriptions = chat_utils.parse_tool_descriptions(self.tool_list)
 
+        # 获取当前日期（用于 system_prompt 中的 {formatted_date} 占位符）
+        from datetime import datetime
+        today = datetime.today()
+        weekday_names = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+        weekday = weekday_names[today.weekday()]
+        formatted_date = today.strftime("%Y年%m月%d日") + " " + weekday
+
         self.system_prompt_content = persona.system_prompt.format(
-            tool_descriptions=self.tool_descriptions
+            tool_descriptions=self.tool_descriptions,
+            formatted_date=formatted_date
         )
         self.system_prompt = ChatMessage(
             role="system", content=self.system_prompt_content
@@ -181,7 +189,7 @@ class CodeActAgent(Workflow):
             chat_history = await chat_utils.add_memory_block(self.remembered_info, chat_history)
 
         # 统一先取一次状态（包含截图引用），后续根据需要下载截图字节
-        state = await self.tools.get_state_async(include_screenshot=True)
+        state = await self.tools.get_state_async(include_screenshot=False)
         try:
             a11y_tree = state.get("a11y_tree")
             phone_state = state.get("phone_state")
@@ -509,7 +517,7 @@ class CodeActAgent(Workflow):
             screenshot = None
             
             try:
-                state = await self.tools.get_state_async(include_screenshot=True)
+                state = await self.tools.get_state_async(include_screenshot=False)
                 a11y_tree = state.get("a11y_tree")
                 ref = (state or {}).get("screenshot_ref") or {}
                 url = ref.get("url")

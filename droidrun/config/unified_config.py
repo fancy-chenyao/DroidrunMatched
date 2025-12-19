@@ -45,6 +45,11 @@ class AgentConfig:
     vision: bool = False
     save_trajectories: str = "step"
     failure_reflection: bool = True  # Failure Reflection 功能开关
+    
+    # 微冷启动优化配置
+    use_micro_persona: bool = True  # 使用微冷启动专用提示词（减少 40% tokens）
+    micro_auto_complete: bool = False  # 自动 complete（已废弃，不推荐使用）
+    disable_vision_for_simple_tasks: bool = True  # 简单任务禁用 Vision（节省 30%）
 
 @dataclass
 class ToolsConfig:

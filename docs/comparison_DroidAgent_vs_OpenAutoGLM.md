@@ -1,4 +1,4 @@
-# DroidRun vs Open-AutoGLM 系统级对比分析
+# DroidAgent vs Open-AutoGLM 系统级对比分析
 
 ## 项目概览
 
@@ -9,7 +9,7 @@
 - **通信方式**: 本地 ADB 连接
 - **语言**: Python (OpenAI SDK)
 
-### DroidRun
+### DroidAgent
 - **定位**: 企业级移动端自动化测试和执行框架
 - **核心模型**: 支持多种 LLM (OpenAI-compatible API)
 - **架构**: 复杂的多 Agent 协同架构 (PlannerAgent + CodeActAgent)
@@ -51,7 +51,7 @@ PhoneAgent
       finish() 或继续下一步
 ```
 
-#### DroidRun: 多 Agent 协同架构
+#### DroidAgent: 多 Agent 协同架构
 ```
 DroidAgent (协调器)
 ├── PlannerAgent (任务规划)
@@ -95,7 +95,7 @@ DroidAgent (协调器)
 
 ### 1.2 执行模式对比
 
-| 特性 | Open-AutoGLM | DroidRun |
+| 特性 | Open-AutoGLM | DroidAgent |
 |------|-------------|----------|
 | **执行模式** | 单步循环 (Step-by-step) | 规划 + 执行 (Plan & Execute) |
 | **任务分解** | ❌ 无 | ✅ PlannerAgent 自动分解 |
@@ -131,7 +131,7 @@ messages = [
 - ❌ **精度依赖**: 完全依赖模型的视觉理解能力
 - ❌ **无结构化信息**: 没有元素层级和属性
 
-#### DroidRun: a11y_tree + 截图 (可选)
+#### DroidAgent: a11y_tree + 截图 (可选)
 ```python
 state = await tools.get_state_async(include_screenshot=True)
 # 返回结构化的 UI 树
@@ -178,7 +178,7 @@ def _execute_step():
 - ✅ **简单**: 无复杂的刷新逻辑
 - ❌ **被动**: 只在步骤边界刷新
 
-#### DroidRun: 三重 UI 刷新机制
+#### DroidAgent: 三重 UI 刷新机制
 ```python
 # 1. 思考前刷新
 state = await tools.get_state_async(include_screenshot=True)
@@ -222,7 +222,7 @@ y = int(500 / 1000 * screen_height)
 - ❌ **精度问题**: 小元素难以精确点击
 - ❌ **视觉依赖**: 完全依赖视觉模型定位
 
-#### DroidRun: 索引 + 坐标混合
+#### DroidAgent: 索引 + 坐标混合
 ```python
 # 方式 1: 通过索引 (推荐)
 tap_by_index(161)  # 点击 a11y_tree 中索引为 161 的元素
@@ -264,7 +264,7 @@ actions = [
 ]
 ```
 
-#### DroidRun: 20+ 种动作 + 工具方法
+#### DroidAgent: 20+ 种动作 + 工具方法
 ```python
 # 基础动作
 tap_by_index, tap_by_text, tap, input_text, swipe, back, home, ...
@@ -306,7 +306,7 @@ def _default_confirmation(message: str) -> bool:
     return response.upper() == "Y"
 ```
 
-#### DroidRun: ask_user() 工具
+#### DroidAgent: ask_user() 工具
 ```python
 # LLM 主动调用
 answer = ask_user(question="是否确认支付 100 元?")
@@ -342,7 +342,7 @@ adb_conn.connect("192.168.1.100:5555")
 - ❌ 需要 ADB 命令行工具
 - ❌ 无法远程控制
 
-#### DroidRun: WebSocket + ADB 双模式
+#### DroidAgent: WebSocket + ADB 双模式
 ```python
 # 模式 1: 本地 ADB (开发/测试)
 tools = AdbTools(device_id="emulator-5554")
@@ -393,7 +393,7 @@ restore_keyboard(original_ime, device_id)
 - ❌ 需要切换输入法
 - ❌ 不支持输入法相关功能 (联想、emoji 等)
 
-#### DroidRun: 原生输入 + ADB Keyboard
+#### DroidAgent: 原生输入 + ADB Keyboard
 ```python
 # 方式 1: 原生输入 (WebSocket 模式)
 input_text("你好")  # 通过移动端原生输入法
@@ -434,7 +434,7 @@ response = client.chat.completions.create(
 - ✅ **兼容**: 支持所有 OpenAI-compatible API
 - ❌ **无抽象**: 直接调用 API，无高级封装
 
-#### DroidRun: LlamaIndex + Workflow
+#### DroidAgent: LlamaIndex + Workflow
 ```python
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.workflow import Workflow
@@ -489,7 +489,7 @@ SYSTEM_PROMPT = """
 - ❌ **冗长**: 8000+ 字符
 - ❌ **不灵活**: 无法针对特定场景定制
 
-#### DroidRun: 多 Persona 系统
+#### DroidAgent: 多 Persona 系统
 ```python
 # Default Persona (默认)
 DEFAULT = AgentPersona(
@@ -556,7 +556,7 @@ def _parse_response(content: str) -> tuple[str, str]:
     return "", content
 ```
 
-#### DroidRun: 结构化解析 + 工具调用
+#### DroidAgent: 结构化解析 + 工具调用
 ```python
 # LLM 响应自动解析为工具调用
 response = await llm.achat(messages)
@@ -584,7 +584,7 @@ for tool_call in tool_calls:
 
 #### Open-AutoGLM: ❌ 无记忆系统
 
-#### DroidRun: ✅ ExperienceMemory
+#### DroidAgent: ✅ ExperienceMemory
 ```python
 class ExperienceMemory:
     """经验记忆管理器"""
@@ -626,7 +626,7 @@ class ExperienceMemory:
 
 #### Open-AutoGLM: ❌ 无反思机制
 
-#### DroidRun: ✅ FailureReflector
+#### DroidAgent: ✅ FailureReflector
 ```python
 class FailureReflector:
     """失败反思模块"""
@@ -681,7 +681,7 @@ PHONE_AGENT_DEVICE_ID = "emulator-5554"
 - ❌ **不灵活**: 无法动态修改
 - ❌ **无持久化**: 重启后需重新设置
 
-#### DroidRun: 统一配置文件
+#### DroidAgent: 统一配置文件
 ```yaml
 # droidrun.yaml
 droidrun:
@@ -743,7 +743,7 @@ python main.py
 - ❌ 无服务端部署方案
 - ❌ 无多用户支持
 
-#### DroidRun: 多种部署模式
+#### DroidAgent: 多种部署模式
 ```bash
 # 模式 1: 本地 CLI (开发/测试)
 droidrun run "打开计算器"
@@ -797,7 +797,7 @@ if self.agent_config.verbose:
 - ❌ **无持久化**: 无法保存和分析
 - ❌ **无过滤**: 无法按级别过滤
 
-#### DroidRun: 结构化日志
+#### DroidAgent: 结构化日志
 ```python
 from droidrun.agent.utils.logging_utils import LoggingUtils
 
@@ -828,7 +828,7 @@ logger.info("[TaskExecutor] ✅ Base model loaded: {model}", model=model_name)
 
 #### Open-AutoGLM: ❌ 无轨迹记录
 
-#### DroidRun: ✅ Trajectory 系统
+#### DroidAgent: ✅ Trajectory 系统
 ```python
 class Trajectory:
     """任务执行轨迹记录"""
@@ -890,7 +890,7 @@ Open-AutoGLM/
 - ✅ **清晰**: 模块划分明确
 - ❌ **单一**: 缺少高级特性
 
-#### DroidRun
+#### DroidAgent
 ```
 droidrun/
 ├── agent/
@@ -933,7 +933,7 @@ droidrun/
 - ✅ README 文档完善
 - ✅ 示例代码清晰
 
-#### DroidRun
+#### DroidAgent
 - ✅ 完善的文档系统
   - 架构设计文档
   - API 文档
@@ -948,7 +948,7 @@ droidrun/
 
 ### 10.1 性能对比
 
-| 指标 | Open-AutoGLM | DroidRun |
+| 指标 | Open-AutoGLM | DroidAgent |
 |------|-------------|----------|
 | **冷启动耗时** | 快 (单次 LLM 调用) | 慢 (规划 + 执行) |
 | **热启动耗时** | N/A | 非常快 (直接执行) |
@@ -964,7 +964,7 @@ droidrun/
 - ❌ **功能限制**: 难以扩展高级特性
 - ❌ **单一模式**: 无法支持多种执行策略
 
-#### DroidRun
+#### DroidAgent
 - ✅ **高度可扩展**: 插件式架构
 - ✅ **多种模式**: 支持多种执行策略
 - ✅ **企业就绪**: 生产级部署能力
@@ -982,7 +982,7 @@ droidrun/
 5. ❌ **复杂任务**: 多步骤、多应用的复杂流程
 6. ❌ **生产部署**: 企业级应用
 
-### DroidRun 适用于:
+### DroidAgent 适用于:
 1. ✅ **企业应用**: 生产级自动化需求
 2. ✅ **复杂任务**: 多步骤、跨应用的复杂流程
 3. ✅ **远程控制**: 需要远程操作移动设备
@@ -995,7 +995,7 @@ droidrun/
 
 ## 12. 核心差异总结
 
-| 维度 | Open-AutoGLM | DroidRun |
+| 维度 | Open-AutoGLM | DroidAgent |
 |------|-------------|----------|
 | **定位** | 研究型框架 | 企业级平台 |
 | **架构** | 单 Agent | 多 Agent 协同 |
@@ -1022,7 +1022,7 @@ droidrun/
 3. ✅ **文档**: README 简洁易懂
 4. ✅ **视觉模型**: AutoGLM-Phone-9B 专门优化
 
-### DroidRun 可以借鉴 Open-AutoGLM:
+### DroidAgent 可以借鉴 Open-AutoGLM:
 1. **简化入口**: 提供类似 `PhoneAgent` 的简单接口
    ```python
    # 理想的简单接口
@@ -1037,7 +1037,7 @@ droidrun/
    # 简单模式 (类似 Open-AutoGLM)
    agent = SimpleAgent(model="qwen-plus")
    
-   # 高级模式 (完整 DroidRun)
+   # 高级模式 (完整 DroidAgent)
    agent = DroidAgent(
        goal=goal,
        llm=llm,
@@ -1055,7 +1055,7 @@ droidrun/
    agent.run("打开微信")
    ```
 
-### Open-AutoGLM 可以借鉴 DroidRun:
+### Open-AutoGLM 可以借鉴 DroidAgent:
 1. **任务分解**: 添加简单的 PlannerAgent
 2. **经验复用**: 实现基础的 ExperienceMemory
 3. **WebSocket 支持**: 支持远程控制
@@ -1071,7 +1071,7 @@ droidrun/
 - 🎯 **最佳实践**: 研究、学习、快速原型
 - 🎯 **核心理念**: Simplicity is beauty
 
-### DroidRun: "强大而完善"
+### DroidAgent: "强大而完善"
 - 🎯 **核心优势**: 功能完善、企业级、可扩展
 - 🎯 **最佳实践**: 生产部署、复杂任务、远程控制
 - 🎯 **核心理念**: Production-ready automation platform
@@ -1084,7 +1084,7 @@ droidrun/
 - ➕ 支持远程控制
 - ✅ 保持简洁性
 
-**DroidRun**:
+**DroidAgent**:
 - ➕ 提供简化的入口接口
 - ➕ 改进文档和教程
 - ➕ 降低学习曲线
@@ -1095,3 +1095,13 @@ droidrun/
 **文档版本**: 1.0  
 **生成日期**: 2024年12月12日  
 **作者**: Cascade AI
+
+| 指标 | 通用 LLM (qwen3-max) | AutoGLM-Phone-9B |
+|------|---------------------|------------------|
+| **视觉理解** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| **结构化理解** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| **指令遵循** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **推理能力** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| **响应速度** | 快（云端） | 非常快（本地） |
+| **成本** | 按 Token 收费 | 免费（本地部署） |
+| **手机专项优化** | ❌ | ✅ |

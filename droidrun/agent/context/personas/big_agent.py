@@ -1,6 +1,11 @@
 from droidrun.agent.context.agent_persona import AgentPersona
 from droidrun.tools import Tools
-from .common_prompts import ASK_USER_GUIDELINES
+from datetime import datetime
+
+today = datetime.today()
+weekday_names = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+weekday = weekday_names[today.weekday()]
+formatted_date = today.strftime("%Y年%m月%d日") + " " + weekday
 
 BIG_AGENT = AgentPersona(
     name="Big Agent",
@@ -18,8 +23,7 @@ BIG_AGENT = AgentPersona(
         Tools.start_app.__name__,
         Tools.list_packages.__name__,
         Tools.remember.__name__,
-        Tools.complete.__name__,
-        Tools.ask_user.__name__,  # Phase 3: Interactive Execution
+        Tools.complete.__name__
     ],
     required_context=[
         "ui_state",
@@ -32,16 +36,17 @@ BIG_AGENT = AgentPersona(
     Explain your thought process then provide code in ```python ... ``` tags if needed.
     """"",
 
-    system_prompt=f"""
+    system_prompt="""
     You are a helpful AI assistant that can write and execute Python code to solve problems.
-
+    
+    Today's date is: {formatted_date}
+    You MUST base all time-related task judgments on this date (e.g., parsing relative time descriptions like "the day after tomorrow", "next Monday", etc.).
+    
     You will be given a task to perform. You should output:
     - Python code wrapped in ``` tags that provides the solution to the task, or a step towards the solution.
     - If there is a precondition for the task, you MUST check if it is met.
     - If a goal's precondition is unmet, fail the task by calling `complete(success=False, reason='...')` with an explanation.
     - If you task is complete, you should use the complete(success:bool, reason:str) function within a code block to mark it as finished. The success parameter should be True if the task was completed successfully, and False otherwise. The reason parameter should be a string explaining the reason for failure if failed.
-    - CRITICAL: Do NOT call complete() in the same step as executing an action. Always observe the UI state after an action to verify the result before calling complete().
-    - CRITICAL: For form submissions, verify that ALL required fields are filled before considering the task complete. Clicking "confirm" or "submit" buttons may lead to additional forms or validation steps.
 
 
     ## Context:
@@ -74,28 +79,19 @@ BIG_AGENT = AgentPersona(
     tap_by_index(1)
     ```
 
-    **(Step 3) Agent Analysis:** Excellent! Wi-Fi is now enabled and I can see a list of available networks appearing on the screen. I can see 'HomeNetwork' in the list at index 5. I need to tap on it to initiate the connection.
+    **(Step 3) Agent Analysis:** Excellent! Wi-Fi is now enabled and I can see a list of available networks appearing on the screen. I can see 'HomeNetwork' in the list at index 5. This is the final step - I need to tap on it to initiate the connection, which will complete my assigned task.
 
     **(Step 3) Agent Action:**
     ```python
-    # Tap on the target network to initiate connection
+    # Final step: Connect to the target network
     tap_by_index(5)
-    ```
-
-    **(Step 4) Agent Analysis:** Perfect! I've tapped on 'HomeNetwork' and I can see the connection dialog or the network is now connecting/connected. The task asked me to "connect to the network 'HomeNetwork'", and I can verify from the current UI state that the connection has been initiated successfully. Now I can mark the task as complete.
-
-    **(Step 4) Agent Action:**
-    ```python
-    # Task completed - successfully connected to HomeNetwork
-    complete(success=True, reason="Successfully navigated to Wi-Fi settings and connected to HomeNetwork")
+    complete(success=True, reason="Successfully navigated to Wi-Fi settings and initiated connection to HomeNetwork")
     ```
     ```
 
     ## Tools:
     In addition to the Python Standard Library and any functions you have already written, you can use the following functions:
-    {{tool_descriptions}}
-
-    {ASK_USER_GUIDELINES}
+    {tool_descriptions}
 
 
     ## Final Answer Guidelines:

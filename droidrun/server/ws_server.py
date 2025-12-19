@@ -374,7 +374,7 @@ class WebSocketServer:
         
         # Phase 5: 注册用户答案处理器（交互式执行）
         self.message_router.register_handler(
-            "user_answer",  # 使用字符串，因为 MessageType 可能没有这个枚举值
+            MessageType.USER_ANSWER,
             self._handle_user_answer
         )
         
@@ -863,8 +863,10 @@ class WebSocketServer:
                 }
         """
         try:
-            question_id = message.get("question_id")
-            answer = message.get("answer")
+            # 从 data 字段中获取答案信息（符合 MessageProtocol 标准格式）
+            data = message.get("data", {})
+            question_id = data.get("question_id") or message.get("question_id")
+            answer = data.get("answer") if "answer" in data else message.get("answer")
             
             LoggingUtils.log_info(
                 "WebSocketServer",
@@ -874,11 +876,19 @@ class WebSocketServer:
                 answer=answer
             )
             
+            # 构建标准化的答案消息（供 WebSocketTools 处理）
+            answer_message = {
+                "type": "user_answer",
+                "question_id": question_id,
+                "answer": answer,
+                "additional_data": data.get("additional_data")
+            }
+            
             # 找到对应设备的 WebSocketTools 实例
             tools = self._device_tools_map.get(device_id)
             if tools:
                 # 调用 WebSocketTools 的答案处理方法
-                success = await tools.handle_user_answer(message)
+                success = await tools.handle_user_answer(answer_message)
                 if success:
                     LoggingUtils.log_success(
                         "WebSocketServer",

@@ -218,15 +218,16 @@ class InteractionManager:
         # 通过 WebSocket 发送问题到 Android 端
         if self._websocket_send_callback:
             try:
-                message = {
-                    "type": "user_question",
-                    "question_id": question_id,
-                    "question_text": question_text,
-                    "question_type": question_type,
-                    "options": options,
-                    "default_value": default_value,
-                    "timeout_seconds": timeout_seconds
-                }
+                # 使用 MessageProtocol 标准格式
+                from droidrun.server.message_protocol import MessageProtocol, MessageType
+                message = MessageProtocol.create_user_question(
+                    question_id=question_id,
+                    question_text=question_text,
+                    question_type=question_type,
+                    options=options,
+                    default_value=default_value,
+                    timeout_seconds=timeout_seconds
+                )
                 await self._websocket_send_callback(message)
                 print(f"✅ [InteractionManager] Question sent via WebSocket: {question_id}")
             except Exception as e:

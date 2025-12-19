@@ -34,6 +34,10 @@ class MessageType(Enum):
     TASK_REQUEST = "task_request"
     TASK_RESPONSE = "task_response"
     TASK_STATUS = "task_status"
+    
+    # Phase 5: 用户交互相关
+    USER_QUESTION = "user_question"  # 服务端 -> Android：询问用户
+    USER_ANSWER = "user_answer"      # Android -> 服务端：用户回答
 
 
 class MessageProtocol:
@@ -417,3 +421,128 @@ class MessageProtocol:
             device_id=device_id
         )
 
+
+    # ========== Phase 5: 用户交互消息 ==========
+    
+    @staticmethod
+    def create_user_question(
+        question_id: str,
+        question_text: str,
+        question_type: str = "text",
+        options: Optional[list] = None,
+        default_value: Optional[str] = None,
+        timeout_seconds: float = 60.0,
+        device_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        创建用户问题消息（服务端 -> Android）
+        
+        Args:
+            question_id: 问题唯一标识
+            question_text: 问题文本
+            question_type: 问题类型 ("text", "choice", "confirm")
+            options: 选项列表（用于 choice 类型）
+            default_value: 默认值
+            timeout_seconds: 超时秒数
+            device_id: 设备ID（可选）
+            
+        Returns:
+            用户问题消息字典
+        """
+        data = {
+            "question_id": question_id,
+            "question_text": question_text,
+            "question_type": question_type,
+            "timeout_seconds": timeout_seconds
+        }
+        
+        if options:
+            data["options"] = options
+        if default_value is not None:
+            data["default_value"] = default_value
+        
+        return MessageProtocol.create_message(
+            MessageType.USER_QUESTION,
+            data=data,
+            device_id=device_id
+        )
+    
+    @staticmethod
+    def create_user_answer(
+        question_id: str,
+        answer: str,
+        device_id: Optional[str] = None,
+        additional_data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        创建用户回答消息（Android -> 服务端）
+        
+        Args:
+            question_id: 问题唯一标识
+            answer: 用户的回答
+            device_id: 设备ID（可选）
+            additional_data: 额外数据（可选）
+            
+        Returns:
+            用户回答消息字典
+        """
+        data = {
+            "question_id": question_id,
+            "answer": answer
+        }
+        
+        if additional_data:
+            data["additional_data"] = additional_data
+        
+        return MessageProtocol.create_message(
+            MessageType.USER_ANSWER,
+            data=data,
+            device_id=device_id
+        )
+    
+    @staticmethod
+    def validate_user_question(message: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+        """
+        验证用户问题消息格式
+        
+        Args:
+            message: 消息字典
+            
+        Returns:
+            (是否有效, 错误信息)
+        """
+        data = message.get("data", {})
+        
+        if not data.get("question_id"):
+            return False, "Missing 'question_id' in data"
+        if not data.get("question_text"):
+            return False, "Missing 'question_text' in data"
+        
+        question_type = data.get("question_type", "text")
+        if question_type not in ["text", "choice", "confirm"]:
+            return False, f"Invalid question_type: {question_type}"
+        
+        if question_type == "choice" and not data.get("options"):
+            return False, "Options required for 'choice' question type"
+        
+        return True, None
+    
+    @staticmethod
+    def validate_user_answer(message: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+        """
+        验证用户回答消息格式
+        
+        Args:
+            message: 消息字典
+            
+        Returns:
+            (是否有效, 错误信息)
+        """
+        data = message.get("data", {})
+        
+        if not data.get("question_id"):
+            return False, "Missing 'question_id' in data"
+        if data.get("answer") is None:
+            return False, "Missing 'answer' in data"
+        
+        return True, None

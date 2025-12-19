@@ -489,60 +489,83 @@ class ExperienceMemory:
             raise
     
     def adapt_parameters(self, experience: TaskExperience, new_goal: str) -> List[Dict]:
-        """参数自适应 - 使用LLM调整动作序列"""
+        """参数自适应 - 使用LLM调整动作序列（优化版：差异化输出 + 压缩输入）"""
         if not self.llm:
             LoggingUtils.log_warning("ExperienceMemory", "No LLM provided for parameter adaptation")
             return experience.action_sequence
         
         try:
+            import copy
+            
+            # 1. 简化动作序列（移除 description, specific_behavior，减少输入 tokens）
+            simplified_actions = []
+            for i, action in enumerate(experience.action_sequence):
+                simplified = {
+                    "index": i,
+                    "action": action.get("action", ""),
+                    "params": action.get("params", {})
+                }
+                simplified_actions.append(simplified)
+            
+            # 2. 构建优化后的提示词（只返回需要修改的动作）
             prompt = f"""
-基于以下历史经验，为新的目标任务调整动作序列：
-
-历史经验目标: {experience.goal}
-历史动作序列: {json.dumps(experience.action_sequence, ensure_ascii=False, indent=2)}
-
+历史目标: {experience.goal}
 新目标: {new_goal}
 
-**重要约束**：
-1. 只修改动作的参数值（如日期、文本内容、索引等）
-2. 必须保持动作的顺序完全不变
-3. 特别注意：确认按钮、提交按钮、页面跳转等流程控制动作必须保留
-4. 如果某个动作的参数不需要修改，保持原值不变
+动作序列:
+{json.dumps(simplified_actions, ensure_ascii=False, indent=2)}
 
-请分析新目标与历史目标的差异，并返回调整后的动作序列。
-返回格式应该是JSON数组，每个动作包含action和params字段。
+请分析新目标与历史目标的差异，**只返回需要修改的动作**。
 
-调整后的动作序列：
+返回格式（JSON数组）：
+[
+  {{"index": 2, "params": {{"text": "新文本"}}}},
+  {{"index": 5, "params": {{"index": 18}}}}
+]
+
+**重要**：
+1. 只返回需要修改的动作，不需要修改的动作不要包含
+2. 如果所有动作都不需要修改，返回空数组 []
+3. 只返回修改后的 params，不要返回 action 字段
+4. index 是动作在序列中的索引（从 0 开始）
+
+需要修改的动作：
 """
+            
+            # 3. 调用 LLM
             response = self.llm.complete(prompt)
             
-            # 尝试解析JSON响应
+            # 4. 解析响应（只包含需要修改的动作）
             json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
-            if json_match:
-                adapted_actions = json.loads(json_match.group())
-                # 保留/回填 description 和 specific_behavior 字段，保证下游 changed_indices 检测可用
-                try:
-                    original_actions = experience.action_sequence or []
-                    for i, a in enumerate(adapted_actions or []):
-                        if isinstance(a, dict):
-                            if 0 <= i < len(original_actions):
-                                # 回填 description
-                                if "description" not in a:
-                                    desc = (original_actions[i] or {}).get("description")
-                                    if desc:
-                                        a["description"] = desc
-                                # 回填 specific_behavior
-                                if "specific_behavior" not in a:
-                                    specific_behavior = (original_actions[i] or {}).get("specific_behavior")
-                                    if specific_behavior is not None:  # 允许 None 值
-                                        a["specific_behavior"] = specific_behavior
-                except Exception:
-                    pass
-                LoggingUtils.log_progress("ExperienceMemory", "Parameters adapted for new goal: {goal}", goal=new_goal)
-                return adapted_actions
-            else:
+            if not json_match:
                 LoggingUtils.log_warning("ExperienceMemory", "Could not parse adapted actions from LLM response")
                 return experience.action_sequence
+            
+            changes = json.loads(json_match.group())
+            
+            # 5. 在原始动作序列上应用修改（保持完整性）
+            adapted_actions = copy.deepcopy(experience.action_sequence)
+            
+            modified_count = 0
+            for change in changes:
+                index = change.get("index")
+                new_params = change.get("params")
+                
+                if index is not None and 0 <= index < len(adapted_actions):
+                    # 只更新 params，保留其他字段（action, description, specific_behavior）
+                    adapted_actions[index]["params"] = new_params
+                    modified_count += 1
+                    LoggingUtils.log_debug("ExperienceMemory", 
+                                          "Updated action {idx}: {action}", 
+                                          idx=index, 
+                                          action=adapted_actions[index].get("action", ""))
+            
+            LoggingUtils.log_progress("ExperienceMemory", 
+                                     "Parameters adapted: {count} actions modified (out of {total})", 
+                                     count=modified_count, 
+                                     total=len(adapted_actions))
+            
+            return adapted_actions
                 
         except Exception as e:
             LoggingUtils.log_warning("ExperienceMemory", "Parameter adaptation failed: {error}", error=e)
