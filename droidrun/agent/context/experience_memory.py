@@ -20,6 +20,7 @@ class TaskExperience:
     id: str
     goal: str
     type: Optional[str]
+    type: Optional[str]
     success: bool
     timestamp: float
     page_sequence: List[Dict[str, Any]]
@@ -70,10 +71,27 @@ class ExperienceMemory:
         self._ensure_storage_dirs()
         self._load_type_experiences()
         # LoggingUtils.log_info("ExperienceMemory", "ExperienceMemory initialized with {count} experiences", count=len(self.experiences))
+        # self.experiences: List[TaskExperience] = []
+        self.type_experience_cache: Dict[str, List[TaskExperience]] = {}
+        self.supported_types = ["请休假", "员工差旅"]
+        self._ensure_storage_dirs()
+        self._load_type_experiences()
+        # LoggingUtils.log_info("ExperienceMemory", "ExperienceMemory initialized with {count} experiences", count=len(self.experiences))
     
     def _ensure_storage_dir(self):
         """确保存储目录存在"""
         os.makedirs(self.storage_dir, exist_ok=True)
+
+    def _ensure_storage_dirs(self):
+        """确保存储目录存在"""
+        os.makedirs(self.storage_dir, exist_ok=True)
+
+        for type_name in self.supported_types:
+            # 处理特殊字符（避免文件夹命名非法）
+            safe_type_name = re.sub(r'[<>:"/\\|?*]', '_', type_name)
+            type_dir = os.path.join(self.storage_dir, safe_type_name)
+            os.makedirs(type_dir, exist_ok=True)
+
 
     def _ensure_storage_dirs(self):
         """确保存储目录存在"""
@@ -91,6 +109,7 @@ class ExperienceMemory:
         if not os.path.exists(self.storage_dir):
             return
 
+
         for filename in os.listdir(self.storage_dir):
             if filename.endswith('.json'):
                 filepath = os.path.join(self.storage_dir, filename)
@@ -101,7 +120,39 @@ class ExperienceMemory:
                         self.experiences.append(experience)
                 except Exception as e:
                     LoggingUtils.log_warning("ExperienceMemory", "Failed to load experience from {filename}: {error}",
+                    LoggingUtils.log_warning("ExperienceMemory", "Failed to load experience from {filename}: {error}",
                                             filename=filename, error=e)
+
+    def _load_type_experiences(self):
+        """预加载所有类型文件夹下的经验，按类型缓存到 type_experience_cache"""
+        # 遍历根目录下的所有子文件夹（即 task_type 文件夹）
+        if not os.path.exists(self.storage_dir):
+            return
+
+        for type_dir in os.listdir(self.storage_dir):
+            type_dir_path = os.path.join(self.storage_dir, type_dir)
+            if not os.path.isdir(type_dir_path):
+                continue  # 跳过非文件夹
+
+            task_type = type_dir
+
+            # 加载该文件夹下的所有经验
+            experiences = []
+            for filename in os.listdir(type_dir_path):
+                if filename.endswith('.json'):
+                    filepath = os.path.join(type_dir_path, filename)
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            exp = TaskExperience.from_dict(data)
+                            experiences.append(exp)
+                    except Exception as e:
+                        LoggingUtils.log_warning("ExperienceMemory", f"Failed to load {filename}: {e}")
+
+            # 缓存该类型的经验
+            self.type_experience_cache[task_type] = experiences
+            LoggingUtils.log_info("ExperienceMemory", f"Preloaded {len(experiences)} experiences for type: {task_type}")
+
 
     def _load_type_experiences(self):
         """预加载所有类型文件夹下的经验，按类型缓存到 type_experience_cache"""
@@ -244,7 +295,10 @@ class ExperienceMemory:
 
         # all_experiences_goals = [exp.goal for exp in self.experiences]
         # similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
+        # all_experiences_goals = [exp.goal for exp in self.experiences]
+        # similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
 
+        for i, experience in enumerate(type_experiences):
         for i, experience in enumerate(type_experiences):
             try:
                 similarity = similarity_scores[i]
@@ -468,9 +522,17 @@ class ExperienceMemory:
             type_dir = os.path.join(self.storage_dir, safe_type_name)
             os.makedirs(type_dir, exist_ok=True)
 
+            task_type = experience.type
+            # 处理特殊字符，确保文件夹名称合法
+            safe_type_name = re.sub(r'[<>:"/\\|?*]', '_', task_type)
+            # 构建类型子文件夹路径
+            type_dir = os.path.join(self.storage_dir, safe_type_name)
+            os.makedirs(type_dir, exist_ok=True)
+
             # 生成文件名
             safe_goal = "".join(c if c.isalnum() or c in "._-" else "_" for c in experience.goal)
             filename = f"{safe_goal}_{int(experience.timestamp)}.json"
+            filepath = os.path.join(type_dir, filename)
             filepath = os.path.join(type_dir, filename)
             
             # 保存到文件
@@ -478,6 +540,9 @@ class ExperienceMemory:
                 json.dump(experience.to_dict(), f, indent=2, ensure_ascii=False)
             
             # 添加到内存列表
+            # self.experiences.append(experience)
+            self.type_experience_cache[task_type].append(experience)
+
             # self.experiences.append(experience)
             self.type_experience_cache[task_type].append(experience)
 
@@ -583,6 +648,16 @@ class ExperienceMemory:
                     return exp
         return None  # 未找到时返回None
 
+        # for exp in self.experiences:
+        #     if exp.id == experience_id:
+        #         return exp
+        # return None
+        for experiences in self.type_experience_cache.values():  # 遍历所有类型的经验列表
+            for exp in experiences:
+                if exp.id == experience_id:  # 匹配唯一ID
+                    return exp
+        return None  # 未找到时返回None
+
     def get_all_experiences(self) -> List[TaskExperience]:
         """获取所有经验"""
         # return self.experiences.copy()
@@ -592,8 +667,24 @@ class ExperienceMemory:
             all_experiences.extend(experiences)
         return all_experiences.copy()  # 返回副本，避免外部修改缓存
 
+        # return self.experiences.copy()
+        all_experiences = []
+        # 遍历所有类型的缓存，汇总所有经验
+        for experiences in self.type_experience_cache.values():
+            all_experiences.extend(experiences)
+        return all_experiences.copy()  # 返回副本，避免外部修改缓存
+
     def clear_experiences(self):
         """清空所有经验"""
+        # self.experiences = []
+        # # 清空存储目录
+        # if os.path.exists(self.storage_dir):
+        #     for filename in os.listdir(self.storage_dir):
+        #         if filename.endswith('.json'):
+        #             os.remove(os.path.join(self.storage_dir, filename))
+        # logger.info("🧹 All experiences cleared")
+        # 清空缓存
+        self.type_experience_cache.clear()
         # self.experiences = []
         # # 清空存储目录
         # if os.path.exists(self.storage_dir):
