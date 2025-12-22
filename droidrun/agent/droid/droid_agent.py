@@ -1769,7 +1769,6 @@ class DroidAgent(Workflow):
             id=self.experience_id,  # 使用共享的experience_id
             goal=self.goal,
             type=self.current_task_type,
-            type=self.current_task_type,
             success=ev.success,
             timestamp=time.time(),
             page_sequence=page_sequence,

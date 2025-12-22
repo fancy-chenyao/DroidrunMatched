@@ -120,7 +120,6 @@ class ExperienceMemory:
                         self.experiences.append(experience)
                 except Exception as e:
                     LoggingUtils.log_warning("ExperienceMemory", "Failed to load experience from {filename}: {error}",
-                    LoggingUtils.log_warning("ExperienceMemory", "Failed to load experience from {filename}: {error}",
                                             filename=filename, error=e)
 
     def _load_type_experiences(self):
@@ -295,10 +294,7 @@ class ExperienceMemory:
 
         # all_experiences_goals = [exp.goal for exp in self.experiences]
         # similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
-        # all_experiences_goals = [exp.goal for exp in self.experiences]
-        # similarity_scores = self._batch_calculate_similarity(goal, all_experiences_goals)
 
-        for i, experience in enumerate(type_experiences):
         for i, experience in enumerate(type_experiences):
             try:
                 similarity = similarity_scores[i]
