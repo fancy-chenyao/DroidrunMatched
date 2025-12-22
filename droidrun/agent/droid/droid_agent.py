@@ -1171,7 +1171,6 @@ class DroidAgent(Workflow):
                                 wait_start = time.time()
                                 fallback_delay = self.config_manager.get("tools.screenshot_wait_time", 1.0)
                                 wait_duration = await self.ui_stability_checker.smart_wait("tap", fallback_delay)
-                                LoggingUtils.log_debug("DroidAgent", "⏱️ Dynamic wait completed in {duration:.2f}s", duration=wait_duration)
                             else:
                                 # 传统固定延迟
                                 screenshot_wait = self.config_manager.get("tools.screenshot_wait_time", 1.0)
@@ -1215,7 +1214,6 @@ class DroidAgent(Workflow):
                                 wait_start = time.time()
                                 fallback_delay = self.config_manager.get("tools.action_wait_time", 0.5)
                                 wait_duration = await self.ui_stability_checker.smart_wait("input", fallback_delay)
-                                LoggingUtils.log_debug("DroidAgent", "⏱️ Dynamic wait completed in {duration:.2f}s", duration=wait_duration)
                             else:
                                 # 传统固定延迟
                                 wait_time = self.config_manager.get("tools.action_wait_time", 0.5)

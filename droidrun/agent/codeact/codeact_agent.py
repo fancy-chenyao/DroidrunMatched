@@ -177,10 +177,6 @@ class CodeActAgent(Workflow):
         
         # 性能分析：记录 LLM 思考开始时间
         llm_start_time = time.time()
-        llm_start_timestamp = time.strftime("%H:%M:%S", time.localtime(llm_start_time))
-        from droidrun.agent.utils.logging_utils import LoggingUtils
-        print(f"🤔 [Performance] LLM 开始思考 at {llm_start_timestamp}")
-        LoggingUtils.log_info("Performance", "🤔 LLM 开始思考 at {time}", time=llm_start_timestamp)
 
         model = self.llm.class_name()
         
@@ -401,8 +397,6 @@ class CodeActAgent(Workflow):
     ) -> ChatResponse | None:
         # 记录 LLM 思考开始时间
         llm_start_time = time.time()
-        start_timestamp = time.strftime("%H:%M:%S", time.localtime())
-        logger.info(f"🤔 LLM 开始思考 at {start_timestamp}")
         
         limited_history = self._limit_history(chat_history)
         messages_to_send = [self.system_prompt] + limited_history

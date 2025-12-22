@@ -162,10 +162,6 @@ class WebSocketTools(Tools):
         
         try:
             send_start_time = time.time()
-            send_timestamp = time.strftime("%H:%M:%S", time.localtime())
-            if command != "get_state":
-                LoggingUtils.log_info("WebSocketTools", "📤 发送操作到移动端: {cmd} at {time}", 
-                                    cmd=command, time=send_timestamp)
             
             success = await self.session_manager.send_to_device(self.device_id, request_message)
             if not success:
@@ -357,8 +353,6 @@ class WebSocketTools(Tools):
             包含 'a11y_tree' 和 'phone_state' 的字典
         """
         try:
-            LoggingUtils.log_debug("WebSocketTools", "[async] Getting state from device {device_id}", device_id=self.device_id)
-            
             response = await self.get_state_async(include_screenshot=include_screenshot)
             return response
             
