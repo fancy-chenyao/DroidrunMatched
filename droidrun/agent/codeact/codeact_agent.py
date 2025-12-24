@@ -32,6 +32,7 @@ from droidrun.agent.context.episodic_memory import EpisodicMemory, EpisodicMemor
 from droidrun.tools import Tools
 from droidrun.tools.adb import AdbTools
 from droidrun.agent.context.agent_persona import AgentPersona
+from droidrun.agent.utils.logging_utils import LoggingUtils
 
 logger = logging.getLogger("droidrun")
 

@@ -438,14 +438,21 @@ class DroidAgent(Workflow):
                                 )
                         
                         except Exception as reflection_error:
-                            LoggingUtils.log_error(
-                                "DroidAgent",
-                                "Failed to analyze failure: {error}",
-                                error=str(reflection_error)
-                            )
-                            if self.debug:
-                                import traceback
-                                LoggingUtils.log_error("DroidAgent", "{trace}", trace=traceback.format_exc())
+                            try:
+                                from droidrun.agent.utils.logging_utils import LoggingUtils as LU
+                                LU.log_error(
+                                    "DroidAgent",
+                                    "Failed to analyze failure: {error}",
+                                    error=str(reflection_error)
+                                )
+                                if self.debug:
+                                    import traceback
+                                    LU.log_error("DroidAgent", "{trace}", trace=traceback.format_exc())
+                            except Exception:
+                                logger.error(f"[DroidAgent] Failed to analyze failure: {str(reflection_error)}")
+                                if self.debug:
+                                    import traceback
+                                    logger.error(f"[DroidAgent] {traceback.format_exc()}")
 
                     task = Task(
                         description=enhanced_goal,
@@ -518,8 +525,11 @@ class DroidAgent(Workflow):
         except Exception as e:
             log_error("[DroidAgent] Task execution", e, level="error")
             if self.debug:
-                
-                LoggingUtils.log_error("DroidAgent", "{error}", error=traceback.format_exc())
+                try:
+                    from droidrun.agent.utils.logging_utils import LoggingUtils as LU
+                    LU.log_error("DroidAgent", "{error}", error=traceback.format_exc())
+                except Exception:
+                    logger.error(f"[DroidAgent] {traceback.format_exc()}")
             return CodeActResultEvent(success=False, reason=f"Error: {str(e)}", task=task, steps=0)
 
     @step
@@ -551,7 +561,11 @@ class DroidAgent(Workflow):
         except ExceptionConstants.RUNTIME_EXCEPTIONS as e:
             log_error("[DroidAgent] Execution", e, level="error")
             if self.debug:
-                LoggingUtils.log_error("DroidAgent", "{error}", error=traceback.format_exc())
+                try:
+                    from droidrun.agent.utils.logging_utils import LoggingUtils as LU
+                    LU.log_error("DroidAgent", "{error}", error=traceback.format_exc())
+                except Exception:
+                    logger.error(f"[DroidAgent] {traceback.format_exc()}")
             tasks = self.task_manager.get_task_history()
             return FinalizeEvent(
                 success=False,
@@ -637,7 +651,11 @@ class DroidAgent(Workflow):
         except Exception as e:
             log_error("[DroidAgent] Planning", e, level="error")
             if self.debug:
-                LoggingUtils.log_error("DroidAgent", "{error}", error=traceback.format_exc())
+                try:
+                    from droidrun.agent.utils.logging_utils import LoggingUtils as LU
+                    LU.log_error("DroidAgent", "{error}", error=traceback.format_exc())
+                except Exception:
+                    logger.error(f"[DroidAgent] {traceback.format_exc()}")
             tasks = self.task_manager.get_task_history()
             return FinalizeEvent(
                 success=False,
