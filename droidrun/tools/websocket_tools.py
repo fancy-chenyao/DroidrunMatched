@@ -333,7 +333,7 @@ class WebSocketTools(Tools):
                 self.last_screenshot = response.get("screenshot_base64")
             
             get_state_duration = time.time() - get_state_start
-            print(f"⏱️ [Performance] get_state total: {get_state_duration:.2f}s (elements: {len(filtered_elements)})")
+            # 只使用 LoggingUtils，移除 print 重复
             LoggingUtils.log_info("Performance", "⏱️ get_state total: {duration:.2f}s (elements: {count})", 
                                 duration=get_state_duration, count=len(filtered_elements))
             

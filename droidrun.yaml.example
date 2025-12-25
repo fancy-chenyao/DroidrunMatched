@@ -31,17 +31,13 @@ droidrun:
   agent:
     max_steps: 20
     default_max_steps: 20
-    max_micro_cold_steps: 5
+    max_micro_cold_steps: 10
     micro_cold_timeout: 60
     reasoning: false
     reflection: false
+    failure_reflection: true
     vision: false
     save_trajectories: "step"
-    
-    # 微冷启动优化配置
-    use_micro_persona: true  # 使用微冷启动专用提示词（减少 40% tokens，节省 20% 时间）
-    disable_vision_for_simple_tasks: true  # 简单任务禁用 Vision（节省 30% 时间，推荐启用）
-    micro_auto_complete: false  # 自动 complete（已废弃，不推荐使用）
   
   # 工具配置
   tools:
@@ -53,14 +49,21 @@ droidrun:
     
     # 时间相关配置
     macro_generation_wait_time: 0.5
-    action_wait_time: 0.5
-    screenshot_wait_time: 1.0
+    action_wait_time: 0.2
+    screenshot_wait_time: 0.3
     long_wait_time: 2.0
+    
+    # UI稳定性检测（动态等待）
+    # 设置为 false 可以禁用动态等待，使用固定延迟（更快但可能不够稳定）
+    use_dynamic_wait: false
+
+    export_a11y_tree: true
+    a11y_export_dir: "./a11y_exports"
   
   # API配置
   api:
-    api_key: null  # 从环境变量 ALIYUN_API_KEY 获取
-    model: "qwen-plus"
-    api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    api_key: "dummy-key"  # 本地模型使用 dummy key
+    model: "autoglm-phone-9b"
+    api_base: "http://192.168.100.230:8005/v1"
     timeout: 30
     max_retries: 3

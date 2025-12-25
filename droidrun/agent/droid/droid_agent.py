@@ -954,6 +954,7 @@ class DroidAgent(Workflow):
     async def finalize(self, ctx: Context, ev: FinalizeEvent) -> StopEvent:
         ctx.write_event_to_stream(ev)
         
+        # ✅ 优先打印耗时信息（在保存操作之前）
         if hasattr(self, '_task_start_time'):
             total_duration = time.time() - self._task_start_time
             LoggingUtils.log_info("Performance", "⏱️ ✅ Task completed in {duration:.2f}s (success={success}, steps={steps})", 
@@ -980,7 +981,8 @@ class DroidAgent(Workflow):
         if getattr(self, 'skip_persist_for_perfect_match', False):
             LoggingUtils.log_info("DroidAgent", "该任务已有高度重合的历史经验，不再持久化该任务")
             return StopEvent(result)
-            
+        
+        # 📝 开始保存操作（轨迹和经验）
         if self.trajectory and self.save_trajectories != "none":
             self.trajectory.save_trajectory()
 

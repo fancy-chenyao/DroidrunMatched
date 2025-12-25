@@ -236,7 +236,7 @@ class CodeActAgent(Workflow):
         # 性能分析：记录 LLM 思考结束时间
         llm_duration = time.time() - llm_start_time
         llm_end_timestamp = time.strftime("%H:%M:%S", time.localtime())
-        print(f"💡 [Performance] LLM 完成思考 at {llm_end_timestamp}, 耗时: {llm_duration:.2f}s")
+        # 只使用 LoggingUtils，移除 print 重复
         LoggingUtils.log_info("Performance", "💡 LLM 完成思考 at {time}, 耗时: {duration:.2f}s", 
                             time=llm_end_timestamp, duration=llm_duration)
         

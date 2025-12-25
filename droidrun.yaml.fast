@@ -1,5 +1,5 @@
-# DroidRun 优化配置文件（平衡模式）
-# 性能提升：30-40%，保留基本调试能力
+# DroidRun 极速配置文件（生产环境）
+# 性能提升：40-60%，牺牲部分调试能力
 
 droidrun:
   # 系统核心配置
@@ -35,9 +35,9 @@ droidrun:
     micro_cold_timeout: 60
     reasoning: false
     reflection: false
-    failure_reflection: true        # 保留失败反思（便于调试）
+    failure_reflection: false       # ✅ 优化：禁用失败反思（追求速度）
     vision: false
-    save_trajectories: "action"     # ✅ 优化：只保存动作级别（vs "step"）
+    save_trajectories: "none"       # ✅ 优化：不保存轨迹（最快）
   
   # 工具配置
   tools:
@@ -47,17 +47,17 @@ droidrun:
     default_y_coordinate: 0
     default_swipe_duration: 300
     
-    # 时间相关配置（优化后）
-    macro_generation_wait_time: 0.3  # ✅ 优化：从 0.5 减少到 0.3
-    action_wait_time: 0.2            # ✅ 已优化
-    screenshot_wait_time: 0.3        # ✅ 已优化
+    # 时间相关配置（激进优化）
+    macro_generation_wait_time: 0.2  # ✅ 优化：从 0.5 减少到 0.2
+    action_wait_time: 0.1            # ✅ 优化：从 0.2 减少到 0.1
+    screenshot_wait_time: 0.2        # ✅ 优化：从 0.3 减少到 0.2
     long_wait_time: 1.5              # ✅ 优化：从 2.0 减少到 1.5
     
     # UI稳定性检测
     use_dynamic_wait: false          # ✅ 已优化：禁用动态等待
 
-    # a11y_tree 导出（调试用）
-    export_a11y_tree: false          # ✅ 优化：禁用导出（生产环境）
+    # a11y_tree 导出
+    export_a11y_tree: false          # ✅ 优化：禁用导出
     a11y_export_dir: "./a11y_exports"
   
   # API配置
@@ -67,3 +67,23 @@ droidrun:
     api_base: "http://192.168.100.230:8005/v1"
     timeout: 30
     max_retries: 3
+
+# 极速优化说明：
+# 1. save_trajectories: "none" - 节省 0.5-2秒，不保存任何轨迹
+# 2. failure_reflection: false - 失败时节省 1-2秒
+# 3. export_a11y_tree: false - 节省 0.5-2.5秒
+# 4. macro_generation_wait_time: 0.2 - 节省 0.3秒
+# 5. action_wait_time: 0.1 - 节省 0.5-1秒
+# 6. screenshot_wait_time: 0.2 - 节省 0.5-1秒
+# 7. long_wait_time: 1.5 - 节省 0.5-1秒
+# 8. use_dynamic_wait: false - 节省 5-10秒
+#
+# 预期效果：
+# - 任务耗时从 98秒 → 约 50-60秒
+# - 性能提升：40-60%
+# - 适合生产环境，追求极致速度
+#
+# ⚠️ 注意：
+# - 不保存轨迹，无法回溯调试
+# - 等待时间较短，可能影响稳定性
+# - 建议先在测试环境验证

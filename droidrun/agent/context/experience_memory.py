@@ -65,18 +65,10 @@ class ExperienceMemory:
     def __init__(self, storage_dir: str = "experiences", llm=None):
         self.storage_dir = storage_dir
         self.llm = llm
-        # self.experiences: List[TaskExperience] = []
         self.type_experience_cache: Dict[str, List[TaskExperience]] = {}
         self.supported_types = ["请休假", "员工差旅"]
         self._ensure_storage_dirs()
         self._load_type_experiences()
-        # LoggingUtils.log_info("ExperienceMemory", "ExperienceMemory initialized with {count} experiences", count=len(self.experiences))
-        # self.experiences: List[TaskExperience] = []
-        self.type_experience_cache: Dict[str, List[TaskExperience]] = {}
-        self.supported_types = ["请休假", "员工差旅"]
-        self._ensure_storage_dirs()
-        self._load_type_experiences()
-        # LoggingUtils.log_info("ExperienceMemory", "ExperienceMemory initialized with {count} experiences", count=len(self.experiences))
     
     def _ensure_storage_dir(self):
         """确保存储目录存在"""
@@ -121,37 +113,6 @@ class ExperienceMemory:
                 except Exception as e:
                     LoggingUtils.log_warning("ExperienceMemory", "Failed to load experience from {filename}: {error}",
                                             filename=filename, error=e)
-
-    def _load_type_experiences(self):
-        """预加载所有类型文件夹下的经验，按类型缓存到 type_experience_cache"""
-        # 遍历根目录下的所有子文件夹（即 task_type 文件夹）
-        if not os.path.exists(self.storage_dir):
-            return
-
-        for type_dir in os.listdir(self.storage_dir):
-            type_dir_path = os.path.join(self.storage_dir, type_dir)
-            if not os.path.isdir(type_dir_path):
-                continue  # 跳过非文件夹
-
-            task_type = type_dir
-
-            # 加载该文件夹下的所有经验
-            experiences = []
-            for filename in os.listdir(type_dir_path):
-                if filename.endswith('.json'):
-                    filepath = os.path.join(type_dir_path, filename)
-                    try:
-                        with open(filepath, 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                            exp = TaskExperience.from_dict(data)
-                            experiences.append(exp)
-                    except Exception as e:
-                        LoggingUtils.log_warning("ExperienceMemory", f"Failed to load {filename}: {e}")
-
-            # 缓存该类型的经验
-            self.type_experience_cache[task_type] = experiences
-            LoggingUtils.log_info("ExperienceMemory", f"Preloaded {len(experiences)} experiences for type: {task_type}")
-
 
     def _load_type_experiences(self):
         """预加载所有类型文件夹下的经验，按类型缓存到 type_experience_cache"""
