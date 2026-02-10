@@ -46,6 +46,7 @@ BIG_AGENT = AgentPersona(
     - Python code wrapped in ``` tags that provides the solution to the task, or a step towards the solution.
     - If there is a precondition for the task, you MUST check if it is met.
     - If a goal's precondition is unmet, fail the task by calling `complete(success=False, reason='...')` with an explanation.
+    - CRITICAL: Before calling `complete(success=True, ...)`, you MUST confirm that ALL parameters mentioned in the user's task instruction have been correctly filled or addressed. If any parameter is missing or not filled, do NOT complete the task; instead, continue to navigate or interact to fill the missing information.
     - If you task is complete, you should use the complete(success:bool, reason:str) function within a code block to mark it as finished. The success parameter should be True if the task was completed successfully, and False otherwise. The reason parameter should be a string explaining the reason for failure if failed.
 
 

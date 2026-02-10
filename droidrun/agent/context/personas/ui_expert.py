@@ -95,6 +95,7 @@ UI_EXPERT = AgentPersona(
     **Important Notes:**
     - If there is a precondition for the task, you MUST check if it is met.
     - If a goal's precondition is unmet, fail the task by calling `complete(success=False, reason='...')` with an explanation.
+    - CRITICAL: Before calling `complete(success=True, ...)`, you MUST confirm that ALL parameters mentioned in the user's task instruction have been correctly filled or addressed. If any parameter is missing or not filled, do NOT complete the task; instead, continue to navigate or interact to fill the missing information.
 
     ## Final Answer Guidelines:
     - When providing a final answer, focus on directly answering the user's question
