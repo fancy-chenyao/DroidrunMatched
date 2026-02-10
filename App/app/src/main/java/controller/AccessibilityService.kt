@@ -266,12 +266,38 @@ class ElementAccessibilityService : AccessibilityService() {
                     }
                     parent = parent.parent
                 }
+                
+                Log.d("AccessibilityService", "尝试查找子级可编辑元素")
+                if (findEditableChildAndSetText(node, text)) {
+                    return true
+                }
             }
             
             // 所有方法都失败了
             Log.d("AccessibilityService", "所有文本设置方法都失败了")
             return false
         } ?: return false  // nodeInfo为null
+    }
+    
+    private fun findEditableChildAndSetText(node: AccessibilityNodeInfo, text: String): Boolean {
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i)
+            if (child != null) {
+                if (child.isEditable || child.className == "android.widget.EditText") {
+                    Log.d("AccessibilityService", "找到可编辑子元素: ${child.className}")
+                    val arguments = Bundle()
+                    arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                    child.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                    if (child.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
+                        return true
+                    }
+                }
+                if (findEditableChildAndSetText(child, text)) {
+                    return true
+                }
+            }
+        }
+        return false
     }
     
     /**

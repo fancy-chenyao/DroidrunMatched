@@ -217,19 +217,25 @@ object ElementController {
     }
 
     fun setInputValue(activity: Activity, elementId: String, text: String, callback: (Boolean) -> Unit) {
-        when (PageSniffer.getCurrentPageType(activity)) {
+        val pageType = PageSniffer.getCurrentPageType(activity)
+        Log.d(TAG, "setInputValue: elementId=$elementId, pageType=$pageType")
+        when (pageType) {
             PageSniffer.PageType.NATIVE -> {
+                Log.d(TAG, "Dispatching to NativeController")
                 NativeController.setInputValue(activity, elementId, text, callback)
             }
             PageSniffer.PageType.WEB_VIEW -> {
+                Log.d(TAG, "Dispatching to WebViewController")
                 val webView = findWebView(activity)
                 if (webView != null) {
                     WebViewController.setInputValue(webView, elementId, text, callback)
                 } else {
+                    Log.e(TAG, "Page is WEB_VIEW but no WebView found")
                     callback(false)
                 }
             }
             else -> {
+                Log.d(TAG, "Dispatching to AccessibilityController")
                 AccessibilityController.setInputValue(activity, elementId, text, callback)
             }
         }

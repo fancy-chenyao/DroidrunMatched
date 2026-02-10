@@ -227,15 +227,57 @@ object WebViewController {
                 setInputValue: function(elementId, text) {
                     try {
                         const element = document.getElementById(elementId);
-                        if (element && element.value !== undefined) {
-                            element.value = text || '';
-                            // 触发输入事件
-                            const event = new Event('input', { bubbles: true });
-                            element.dispatchEvent(event);
-                            return true;
+                        
+                        // 辅助函数：设置值并触发事件
+                        function setAndDispatch(el, val) {
+                            const safeVal = val || '';
+                            
+                            // 尝试设置 value 或 innerText
+                            if ('value' in el) {
+                                // 针对 React/Vue 等框架，尝试使用原生 setter 以绕过框架拦截
+                                try {
+                                    const proto = window.HTMLInputElement.prototype;
+                                    const nativeSetter = Object.getOwnPropertyDescriptor(proto, "value").set;
+                                    if (nativeSetter) {
+                                        nativeSetter.call(el, safeVal);
+                                    } else {
+                                        el.value = safeVal;
+                                    }
+                                } catch (e) {
+                                    el.value = safeVal;
+                                }
+                            } else if (el.isContentEditable) {
+                                el.innerText = safeVal;
+                            }
+                            
+                            // 触发一系列事件以确保应用感知到变化
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                            el.dispatchEvent(new Event('blur', { bubbles: true }));
+                        }
+
+                        if (element) {
+                            // 1. 自身是输入元素
+                            const tagName = element.tagName;
+                            if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || element.isContentEditable) {
+                                console.log('WebViewController: 对元素直接设置输入: ' + tagName);
+                                setAndDispatch(element, text);
+                                return true;
+                            }
+                            
+                            // 2. 自身是容器，查找子输入元素
+                            const childInput = element.querySelector('input, textarea, select, [contenteditable="true"]');
+                            if (childInput) {
+                                console.log('WebViewController: 目标是容器，已找到子输入元素: ' + childInput.tagName);
+                                setAndDispatch(childInput, text);
+                                return true;
+                            }
+                            
+                            console.log('WebViewController: 目标元素不可输入且无子输入元素: ' + tagName);
                         }
                         return false;
                     } catch (error) {
+                        console.log('WebViewController: setInputValue 异常: ' + error.message);
                         return false;
                     }
                 }

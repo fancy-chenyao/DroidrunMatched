@@ -503,7 +503,7 @@ class DroidAgent(Workflow):
                 })
                 
                 if monitor_result.fallback_needed:
-                    LoggingUtils.log_warning("DroidAgent", "Execution anomaly detected: {message}", message=monitor_result.message)
+                    LoggingUtils.log_warning("DroidAgent", "Execution anomaly detected: {detail}", detail=monitor_result.message)
                     # 触发回退逻辑
                     return self._handle_fallback(monitor_result, task)
 

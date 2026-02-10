@@ -211,27 +211,71 @@ object NativeController {
         }
     }
     
+    private const val TAG = "NativeController"
+
     /**
      * 设置输入值
      */
     fun setInputValue(activity: Activity, elementId: String, text: String, callback: (Boolean) -> Unit) {
+        Log.d(TAG, "setInputValue: elementId=$elementId, text='$text'")
         val rootView = activity.window.decorView.findViewById<View>(android.R.id.content)
         val targetView = findViewByResourceName(rootView, elementId)
         
+        if (targetView == null) {
+            Log.e(TAG, "Target view not found for elementId: $elementId")
+            callback(false)
+            return
+        }
+        
+        Log.d(TAG, "Found target view: $targetView (class=${targetView.javaClass.name})")
+
         if (targetView is EditText) {
+            Log.d(TAG, "Target is EditText, setting text...")
             targetView.setText(text)
             callback(true)
-        } else if (targetView is TextView) {
+            return
+        }
+        
+        // 如果是ViewGroup，尝试查找子EditText
+        if (targetView is ViewGroup) {
+            Log.d(TAG, "Target is ViewGroup, searching for child EditText...")
+            val childEditText = findFirstEditText(targetView)
+            if (childEditText != null) {
+                Log.d(TAG, "Found child EditText: $childEditText")
+                childEditText.setText(text)
+                callback(true)
+                return
+            } else {
+                Log.d(TAG, "No child EditText found in ViewGroup")
+            }
+        }
+        
+        if (targetView is TextView) {
             // 尝试设置TextView的文本
             try {
+                Log.d(TAG, "Target is TextView, trying to set text...")
                 targetView.text = text
                 callback(true)
             } catch (e: Exception) {
+                Log.e(TAG, "Failed to set text on TextView: ${e.message}")
                 callback(false)
             }
         } else {
+            Log.w(TAG, "Target view type not supported for input: ${targetView.javaClass.name}")
             callback(false)
         }
+    }
+    
+    private fun findFirstEditText(view: View): EditText? {
+        if (view is EditText) return view
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                val child = view.getChildAt(i)
+                val result = findFirstEditText(child)
+                if (result != null) return result
+            }
+        }
+        return null
     }
     
     /**

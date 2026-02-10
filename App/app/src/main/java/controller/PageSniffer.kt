@@ -11,6 +11,7 @@ import android.widget.CheckBox
 import android.widget.CompoundButton
 import android.widget.EditText
 import android.widget.ImageView
+import android.util.Log
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.SeekBar
@@ -24,20 +25,24 @@ object PageSniffer {
         NATIVE, WEB_VIEW, UNKNOWN
     }
 
+    private const val TAG = "PageSniffer"
+
     fun getCurrentPageType(activity: Activity): PageType {
         val rootView = activity.window.decorView.findViewById<View>(R.id.content)
 
         // 基于视图/类/字段特征判定（与具体Activity无关，通用）
-        return when {
+        val type = when {
             findWebView(rootView) -> PageType.WEB_VIEW // 只要包含一个WebView组件，就认为是WebView
             hasVisibleNativeControls(rootView) -> PageType.NATIVE // 仅当所有控件都是原生控件时才认为页面为Native
             else -> PageType.UNKNOWN
         }
+        Log.d(TAG, "getCurrentPageType: $type (Activity: ${activity.javaClass.simpleName})")
+        return type
     }
 
     private fun findWebView(view: View): Boolean {
-        // 仅当 WebView 实际可见时才认为是 Web 页面
-        if (view is WebView && isActuallyVisible(view)) {
+        // 只要是WebView组件，就认为是Web页面 (放宽可见性检查，因为WebView可能被其他视图覆盖或处于加载状态)
+        if (view is WebView) {
             return true
         }
         if (view is ViewGroup && isContainerTraversable(view)) {

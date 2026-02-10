@@ -3,6 +3,7 @@ package controller
 import android.app.Activity
 import android.view.View
 import android.view.ViewGroup
+import android.util.Log
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 
@@ -205,13 +206,18 @@ object AccessibilityController {
         return "${view.left},${view.top},${view.right},${view.bottom}"
     }
     
+    private const val TAG = "AccessibilityController"
+
     /**
      * 设置输入值
      */
     fun setInputValue(activity: Activity, elementId: String, value: String, callback: (Boolean) -> Unit) {
+        Log.d(TAG, "setInputValue: elementId=$elementId, value='$value'")
+        
         // 优先使用无障碍服务
         val accessibilityService = ElementAccessibilityService.getInstance()
         if (accessibilityService != null) {
+            Log.d(TAG, "AccessibilityService available, trying to find node...")
             // 通过无障碍服务查找元素
             var nodeInfo = accessibilityService.findElementById(elementId)
             if (nodeInfo == null) {
@@ -219,10 +225,16 @@ object AccessibilityController {
             }
             
             if (nodeInfo != null) {
+                Log.d(TAG, "Found node via AccessibilityService, setting text...")
                 val success = accessibilityService.setText(nodeInfo, value)
+                Log.d(TAG, "AccessibilityService setText result: $success")
                 callback(success)
                 return
+            } else {
+                Log.d(TAG, "Node not found via AccessibilityService, falling back to reflection")
             }
+        } else {
+            Log.d(TAG, "AccessibilityService not available, using reflection")
         }
         
         // 如果无障碍服务不可用，回退到反射方式
@@ -230,23 +242,69 @@ object AccessibilityController {
         val targetView = findUIElement(rootView, elementId)
         
         if (targetView != null) {
-            try {
-                // 尝试通过反射设置文本
-                val method = targetView.javaClass.getMethod("setText", CharSequence::class.java)
-                method.invoke(targetView, value)
+            Log.d(TAG, "Found target view via findUIElement: $targetView (class=${targetView.javaClass.name})")
+            
+            // 尝试直接设置文本
+            if (trySetTextReflectively(targetView, value)) {
+                Log.d(TAG, "Successfully set text reflectively")
                 callback(true)
-            } catch (e: Exception) {
-                // 如果setText方法不存在，尝试其他方法
-                try {
-                    val method = targetView.javaClass.getMethod("setContentDescription", CharSequence::class.java)
-                    method.invoke(targetView, value)
-                    callback(true)
-                } catch (e2: Exception) {
-                    callback(false)
-                }
+                return
+            } else {
+                Log.d(TAG, "Failed to set text reflectively")
             }
-        } else {
+
+            // 如果直接设置失败，且是ViewGroup，尝试查找子EditText
+            if (targetView is ViewGroup) {
+                Log.d(TAG, "Target is ViewGroup, searching for child EditText...")
+                val childEditText = findFirstEditText(targetView)
+                if (childEditText != null) {
+                    Log.d(TAG, "Found child EditText: $childEditText")
+                    childEditText.setText(value)
+                    Log.d(TAG, "Set text on child EditText")
+                    callback(true)
+                    return
+                } else {
+                    Log.d(TAG, "No child EditText found in ViewGroup")
+                }
+            } else {
+                Log.d(TAG, "Target is not ViewGroup, cannot search for children")
+            }
+
+            Log.w(TAG, "Failed to set input value on found view")
             callback(false)
+        } else {
+            Log.e(TAG, "Target view not found for elementId: $elementId")
+            callback(false)
+        }
+    }
+
+    private fun findFirstEditText(view: View): android.widget.EditText? {
+        if (view is android.widget.EditText) return view
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                val child = view.getChildAt(i)
+                val result = findFirstEditText(child)
+                if (result != null) return result
+            }
+        }
+        return null
+    }
+
+    private fun trySetTextReflectively(view: View, value: String): Boolean {
+        try {
+            // 尝试通过反射设置文本
+            val method = view.javaClass.getMethod("setText", CharSequence::class.java)
+            method.invoke(view, value)
+            return true
+        } catch (e: Exception) {
+            // 如果setText方法不存在，尝试其他方法
+            try {
+                val method = view.javaClass.getMethod("setContentDescription", CharSequence::class.java)
+                method.invoke(view, value)
+                return true
+            } catch (e2: Exception) {
+                return false
+            }
         }
     }
     
@@ -318,12 +376,19 @@ object AccessibilityController {
      * 查找UI元素
      */
     private fun findUIElement(view: View, elementId: String): View? {
+        // 检查view hash ID
+        if (elementId == "ui_${view.hashCode()}") {
+            Log.d(TAG, "findUIElement matched by hash ID: $elementId")
+            return view
+        }
+
         if (isAccessibleView(view)) {
             val semanticLabel = getSemanticLabel(view)
             val tooltip = getTooltip(view)
             val accessibilityLabel = getAccessibilityLabel(view)
             
             if (elementId == semanticLabel || elementId == tooltip || elementId == accessibilityLabel) {
+                Log.d(TAG, "findUIElement matched by label: $elementId (semantic=$semanticLabel, tooltip=$tooltip, accessibility=$accessibilityLabel)")
                 return view
             }
         }
@@ -335,6 +400,7 @@ object AccessibilityController {
             val mockTooltip = mockTag["tooltip"] as? String
             
             if (elementId == mockSemanticLabel || elementId == mockTooltip) {
+                Log.d(TAG, "findUIElement matched by mock label: $elementId")
                 return view
             }
         }

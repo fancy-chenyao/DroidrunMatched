@@ -466,8 +466,8 @@ object CommandHandler {
                                 activityChanged.set(true)
                             }
                             
-                            // 总是清理缓存
-                            clearCache()
+                            // 移除强制清理缓存，允许后续命令（如input_text）复用元素树
+                            // clearCache()
                             
                             val hasChange = layoutChanged.get() || activityChanged.get()
                             val changeTypes = mutableListOf<String>()
@@ -674,8 +674,8 @@ object CommandHandler {
                     activityChanged.set(true)
                 }
                 
-                // 总是清理缓存
-                clearCache()
+                // 移除强制清理缓存，允许后续命令复用元素树
+                // clearCache()
                 
                 // 构建详细的描述信息
                 val elementDesc = buildElementDescription(targetElement, index)
