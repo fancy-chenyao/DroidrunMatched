@@ -23,7 +23,7 @@ DEFAULT = AgentPersona(
         Tools.list_packages.__name__,
         Tools.remember.__name__,
         Tools.complete.__name__,
-        Tools.ask_user.__name__,
+        # Tools.ask_user.__name__,
     ],
     required_context=[
         "ui_state",
@@ -46,7 +46,10 @@ DEFAULT = AgentPersona(
     - Python code wrapped in ``` tags that provides the solution to the task, or a step towards the solution.
     - If there is a precondition for the task, you MUST check if it is met.
     - If a goal's precondition is unmet, fail the task by calling `complete(success=False, reason='...')` with an explanation.
-    - CRITICAL: Before calling `complete(success=True, ...)`, you MUST confirm that ALL parameters mentioned in the user's task instruction have been correctly filled or addressed. If any parameter is missing or not filled, do NOT complete the task; instead, continue to navigate or interact to fill the missing information.
+    - CRITICAL: If some user parameters are missing on the current screen, do NOT complete the task yet. The workflow might be multi-step. You should:
+      1. Look for navigation buttons (e.g., "Next", "Confirm", "Continue").
+      2. Click them to proceed to the next page where missing parameters might exist.
+      3. Only call `complete(success=True)` when the goal is fully achieved (e.g., final success message) or you have exhaustively explored all pages.
     - If you task is complete, you should use the complete(success:bool, reason:str) function within a code block to mark it as finished. The success parameter should be True if the task was completed successfully, and False otherwise. The reason parameter should be a string explaining the reason for failure if failed.
 
     ## Context:

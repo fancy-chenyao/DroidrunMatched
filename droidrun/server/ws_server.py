@@ -445,6 +445,30 @@ class WebSocketServer:
                 parsed_message, parse_error = MessageProtocol.parse_message(message_str)
             
             if parsed_message:
+                # -----------------------------------------------------------------
+                # DEBUG: Save received JSON to file for inspection
+                # -----------------------------------------------------------------
+                try:
+                    debug_dir = os.path.join(os.getcwd(), "debug_received_json")
+                    if not os.path.exists(debug_dir):
+                        os.makedirs(debug_dir)
+                    
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                    msg_type = parsed_message.get("type", "unknown")
+                    # Use a sanitized device_id for filename
+                    safe_device_id = device_id.replace(":", "_").replace("/", "_") if device_id else "unknown_device"
+                    
+                    filename = f"recv_{safe_device_id}_{timestamp}_{msg_type}.json"
+                    filepath = os.path.join(debug_dir, filename)
+                    
+                    with open(filepath, "w", encoding="utf-8") as f:
+                        json.dump(parsed_message, f, ensure_ascii=False, indent=2)
+                        
+                    # LoggingUtils.log_debug("WebSocketServer", f"Saved received JSON to {filename}")
+                except Exception as e:
+                    LoggingUtils.log_error("WebSocketServer", "Failed to save debug JSON: {error}", error=e)
+                # -----------------------------------------------------------------
+
                 mtype = parsed_message.get("type")
                 rid = parsed_message.get("request_id")
                 data = parsed_message.get("data") or {}

@@ -420,6 +420,9 @@ class WebSocketTools(Tools):
         """
         通过索引点击元素
         
+        注意：如果是为了输入文本，请勿使用此方法先点击！
+        直接使用 input_text(text, index) 即可完成点击和输入，更加稳定可靠。
+        
         Args:
             index: 元素索引
             
@@ -612,7 +615,11 @@ class WebSocketTools(Tools):
         
         Args:
             text: 要输入的文本
-            index: 可选的元素索引，如果提供则由移动端直接在该元素中输入文本
+            index: [强烈推荐] 目标输入框的元素索引。
+                  如果提供了index，系统会自动处理焦点问题并直接输入，无需先调用 tap 操作。
+                  这是最可靠的输入方式，避免了分开点击和输入可能导致的焦点丢失或状态错误。
+                  用法示例: input_text("hello", 12)  <-- 推荐
+                           input_text("hello")      <-- 不推荐（仅在确信当前已有焦点时使用）
             
         Returns:
             操作结果消息

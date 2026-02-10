@@ -124,13 +124,13 @@ class Tools(ABC):
         
         Args:
             text: Text to input
-            index: Optional element index to target specific input field.
+            index: [RECOMMENDED] Optional element index to target specific input field.
                   If provided, will directly input text into that element without needing to tap first.
-                  Recommended usage: input_text("your text", element_index) for better efficiency.
+                  This handles focus automatically and is much more reliable than tapping separately.
         
         Examples:
-            input_text("Hello")  # Input into currently focused field
-            input_text("Beijing", 5)  # Input "Beijing" directly into element at index 5
+            input_text("Beijing", 5)  # Recommended: Inputs directly into element 5
+            input_text("Hello")       # Not recommended: Inputs into currently focused field (risky)
         """
         pass
 

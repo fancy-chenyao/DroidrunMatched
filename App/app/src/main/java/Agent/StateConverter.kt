@@ -45,7 +45,7 @@ object StateConverter {
             if (context == null) return
             
             // 使用指定的外部存储路径
-            val outputDir = File("/storage/0000-0000/Android/data/com.example.emplab/files/xml")
+            val outputDir = context.getExternalFilesDir("xml") ?: File(context.filesDir, "xml")
             if (!outputDir.exists()) {
                 outputDir.mkdirs()
             }
@@ -75,7 +75,7 @@ object StateConverter {
             if (context == null) return
             
             // 使用指定的外部存储路径
-            val outputDir = File("/storage/0000-0000/Android/data/com.example.emplab/files/xml")
+            val outputDir = context.getExternalFilesDir("xml") ?: File(context.filesDir, "xml")
             if (!outputDir.exists()) {
                 outputDir.mkdirs()
             }
@@ -105,7 +105,7 @@ object StateConverter {
             if (context == null) return
             
             // 使用指定的外部存储路径
-            val outputDir = File("/storage/0000-0000/Android/data/com.example.emplab/files/xml")
+            val outputDir = context.getExternalFilesDir("xml") ?: File(context.filesDir, "xml")
             if (!outputDir.exists()) {
                 outputDir.mkdirs()
             }

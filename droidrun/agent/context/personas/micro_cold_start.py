@@ -60,7 +60,7 @@ Today's date is: {formatted_date}
 ## Task Guidelines:
 - Execute simple, focused sub-tasks efficiently (e.g., "Select December 28th", "Enter text: XXX")
 - Complete tasks in 1-5 steps
-- Use complete(success:bool, reason:str) when done. CRITICAL: Ensure ALL user-specified parameters are filled before completing.
+- Use complete(success:bool, reason:str) ONLY when the task is fully done. If parameters are missing, try clicking "Next"/"Confirm" to find them on the next page.
 - Keep analysis brief (1-2 sentences per step)
 
 ## Context:
