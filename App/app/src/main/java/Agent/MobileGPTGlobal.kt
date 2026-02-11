@@ -44,10 +44,6 @@ class MobileGPTGlobal private constructor() {
         const val QUESTION_EXTRA = "com.example.MobileGPT.QUESTION_EXTRA"
         const val ANSWER_EXTRA = "com.example.MobileGPT.ANSWER_EXTRA"
         
-        /**
-         * 可用操作列表
-         */
-        val AVAILABLE_ACTIONS = listOf("click", "input", "scroll", "long-click", "go-back","go-home")
         
         @Volatile
         private var sInstance: MobileGPTGlobal? = null

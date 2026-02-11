@@ -263,17 +263,7 @@ class LeaveTimeActivity : AppCompatActivity() {
         // 不再手动触发，依赖ViewTreeObserver自动检测
     }
     
-    /**
-     * 触发页面变化检测
-     */
-    private fun triggerPageChangeDetection() {
-        // 这里可以调用MobileService的页面变化检测方法
-        // 由于LeaveTimeActivity没有直接访问MobileService的权限，
-        // 可以通过广播或其他方式通知MobileService
-        Log.d("LeaveTimeActivity", "触发页面变化检测 - 日期选择器状态: ${customDatePicker?.isShowing()}")
-        val intent = Intent("com.example.emplab.TRIGGER_PAGE_CHANGE")
-        sendBroadcast(intent)
-    }
+    
     
     /**
      * 初始化自定义时间选择器
