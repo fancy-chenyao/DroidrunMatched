@@ -79,38 +79,10 @@ class MobileService : Service() {
                     val receivedInstruction = intent.getStringExtra(MobileGPTGlobal.INSTRUCTION_EXTRA)
                     if (receivedInstruction != null) {
                         Log.d(TAG, "收到任务指令: $receivedInstruction")
-                        
-                        // 保存待发送的指令
-                        pendingInstruction = receivedInstruction
-                        
-                        // 检查WebSocket连接状态
-                        if (wsClient?.isConnected() == true) {
-                            // 已连接，直接发送指令
-                            Log.d(TAG, "WebSocket已连接，直接发送任务指令")
-                            sendTaskInstruction(receivedInstruction)
-                    } else {
-                            // 未连接，先建立连接
-                            // 注意：pendingInstruction已在上面保存，连接成功后会自动发送
-                            Log.d(TAG, "WebSocket未连接，开始建立连接...")
-                            mExecutorService.execute {
-                                ensureWebSocketConnection { success ->
-                                    if (success) {
-                                        Log.d(TAG, "WebSocket连接成功，任务指令将在连接回调中自动发送")
-                                    } else {
-                                        Log.e(TAG, "WebSocket连接失败，无法发送任务指令")
-                                        // 清除待发送的指令
-                                        pendingInstruction = null
-                                        // 可以显示错误提示给用户
-                                    }
-                                }
-                            }
+                        mExecutorService.execute {
+                            Log.d(TAG, "本地Demo模式：开始执行固定经验回放")
+                            runLocalDemo()
                         }
-                        
-                    // 初始化页面变化的参数
-//                        xmlPending = true
-//                        screenNeedUpdate = true
-//                        firstScreen = true
-//                    WaitScreenUpdate()
                     } else {
                         Log.e(TAG, "Received null instruction from intent")
                     }
@@ -140,6 +112,142 @@ class MobileService : Service() {
                     }
                 }
             }
+        }
+    }
+
+    private data class DemoAction(
+        val command: String,
+        val index: Int? = null,
+        val text: String? = null
+    )
+
+    private fun runLocalDemo() {
+        val activity = ActivityTracker.getCurrentActivity()
+        if (activity == null) {
+            Log.w(TAG, "本地Demo模式：当前没有前台Activity，无法执行Demo")
+            mainThreadHandler.post {
+                android.widget.Toast.makeText(
+                    this,
+                    "当前没有前台页面，无法执行Demo",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            return
+        }
+
+        val actions = listOf(
+            DemoAction(command = "tap_by_index", index = 29),
+            DemoAction(command = "tap_by_index", index = 12),
+            DemoAction(command = "tap_by_index", index = 12),
+            DemoAction(command = "tap_by_index", index = 64),
+            DemoAction(command = "tap_by_index", index = 20),
+            DemoAction(command = "tap_by_index", index = 66),
+            DemoAction(command = "tap_by_index", index = 33),
+            DemoAction(command = "input_text", index = 14, text = "计划休息和恢复精力"),
+            DemoAction(command = "input_text", index = 20, text = "上海"),
+            DemoAction(command = "tap_by_index", index = 31),
+            DemoAction(command = "tap_by_index", index = 39),
+            DemoAction(command = "tap_by_index", index = 39)
+        )
+
+        Log.d(TAG, "本地Demo模式：准备执行${actions.size}个动作")
+        mainThreadHandler.post {
+            executeDemoActions(actions, 0)
+        }
+    }
+
+    private fun executeDemoActions(
+        actions: List<DemoAction>,
+        currentIndex: Int
+    ) {
+        if (currentIndex >= actions.size) {
+            Log.d(TAG, "本地Demo模式：所有动作执行完成")
+            mainThreadHandler.post {
+                android.widget.Toast.makeText(
+                    this,
+                    "Demo执行完成",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            return
+        }
+
+        val activity = ActivityTracker.getCurrentActivity()
+        if (activity == null) {
+            Log.w(TAG, "本地Demo模式：executeDemoActions阶段当前没有前台Activity")
+            mainThreadHandler.post {
+                android.widget.Toast.makeText(
+                    this,
+                    "Demo执行中断：当前没有前台页面",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            return
+        }
+
+        Log.d(TAG, "本地Demo模式：第${currentIndex + 1}步，先执行get_state")
+        CommandHandler.handleCommand(
+            command = "get_state",
+            params = JSONObject(),
+            requestId = "demo_get_state_$currentIndex",
+            activity = activity
+        ) {
+            mainThreadHandler.postDelayed(
+                {
+                    executeSingleDemoAction(actions, currentIndex)
+                },
+                200L
+            )
+        }
+    }
+
+    private fun executeSingleDemoAction(
+        actions: List<DemoAction>,
+        currentIndex: Int
+    ) {
+        if (currentIndex >= actions.size) {
+            Log.d(TAG, "本地Demo模式：所有动作执行完成（singleAction入口）")
+            mainThreadHandler.post {
+                android.widget.Toast.makeText(
+                    this,
+                    "Demo执行完成",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            return
+        }
+
+        val activity = ActivityTracker.getCurrentActivity()
+        if (activity == null) {
+            Log.w(TAG, "本地Demo模式：executeSingleDemoAction阶段当前没有前台Activity")
+            mainThreadHandler.post {
+                android.widget.Toast.makeText(
+                    this,
+                    "Demo执行中断：当前没有前台页面",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            return
+        }
+
+        val action = actions[currentIndex]
+        Log.d(TAG, "本地Demo模式：执行第${currentIndex + 1}步动作 command=${action.command}, index=${action.index}, text=${action.text}")
+        val params = JSONObject()
+        action.index?.let { params.put("index", it) }
+        action.text?.let { params.put("text", it) }
+
+        CommandHandler.handleCommand(
+            command = action.command,
+            params = params,
+            requestId = "demo_action_$currentIndex",
+            activity = activity
+        ) {
+            mainThreadHandler.postDelayed(
+                {
+                    executeDemoActions(actions, currentIndex + 1)
+                },
+                1000L
+            )
         }
     }
 

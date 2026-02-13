@@ -36,3 +36,4 @@ droidrun.yaml
 .gradle/
 a11y_exports/
 experiences/
+debug_received_json/
