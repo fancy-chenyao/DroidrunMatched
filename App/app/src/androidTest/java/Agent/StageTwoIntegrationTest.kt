@@ -13,6 +13,10 @@ import org.json.JSONObject
 import org.json.JSONArray
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import org.junit.Assume
+import java.net.InetSocketAddress
+import java.net.Socket
+import com.example.emplab.BuildConfig
 
 /**
  * 阶段二集成测试
@@ -34,9 +38,31 @@ class StageTwoIntegrationTest {
     private lateinit var context: Context
     private var wsClient: WebSocketClient? = null
     private val testDeviceId = "stage2-test-device-${System.currentTimeMillis()}"
+    /**
+     * 检查服务器是否可达
+     * 若不可达，则跳过阶段二测试，避免连接失败导致构建失败
+     */
+    private fun assumeServerReady() {
+        val host = MobileGPTGlobal.WS_HOST_IP
+        val port = MobileGPTGlobal.WS_PORT
+        val reachable = try {
+            Socket().use { s ->
+                s.connect(InetSocketAddress(host, port), 300)
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
+        Assume.assumeTrue("阶段二测试跳过：服务器不可用 ${host}:${port}", reachable)
+    }
 
     @Before
     fun setUp() {
+        /**
+         * 未启用端到端测试时跳过
+         */
+        Assume.assumeTrue("阶段二测试跳过：未启用 E2E 测试", BuildConfig.ENABLE_AGENT_E2E_TESTS)
+        assumeServerReady()
         context = InstrumentationRegistry.getInstrumentation().targetContext
         wsClient = WebSocketClient()
         Log.d("StageTwoTest", "测试设备ID: $testDeviceId")

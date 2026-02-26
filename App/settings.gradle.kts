@@ -38,3 +38,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "EmpLab"
 include(":app")
+include(":MobileService")

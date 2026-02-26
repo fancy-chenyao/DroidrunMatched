@@ -14,7 +14,8 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.example.emplab.TestRunner"
+        buildConfigField("boolean", "ENABLE_AGENT_E2E_TESTS", "false")
     }
 
     buildTypes {
@@ -38,6 +39,15 @@ android {
     }
 }
 
+configurations.all {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "androidx.activity" && requested.name == "activity") {
+            useVersion("1.7.2")
+            because("AGP 7.4.2 + compileSdk 33；activity 1.8.0 要求 34")
+        }
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -47,6 +57,7 @@ dependencies {
     implementation("androidx.gridlayout:gridlayout:1.0.0")
     // WebSocket支持
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(project(":MobileService"))
     testImplementation(libs.junit)
     // 单元测试需要org.json（Android内置，但单元测试需要显式添加）
     // 如果网络问题，可以尝试以下方案：

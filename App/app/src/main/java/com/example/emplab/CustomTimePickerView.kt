@@ -121,11 +121,6 @@ class CustomTimePickerView @JvmOverloads constructor(
                 rbAfternoon.isChecked = true
             }
         }
-
-        // 自动确认选择的时间并关闭选择器
-        onTimeSelectedListener?.invoke(selectedTimeType)
-        // 调用取消监听器，让Activity执行完整的隐藏逻辑
-        onCancelListener?.invoke()
     }
 
     /**

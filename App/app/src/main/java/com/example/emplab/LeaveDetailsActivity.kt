@@ -11,7 +11,6 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import controller.NativeController
 
 class LeaveDetailsActivity : AppCompatActivity() {
     
@@ -141,17 +140,6 @@ class LeaveDetailsActivity : AppCompatActivity() {
             showSuccessDialog()
         }
 
-        // // 延时1秒，抓取当前元素树并打印到前端日志
-        // Handler(Looper.getMainLooper()).postDelayed({
-        //     try {
-        //         NativeController.getElementTree(this) { tree ->
-        //             Log.d("LeaveDetailsActivity", "ElementTree(full):\n${tree.toFormattedString(0)}")
-        //             Toast.makeText(this, "元素树已打印到日志", Toast.LENGTH_SHORT).show()
-        //         }
-        //     } catch (_: Exception) {
-        //         Toast.makeText(this, "元素树抓取失败", Toast.LENGTH_SHORT).show()
-        //     }
-        // }, 1000)
     }
     
     private fun showSuccessDialog() {
@@ -167,14 +155,5 @@ class LeaveDetailsActivity : AppCompatActivity() {
             finish()
         }
 
-        // // 延时打印当前元素树，便于解析器捕捉
-        // Handler(Looper.getMainLooper()).postDelayed({
-        //     try {
-        //         NativeController.getElementTree(this) { tree ->
-        //             Log.d("LeaveDetailsActivity", "SuccessOverlay ElementTree:\n${tree.toFormattedString(0)}")
-        //             Toast.makeText(this, "成功弹层元素树已打印", Toast.LENGTH_SHORT).show()
-        //         }
-        //     } catch (_: Exception) {}
-        // }, 800)
     }
 }

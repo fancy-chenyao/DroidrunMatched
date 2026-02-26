@@ -61,28 +61,22 @@
             android:theme="@style/Theme.EmpLab" />
             
         <activity
-            android:name=".TravelActivity"
-            android:exported="false"
-            android:label="员工差旅"
-            android:theme="@style/Theme.EmpLab" />
-        
-        <activity
             android:name=".TestHostActivity"
             android:exported="false"
-            android:label="Test Host"
+            android:label="测试宿主"
             android:theme="@style/Theme.EmpLab" />
         
         <activity
             android:name=".TestSecondActivity"
             android:exported="false"
-            android:label="Second Screen"
+            android:label="测试页面二"
             android:theme="@style/Theme.EmpLab" />
-
-        <service
-            android:name="Agent.MobileService"
-            android:enabled="true"
+            
+        <activity
+            android:name=".TravelActivity"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:label="员工差旅"
+            android:theme="@style/Theme.EmpLab" />
         
     </application>
 

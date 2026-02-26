@@ -1,13 +1,10 @@
 package com.example.emplab
 
-import Agent.MobileGPTGlobal
-import Agent.MobileService
-import Agent.AgentFloatingWindowManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -34,8 +31,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvNavMessage: TextView
     private lateinit var tvNavProfile: TextView
     
-    // 应用内悬浮窗（仅当前APP内显示）
-    private lateinit var agentFloatingWindow: AgentFloatingWindowManager
+
     
     // 权限请求码
     private val PERMISSION_REQUEST_CODE = 1001
@@ -47,48 +43,57 @@ class MainActivity : AppCompatActivity() {
         // 检查并请求必要权限
         checkAndRequestPermissions()
         
-        // 启动MobileService服务
-        startMobileService()
-        if (!isMobileServiceRunning()) {
-            Log.d("MainActivity", "MobileService服务未运行")
-            Toast.makeText(this, "MobileService服务未运行", Toast.LENGTH_SHORT).show()
-        } else {
-            Log.d("MainActivity", "MobileService服务已运行")
-            Toast.makeText(this, "MobileService服务已运行", Toast.LENGTH_SHORT).show()
-        }
         initViews()
         setupNavigation()
         setupFunctionClicks()
-        // 初始化并显示应用内悬浮窗
-        setupFloatingWindow()
 
     }
     
     /**
      * 检查并请求必要权限
+     * 说明：
+     * - API 33+ 使用 READ_MEDIA_* 权限
+     * - API 32- 使用 READ/WRITE_EXTERNAL_STORAGE 权限
+     * - 仅请求在 Manifest 中声明过的权限，避免未声明导致的崩溃
      */
     private fun checkAndRequestPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val permissionsNeeded = mutableListOf<String>()
-            
-            // 检查存储权限
-            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) 
-                != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        val declared = getDeclaredPermissions()
+        val toRequest = mutableListOf<String>()
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val mediaPerms = listOf(
+                android.Manifest.permission.READ_MEDIA_IMAGES,
+                android.Manifest.permission.READ_MEDIA_VIDEO,
+                android.Manifest.permission.READ_MEDIA_AUDIO
+            )
+            mediaPerms.forEach { perm ->
+                if (declared.contains(perm) &&
+                    ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+                    toRequest.add(perm)
+                }
             }
-            
-            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) 
-                != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val legacyPerms = listOf(
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                android.Manifest.permission.READ_EXTERNAL_STORAGE
+            )
+            legacyPerms.forEach { perm ->
+                if (declared.contains(perm) &&
+                    ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+                    toRequest.add(perm)
+                }
             }
-            
-            // 如果有需要的权限，请求它们
-            if (permissionsNeeded.isNotEmpty()) {
+        }
+        
+        if (toRequest.isNotEmpty()) {
+            try {
                 ActivityCompat.requestPermissions(
                     this,
-                    permissionsNeeded.toTypedArray(),
+                    toRequest.toTypedArray(),
                     PERMISSION_REQUEST_CODE
                 )
+            } catch (e: Exception) {
+                Toast.makeText(this, "权限请求失败: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -118,39 +123,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun startMobileService() {
-        Log.d("MainActivity", "开始启动MobileService服务")
-        try {
-            val serviceIntent = Intent(this, MobileService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                @Suppress("DEPRECATION")
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
-            }
-        } catch (e: Exception) {
-            Log.e("MainActivity", "启动MobileService服务时出错: ${e.message}")
-            e.printStackTrace()
+    /**
+     * 获取当前应用在 Manifest 中声明的权限集合
+     */
+    private fun getDeclaredPermissions(): Set<String> {
+        return try {
+            val pi = packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+            val declared = pi.requestedPermissions ?: emptyArray()
+            declared.toSet()
+        } catch (_: Exception) {
+            emptySet()
         }
     }
-    private fun isMobileServiceRunning(): Boolean {
-        val activityManager = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
-        val services = activityManager.getRunningServices(Integer.MAX_VALUE)
-
-        for (service in services) {
-            if (MobileService::class.java.name == service.service.className) {
-                return true
-            }
-        }
-        return false
-    }
-    private fun isMobileServiceWorking(): Boolean {
-        // 发送一个测试广播检查服务是否响应
-        val intent = Intent(MobileGPTGlobal.STRING_ACTION)
-        intent.putExtra(MobileGPTGlobal.INSTRUCTION_EXTRA, "test")
-        sendBroadcast(intent)
-        return true // 假设发送成功即服务工作正常
-    }
+    
+    
     private fun initViews() {
         // 导航栏
         navHome = findViewById(R.id.nav_home)
@@ -290,58 +276,5 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    /**
-     * 设置悬浮窗（可选：如需在进入首页就展示）
-     */
-    private fun setupFloatingWindow() {
-        agentFloatingWindow = AgentFloatingWindowManager(this)
-        findViewById<View>(android.R.id.content).post {
-            agentFloatingWindow.showFloatingWindow()
-        }
-    }
     
-    /**
-     * 切换悬浮窗显示状态
-     */
-    fun toggleFloatingWindow() {
-        agentFloatingWindow.toggleFloatingWindow()
-    }
-    
-    /**
-     * 显示悬浮窗
-     */
-    fun showFloatingWindow() {
-        agentFloatingWindow.showFloatingWindow()
-    }
-    
-    /**
-     * 隐藏悬浮窗
-     */
-    fun hideFloatingWindow() {
-        agentFloatingWindow.hideFloatingWindow()
-    }
-    
-    override fun onDestroy() {
-        super.onDestroy()
-        // 清理悬浮窗
-        if (::agentFloatingWindow.isInitialized) {
-            agentFloatingWindow.cleanup()
-        }
-    }
-    
-    override fun onPause() {
-        super.onPause()
-        // 暂停时隐藏悬浮窗（按需）
-        if (::agentFloatingWindow.isInitialized && agentFloatingWindow.isFloatingWindowShowing()) {
-            agentFloatingWindow.hideFloatingWindow()
-        }
-    }
-    
-    override fun onResume() {
-        super.onResume()
-        // 恢复时显示悬浮窗
-        if (::agentFloatingWindow.isInitialized && !agentFloatingWindow.isFloatingWindowShowing()) {
-            agentFloatingWindow.showFloatingWindow()
-        }
-    }
 }
