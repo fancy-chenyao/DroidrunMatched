@@ -65,6 +65,18 @@
             android:exported="false"
             android:label="员工差旅"
             android:theme="@style/Theme.EmpLab" />
+        
+        <activity
+            android:name=".TestHostActivity"
+            android:exported="false"
+            android:label="Test Host"
+            android:theme="@style/Theme.EmpLab" />
+        
+        <activity
+            android:name=".TestSecondActivity"
+            android:exported="false"
+            android:label="Second Screen"
+            android:theme="@style/Theme.EmpLab" />
 
         <service
             android:name="Agent.MobileService"
