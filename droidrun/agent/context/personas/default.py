@@ -22,7 +22,8 @@ DEFAULT = AgentPersona(
         Tools.start_app.__name__,
         Tools.list_packages.__name__,
         Tools.remember.__name__,
-        Tools.complete.__name__
+        Tools.complete.__name__,
+        Tools.ask_user.__name__
     ],
     required_context=[
         "ui_state",
