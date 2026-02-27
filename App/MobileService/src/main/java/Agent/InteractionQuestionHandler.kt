@@ -36,6 +36,8 @@ class InteractionQuestionHandler(
     
     private var currentDialog: AlertDialog? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val pendingQuestions = mutableListOf<JSONObject>()
+    private var isProcessing = false
     
     /**
      * 处理用户问题消息
@@ -53,6 +55,26 @@ class InteractionQuestionHandler(
      */
     fun handleQuestionMessage(message: JSONObject) {
         try {
+            Log.d(TAG, "收到问题消息，加入队列")
+            pendingQuestions.add(message)
+            processNextQuestion()
+        } catch (e: Exception) {
+            Log.e(TAG, "处理问题消息失败", e)
+        }
+    }
+    
+    /**
+     * 处理队列中的下一个问题
+     */
+    private fun processNextQuestion() {
+        if (isProcessing || pendingQuestions.isEmpty()) {
+            return
+        }
+        
+        isProcessing = true
+        val message = pendingQuestions.removeAt(0)
+        
+        try {
             val data = message.getJSONObject("data")
             val questionId = data.getString("question_id")
             val questionText = data.getString("question_text")
@@ -60,7 +82,7 @@ class InteractionQuestionHandler(
             val defaultValue = data.optString("default_value", "")
             val timeoutSeconds = data.optDouble("timeout_seconds", 60.0)
             
-            Log.d(TAG, "收到问题: id=$questionId, type=$questionType")
+            Log.d(TAG, "处理问题: id=$questionId, type=$questionType")
             Log.d(TAG, "问题文本: $questionText")
             
             // 在主线程中显示对话框
@@ -96,8 +118,17 @@ class InteractionQuestionHandler(
             }
             
         } catch (e: Exception) {
-            Log.e(TAG, "处理问题消息失败", e)
+            Log.e(TAG, "处理问题失败", e)
+            finishProcessing()
         }
+    }
+    
+    /**
+     * 完成当前问题处理，继续下一个
+     */
+    private fun finishProcessing() {
+        isProcessing = false
+        processNextQuestion()
     }
     
     /**
@@ -330,6 +361,8 @@ class InteractionQuestionHandler(
             
         } catch (e: Exception) {
             Log.e(TAG, "发送答案失败", e)
+        } finally {
+            finishProcessing()
         }
     }
     
@@ -350,6 +383,7 @@ class InteractionQuestionHandler(
      */
     fun cleanup() {
         dismissCurrentDialog()
+        pendingQuestions.clear()
         mainHandler.removeCallbacksAndMessages(null)
     }
 }
