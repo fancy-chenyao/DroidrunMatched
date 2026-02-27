@@ -239,6 +239,11 @@ class DroidAgent(Workflow):
         self.event_counter = 0
         self.experience_id = str(uuid.uuid4())
         
+        # 设置工具实例的当前任务ID，用于交互消息关联
+        if tools and hasattr(tools, '_current_task_id'):
+            tools._current_task_id = self.experience_id
+            LoggingUtils.log_debug("DroidAgent", "Set current task ID for tools: {id}", id=self.experience_id)
+        
         self.trajectory = Trajectory(goal=goal, experience_id=self.experience_id)
         self.task_manager = TaskManager()
         self.task_iter = None
@@ -1001,11 +1006,21 @@ class DroidAgent(Workflow):
 
         # Best-effort resource cleanup hooks (e.g., device TCP forwards)
         try:
+            # 清理交互管理器中的待处理问题
+            if hasattr(self.tools_instance, 'interaction_manager'):
+                # 优先使用 experience_id 作为 task_id
+                task_id = self.experience_id
+                self.tools_instance.interaction_manager.cancel_task_questions(task_id)
+                
+                # 重置工具实例的当前任务ID
+                if hasattr(self.tools_instance, '_current_task_id'):
+                    self.tools_instance._current_task_id = None
+            
             tools = getattr(self, "tools", None)
             if tools and isinstance(tools, AdbTools):
                 tools.teardown_tcp_forward()
-        except Exception:
-            pass
+        except Exception as e:
+            LoggingUtils.log_warning("DroidAgent", "Error during resource cleanup: {error}", error=str(e))
 
         return StopEvent(result)
 

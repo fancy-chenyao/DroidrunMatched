@@ -336,8 +336,8 @@ class InteractionManager:
         if question_id in self._pending_questions:
             del self._pending_questions[question_id]
     
-    def _cancel_task_questions(self, task_id: str):
-        """取消任务的所有待处理问题（内部方法）
+    def cancel_task_questions(self, task_id: str):
+        """取消任务的所有待处理问题
         
         Args:
             task_id: 任务ID
@@ -347,8 +347,18 @@ class InteractionManager:
             if q.task_id == task_id
         ]
         
-        for question_id in question_ids:
-            self.cancel_question(question_id)
+        if question_ids:
+            print(f"🧹 [InteractionManager] Cleaning up {len(question_ids)} pending questions for task: {task_id}")
+            for question_id in question_ids:
+                self.cancel_question(question_id)
+    
+    def _cancel_task_questions(self, task_id: str):
+        """取消任务的所有待处理问题（内部方法，已弃用，请使用 cancel_task_questions）
+        
+        Args:
+            task_id: 任务ID
+        """
+        self.cancel_task_questions(task_id)
     
     def cancel_question(self, question_id: str) -> bool:
         """取消问题

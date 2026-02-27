@@ -56,24 +56,23 @@ class SimpleCodeExecutor:
             for tool_name, tool_function in tools.items():
                 if asyncio.iscoroutinefunction(tool_function):
                     # Create a sync wrapper that schedules the async function properly
-                    def create_sync_wrapper(async_func):
+                    def create_sync_wrapper(async_func, target_loop):
                         def sync_wrapper(*args, **kwargs):
-                            # Get the current event loop
+                            # Use the provided target_loop to schedule the coroutine
+                            # This avoids creating new loops in threads and ensures thread-safety
                             try:
-                                loop = asyncio.get_running_loop()
-                                # Schedule the coroutine in the current loop and wait for result
-                                future = asyncio.run_coroutine_threadsafe(async_func(*args, **kwargs), loop)
-                                return future.result(timeout=5)  # 5秒超时，避免30秒延迟
-                            except RuntimeError:
-                                # No event loop running, use asyncio.run
-                                return asyncio.run(async_func(*args, **kwargs))
+                                future = asyncio.run_coroutine_threadsafe(async_func(*args, **kwargs), target_loop)
+                                # For ask_user, use a much longer timeout (10 minutes)
+                                # For other tools, use a reasonable timeout (30 seconds)
+                                timeout = 600 if async_func.__name__ == 'ask_user' else 30
+                                return future.result(timeout=timeout)
                             except Exception as e:
                                 logger.error(f"Error in sync wrapper for {async_func.__name__}: {e}")
                                 raise
                         return sync_wrapper
                     
                     # Add sync wrapper to globals
-                    globals[tool_name] = create_sync_wrapper(tool_function)
+                    globals[tool_name] = create_sync_wrapper(tool_function, loop)
                 else:
                     # Add sync function directly
                     globals[tool_name] = tool_function
@@ -83,24 +82,21 @@ class SimpleCodeExecutor:
             for tool in tools:
                 if asyncio.iscoroutinefunction(tool):
                     # Create a sync wrapper that schedules the async function properly
-                    def create_sync_wrapper(async_func):
+                    def create_sync_wrapper(async_func, target_loop):
                         def sync_wrapper(*args, **kwargs):
-                            # Get the current event loop
+                            # Use the provided target_loop to schedule the coroutine
                             try:
-                                loop = asyncio.get_running_loop()
-                                # Schedule the coroutine in the current loop and wait for result
-                                future = asyncio.run_coroutine_threadsafe(async_func(*args, **kwargs), loop)
-                                return future.result(timeout=5)  # 5秒超时，避免30秒延迟
-                            except RuntimeError:
-                                # No event loop running, use asyncio.run
-                                return asyncio.run(async_func(*args, **kwargs))
+                                future = asyncio.run_coroutine_threadsafe(async_func(*args, **kwargs), target_loop)
+                                # For ask_user, use a much longer timeout (10 minutes)
+                                timeout = 600 if async_func.__name__ == 'ask_user' else 30
+                                return future.result(timeout=timeout)
                             except Exception as e:
                                 logger.error(f"Error in sync wrapper for {async_func.__name__}: {e}")
                                 raise
                         return sync_wrapper
                     
                     # Add sync wrapper to globals
-                    globals[tool.__name__] = create_sync_wrapper(tool)
+                    globals[tool.__name__] = create_sync_wrapper(tool, loop)
                 else:
                     # Add sync function directly
                     globals[tool.__name__] = tool
